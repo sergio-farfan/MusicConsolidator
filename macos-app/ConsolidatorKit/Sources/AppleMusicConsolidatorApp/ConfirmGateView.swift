@@ -53,7 +53,7 @@ struct ConfirmGateView: View {
                     }
                     AppKitActionButton(
                         identifier: M9ControlID.gateStartOver,
-                        title: "Start over / new audit"
+                        title: "Start over"
                     ) {
                         model.startOver()
                     }
@@ -68,7 +68,7 @@ struct ConfirmGateView: View {
             ContentUnavailableView(
                 "Nothing to confirm",
                 systemImage: "checkmark.seal",
-                description: Text("Run a read-only audit and review its plan first.")
+                description: Text("Run a read-only check and review its plan first.")
             )
         }
     }
@@ -124,7 +124,7 @@ struct ConfirmGateView: View {
                 LabeledContent("Plan file") {
                     IdentifierText(text: model.planFileName ?? "\u{2014}")
                 }
-                LabeledContent("Audit completed") {
+                LabeledContent("Check completed") {
                     Text(
                         result.completedAt.formatted(
                             date: .abbreviated, time: .standard
@@ -148,7 +148,7 @@ struct ConfirmGateView: View {
                 Text(
                     "Approval is of this exact named plan file \u{2014} the apply reloads "
                         + "and revalidates it from disk. If Music changes after this "
-                        + "audit, the apply fails closed \u{2014} run a fresh audit "
+                        + "check, the apply fails closed \u{2014} run a fresh check "
                         + "instead of reusing an old plan."
                 )
                 .font(.caption)
@@ -262,7 +262,7 @@ struct ConfirmGateView: View {
                             + "(\u{201C}\(targetName)\u{201D}) and verifies it by readback."
                     )
                     reminder(
-                        "One apply per fresh audit: success or failure consumes this "
+                        "One apply per fresh check: success or failure consumes this "
                             + "plan \u{2014} afterwards the only paths are Start over or "
                             + "the next queue item."
                     )
@@ -324,11 +324,11 @@ struct ConfirmGateView: View {
         GroupBox {
             Label {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("This audit's apply has been used.")
+                    Text("This check's apply has been used.")
                         .bold()
                     Text(
-                        "See step 4 for the result. One apply per fresh audit: to "
-                            + "apply again, start over and run a new audit."
+                        "See step 4 for the result. One apply per fresh check: to "
+                            + "apply again, start over and run a new check."
                     )
                     .font(.caption)
                     .foregroundStyle(.secondary)

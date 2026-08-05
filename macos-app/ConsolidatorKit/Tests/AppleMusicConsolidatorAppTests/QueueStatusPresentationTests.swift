@@ -145,7 +145,7 @@ struct QueueStatusPresentationTests {
 
         let auditing = QueueStatusStyle.style(for: .auditing)
         #expect(
-            auditing == QueueStatusStyle(symbolName: nil, tint: .blue, label: "auditing\u{2026}")
+            auditing == QueueStatusStyle(symbolName: nil, tint: .blue, label: "reading\u{2026}")
         )
         #expect(auditing.isLive)
 

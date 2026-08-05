@@ -208,7 +208,7 @@ struct RootNavigationStructuralTests {
         runner.proceed.signal()
         #expect(await pollUntil { harness.model.finishedRunReport != nil })
 
-        #expect(toolTip == "Wait for the running audit to finish.")
+        #expect(toolTip == "Wait for the running check to finish.")
         #expect(toolTip == expectedReason)
     }
 }

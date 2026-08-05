@@ -34,7 +34,7 @@ struct ApplyFlowView: View {
                     "No apply yet",
                     systemImage: "play.circle",
                     description: Text(
-                        "Complete an audit, review its plan, and satisfy the confirm "
+                        "Complete a check, review its plan, and satisfy the confirm "
                             + "gate (step 3); Apply starts from there."
                     )
                 )
@@ -115,7 +115,7 @@ private struct UnattendedRunScreen: View {
                 GroupBox {
                     Label {
                         Text(
-                            "Every item is its own fresh live audit and guarded, "
+                            "Every item is its own fresh live read and guarded, "
                                 + "verified apply; failures fail closed and the run "
                                 + "continues. The post-run report collects every "
                                 + "auto-decided judgment item for review."
@@ -319,7 +319,7 @@ private struct ApplyProgressScreen: View {
                                 "The guarded write verifies by readback or fails "
                                     + "closed; force-quitting the app mid-write can "
                                     + "leave a partial target, which is never repaired "
-                                    + "automatically \u{2014} re-audit to inspect."
+                                    + "automatically \u{2014} re-check to inspect."
                             )
                             .font(.callout)
                             .foregroundStyle(.secondary)
@@ -388,7 +388,7 @@ private struct ApplySuccessScreen: View {
 
                 GroupBox {
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("Audit artifacts (the reviewed record of this apply)")
+                        Text("Records (the reviewed record of this apply)")
                             .font(.headline)
                         artifactRow(label: "Plan JSON", path: success.paths.planJson)
                         artifactRow(label: "Detail CSV", path: success.paths.detailCsv)
@@ -438,7 +438,7 @@ private struct ApplySuccessScreen: View {
                 }
                 AppKitActionButton(
                     identifier: M9ControlID.applyStartOver,
-                    title: "Start over / new audit"
+                    title: "Start over"
                 ) {
                     model.startOver()
                 }
@@ -530,7 +530,7 @@ private struct ApplyFailureScreen: View {
                 if model.currentQueueItem?.status == .failed {
                     AppKitActionButton(
                         identifier: M9ControlID.applyRetry,
-                        title: "Retry item (fresh audit)",
+                        title: "Retry item",
                         prominent: true
                     ) {
                         model.retryCurrentQueueItem()
@@ -555,7 +555,7 @@ private struct ApplyFailureScreen: View {
                 }
                 AppKitActionButton(
                     identifier: M9ControlID.applyStartOver,
-                    title: "Start over / new audit"
+                    title: "Start over"
                 ) {
                     model.startOver()
                 }

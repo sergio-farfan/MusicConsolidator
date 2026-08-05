@@ -42,6 +42,10 @@ struct AppKitActionButton: NSViewRepresentable {
     /// forcing the row past a narrow window's edge — the graceful-
     /// truncation half of the M8 fixed-width defect class.
     var compressible: Bool = false
+    /// Optional SF Symbol shown leading the title (UI polish pass: the
+    /// header's tab pill selector). `nil` renders a text-only button,
+    /// unchanged from every prior call site.
+    var systemImage: String? = nil
     let action: () -> Void
 
     final class Coordinator: NSObject {
@@ -85,6 +89,13 @@ struct AppKitActionButton: NSViewRepresentable {
         button.isEnabled = context.environment.isEnabled
         button.controlSize = nsControlSize(context.environment.controlSize)
         button.toolTip = help
+        if let systemImage {
+            button.image = NSImage(systemSymbolName: systemImage, accessibilityDescription: nil)
+            button.imagePosition = .imageLeading
+        } else {
+            button.image = nil
+            button.imagePosition = .noImage
+        }
         button.setAccessibilityIdentifier(identifier)
     }
 }
@@ -262,6 +273,9 @@ enum WaveAControlID {
 
 /// Stable accessibility identifiers for the Wave B mutation-gate controls.
 enum WaveBControlID {
+    /// The header's mode/tab pill selector (UI polish pass): one id per
+    /// `BrowserTab` case.
+    static func tabPill(_ tab: BrowserTab) -> String { "wb.tabPill.\(tab.rawValue)" }
     static let mutationExecute = "wb.mutationExecute"
     static let mutationDismiss = "wb.mutationDismiss"
     static let mutationNameField = "wb.mutationNameField"

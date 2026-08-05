@@ -347,7 +347,7 @@ struct ApplyFailureDisplayClassTests {
             return
         }
         #expect(failure.failureClass == .libraryDrift)
-        #expect(failure.headline == "Library changed since the audit")
+        #expect(failure.headline == "Library changed since the check")
         #expect(failure.message.contains("changed after audit"))
         #expect(failure.message.contains("create a fresh audit"))
         // Only the audit read + the ensure re-read ever ran: no target

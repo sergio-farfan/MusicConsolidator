@@ -235,7 +235,7 @@ struct RunReportFailureClassRenderingTests {
         })
         #expect(lines[index + 1] == "- Failure class: "
             + "Source drifted after a verified write \u{2014} the created target "
-            + "matches the plan, but the source changed after the audit.")
+            + "matches the plan, but the source changed after the check.")
         #expect(lines[index + 2]
             == "- Leftover target: Daechir ESP ORIG \u{2014} Consolidated")
         #expect(!text.contains("- Created:"))

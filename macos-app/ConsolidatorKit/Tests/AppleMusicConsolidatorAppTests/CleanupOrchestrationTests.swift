@@ -60,6 +60,149 @@ struct CleanupScanExclusionTests {
         #expect(model.mutationTask != nil)
         await harness.awaitMutation()
     }
+
+    @Test("an in-flight cleanup scan also holds startAudit() out until it finishes")
+    func scanBlocksAuditEntry() async throws {
+        // Same shape as scanBlocksMutationEntry, but the entry point under
+        // test is the review-flow audit rather than the mutation gate. Only
+        // the scan's listing read (index 0) needs to be scripted before the
+        // release; the eventual audit's own read (index 1) comes after.
+        let runner = StagedBlockingRunner(
+            outputs: [cleanupListingWire(copyPIDs: []), consolidateFixtureWire(name: "Some List")],
+            blockAt: [0]
+        )
+        let harness = try MutationGateHarness(runner: runner)
+        defer { harness.cleanUp() }
+        let model = harness.model
+        model.playlistName = "Some List"
+
+        model.refreshCleanup()
+        #expect(await pollUntil {
+            if case .scanning = model.cleanupScanState { return true }
+            return false
+        })
+        #expect(model.isMutationBusy)
+
+        // startAudit() consults the same `isMutationBusy` guard: refused
+        // outright, no phase change, no task spawned.
+        model.startAudit()
+        #expect(model.runState == .idle)
+        #expect(model.auditTask == nil)
+
+        // Release the scan; the slot frees and startAudit() passes the guard.
+        runner.proceed.signal()
+        await model.cleanupScanTask?.value
+        #expect(!model.isMutationBusy)
+        model.startAudit()
+        #expect(model.auditTask != nil)
+        await model.auditTask?.value
+        #expect(model.result != nil)
+    }
+
+    @Test("executeMutation() refuses while a cleanup scan is in flight, even with a gate already armed")
+    func scanBlocksArmedExecute() async throws {
+        // executeMutation's FIRST guard is `case .armed = mutationGatePhase`
+        // — an unarmed gate would refuse for that reason alone regardless of
+        // isMutationBusy, which would prove nothing about the exclusion.
+        // So: arm a plain delete gate first (2 reads, unblocked), THEN start
+        // a cleanup scan whose single listing read (index 2) is held open,
+        // THEN attempt to dispatch the already-armed gate. Once released,
+        // the SAME armed gate must still be dispatchable (4 more reads:
+        // fresh listing, compile, execute, post-listing — the
+        // verifiedDeleteExecution shape).
+        let runner = StagedBlockingRunner(
+            outputs: [
+                gateListingWire(), soloSnapshotWire(),
+                cleanupListingWire(copyPIDs: []),
+                gateListingWire(), "", "",
+                gateListingWire(excludingPersistentID: "SOLO000000000001"),
+            ],
+            blockAt: [2]
+        )
+        let harness = try MutationGateHarness(runner: runner)
+        defer { harness.cleanUp() }
+        let model = harness.model
+
+        // Arm a plain delete gate. Arming itself does not set isMutationBusy.
+        model.startMutationAudit(kind: .delete, persistentID: "SOLO000000000001")
+        await harness.awaitMutation()
+        #expect(model.armedMutation != nil)
+        model.typedMutationName = "Solo List"
+        #expect(model.mutationGateSatisfied)
+
+        // Start the scan; its listing read blocks at index 2.
+        model.refreshCleanup()
+        #expect(await pollUntil {
+            if case .scanning = model.cleanupScanState { return true }
+            return false
+        })
+        #expect(model.isMutationBusy)
+
+        // The dispatch attempt must NOT proceed: the gate stays armed, no
+        // executing phase, no new reads consumed.
+        model.executeMutation()
+        if case .armed = model.mutationGatePhase {} else {
+            Issue.record("expected the gate to remain armed, got \(model.mutationGatePhase)")
+        }
+
+        // Release the scan; the slot frees.
+        runner.proceed.signal()
+        await model.cleanupScanTask?.value
+        #expect(!model.isMutationBusy)
+
+        // The SAME armed gate now dispatches for real.
+        model.executeMutation()
+        await harness.awaitMutation()
+        guard case .finished(let display) = model.mutationGatePhase else {
+            Issue.record("expected a finished phase, got \(model.mutationGatePhase)")
+            return
+        }
+        #expect(display.verified)
+    }
+
+    @Test("refreshCleanup() itself refuses while another mutation-gate audit is in flight")
+    func mutationAuditBlocksScanEntry() async throws {
+        // Mirror image of scanBlocksMutationEntry: this time the OTHER
+        // activity (a mutation-gate audit's own listing read) is held open,
+        // and refreshCleanup() is the entry point under test.
+        let runner = StagedBlockingRunner(
+            outputs: [gateListingWire(), soloSnapshotWire(), cleanupListingWire(copyPIDs: [])],
+            blockAt: [0]
+        )
+        let harness = try MutationGateHarness(runner: runner)
+        defer { harness.cleanUp() }
+        let model = harness.model
+
+        // mutationGatePhase is set to .auditing synchronously, before the
+        // detached read stage is ever entered — no polling needed.
+        model.startMutationAudit(kind: .delete, persistentID: "SOLO000000000001")
+        if case .auditing = model.mutationGatePhase {} else {
+            Issue.record("expected the audit stage in flight, got \(model.mutationGatePhase)")
+        }
+        #expect(model.isMutationBusy)
+
+        // refreshCleanup()'s entry guard refuses outright: no phase change,
+        // no task spawned.
+        model.refreshCleanup()
+        if case .idle = model.cleanupScanState {} else {
+            Issue.record("cleanup scan must stay idle while a mutation audit runs")
+        }
+        #expect(model.cleanupScanTask == nil)
+
+        // Release the held audit; the slot frees, arming completes normally.
+        runner.proceed.signal()
+        await harness.awaitMutation()
+        #expect(!model.isMutationBusy)
+        #expect(model.armedMutation != nil)
+
+        // Cleanup can now start normally and run to completion.
+        model.refreshCleanup()
+        await model.cleanupScanTask?.value
+        guard case .loaded = model.cleanupScanState else {
+            Issue.record("expected the scan to complete, got \(model.cleanupScanState)")
+            return
+        }
+    }
 }
 
 /// pid -> (listing id, track pid, database id, title)

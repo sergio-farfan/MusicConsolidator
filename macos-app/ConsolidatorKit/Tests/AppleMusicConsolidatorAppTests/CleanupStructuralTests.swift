@@ -47,8 +47,9 @@ struct CleanupStructuralTests {
     @Test("the cleanup tab fits 1200x800 with a qualified and a disqualified group")
     func cleanupTabWithinBounds() async throws {
         // Live sample: Trance copies + verified target + House copies,
-        // House target ABSENT. One combined snapshot wire serves all four
-        // per-name reads (parseAllCopies filters by exact name); listing =
+        // House target ABSENT. Wave C hotfix #2 (2026-08-05): refreshCleanup
+        // is listing-only now — ONE listPlaylists() read regardless of group
+        // count, so the runner needs only the `listing` wire below; listing =
         // trance listing entries + the two House rows.
         var listingEntries = [
             gateEntry(id: 10, name: cleanupGroupName, pid: "CPYAAAA000000001", count: 1),
@@ -61,14 +62,7 @@ struct CleanupStructuralTests {
         listingEntries.append(gateEntry(id: 210, name: "House 2021",
             pid: "CPYEEEE000000005", count: 1))
         let listing = "{\"playlists\": [\(listingEntries.joined(separator: ", "))]}"
-        let trancePIDs = ["CPYAAAA000000001", "CPYBBBB000000002", "CPYCCCC000000003"]
-        let combined = cleanupSnapshotWire(
-            copyPIDs: trancePIDs, extraPlaylists: houseWirePlaylists()
-        )
-        // Discovery order is sorted by plan basename: house-2021-... before
-        // trance-2022-.... Prefetch = listing, then per group name/target:
-        // [House 2021, House 2021 — Merged, Trance 2022, Trance 2022 — Merged].
-        let runner = ScriptedRunner(outputs: [listing, combined, combined, combined, combined])
+        let runner = ScriptedRunner(outputs: [listing])
         let harness = try MutationGateHarness(runner: runner)
         defer { harness.cleanUp() }
         let model = harness.model

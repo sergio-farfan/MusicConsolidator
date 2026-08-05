@@ -218,7 +218,7 @@ nonisolated func classifyApplyFailure(_ error: Error) -> ApplyFailureDisplay {
                 headline: "Plan file unreadable",
                 guidance: "The approved plan artifact could not be read from disk, so the "
                     + "apply never started and nothing was written. Start over and run a "
-                    + "fresh audit \u{2014} approval names an exact plan file, and this one "
+                    + "fresh check \u{2014} approval names an exact plan file, and this one "
                     + "is gone or inaccessible.",
                 message: message
             )
@@ -227,9 +227,9 @@ nonisolated func classifyApplyFailure(_ error: Error) -> ApplyFailureDisplay {
                 .planMalformedJSON,
                 headline: "Plan file rejected \u{2014} not valid JSON",
                 guidance: "The plan artifact on disk is not the strict JSON this tool "
-                    + "writes \u{2014} it was modified or corrupted after the audit. The "
+                    + "writes \u{2014} it was modified or corrupted after the check. The "
                     + "apply never started and nothing was written. Never repair a plan "
-                    + "file by hand; run a fresh audit.",
+                    + "file by hand; run a fresh check.",
                 message: message
             )
         case .decodeRejected:
@@ -238,7 +238,7 @@ nonisolated func classifyApplyFailure(_ error: Error) -> ApplyFailureDisplay {
                 headline: "Plan file rejected \u{2014} strict decode failed",
                 guidance: "The plan artifact does not decode as a canonical plan (missing, "
                     + "unknown, or wrongly-typed fields). The apply never started and "
-                    + "nothing was written. Run a fresh audit and apply its own artifact.",
+                    + "nothing was written. Run a fresh check and apply its own artifact.",
                 message: message
             )
         case .integrityRejected:
@@ -247,7 +247,7 @@ nonisolated func classifyApplyFailure(_ error: Error) -> ApplyFailureDisplay {
                 headline: "Plan file rejected \u{2014} integrity check failed",
                 guidance: "The plan's content does not verify against its own fingerprint "
                     + "and canonical recompute, so it is NOT the reviewed plan. The apply "
-                    + "never started and nothing was written. Run a fresh audit.",
+                    + "never started and nothing was written. Run a fresh check.",
                 message: message
             )
         }
@@ -259,17 +259,17 @@ nonisolated func classifyApplyFailure(_ error: Error) -> ApplyFailureDisplay {
             headline: "Automation failed",
             guidance: "Music automation did not complete. Check that Music is running "
                 + "and that Automation access is granted (the preflight below shows the "
-                + "current state). This audit is consumed either way \u{2014} once the "
-                + "problem is fixed, run a fresh audit.",
+                + "current state). This check is consumed either way \u{2014} once the "
+                + "problem is fixed, run a fresh check.",
             message: message
         )
     case is MusicBridgeError:
         return failureDisplay(
             .libraryDrift,
-            headline: "Library changed since the audit",
+            headline: "Library changed since the check",
             guidance: "The live library no longer matches the reviewed plan (or Music "
                 + "returned data the strict parser rejects), so the apply failed closed "
-                + "at that boundary. Run a fresh audit \u{2014} this plan is consumed "
+                + "at that boundary. Run a fresh check \u{2014} this plan is consumed "
                 + "and is never reused.",
             message: message
         )
@@ -279,7 +279,7 @@ nonisolated func classifyApplyFailure(_ error: Error) -> ApplyFailureDisplay {
             headline: "Unexpected error",
             guidance: "The apply stopped on an error outside the known taxonomy. "
                 + "Nothing is retried automatically. Inspect the verbatim message "
-                + "below, then run a fresh audit.",
+                + "below, then run a fresh check.",
             message: message
         )
     }
@@ -294,7 +294,7 @@ nonisolated func applyVerificationFailureDisplay(_ result: ApplyResult) -> Apply
         guidance: "The guarded write did not verify: the diagnostics below are "
             + "verbatim readback evidence. Nothing is retried automatically and no "
             + "partial state is ever repaired \u{2014} inspect Music, then run a "
-            + "fresh audit.",
+            + "fresh check.",
         message: "",
         mismatches: result.mismatches,
         plannedCount: result.plannedCount,

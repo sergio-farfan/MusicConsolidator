@@ -190,13 +190,16 @@ group is often the intent, because that is what makes a near-match twin
 mergeable on the next scan.
 
 Three entry points exist. The Cleanup tab lists post-merge groups derived
-from merge-plan evidence plus a fresh live listing check (target present
-and unique; every copy accounted for from the listing and the recorded
-evidence; unknown same-name copies disqualify) — the ordered-track target
-verification happens exclusively at gate-arm, immediately before any
-artifact is written, and the arm prefetches only the armed group's two
-names. It deletes a group's source copies one compiled execution at a time
-behind a single per-group typed approval — the one named exception to
+from merge-plan evidence plus a single fresh live listing read — target
+name present and unique in that listing, copy accounting from the
+listing's persistent IDs plus existing on-disk delete evidence, and
+unknown same-name persistent IDs disqualifying the group. The stronger
+ordered-database-ID-and-persistent-ID target verification, and the
+per-copy track-identity recheck, run only when a group's gate is actually
+armed — scoped to just that group's two names, never at discovery — and
+the scan itself holds the OSA slot like every other mutation activity. It
+deletes a group's source copies one compiled execution at a time behind a
+single per-group typed approval — the one named exception to
 one-approval-per-playlist. Browser rows carry
 Delete…/Rename… actions with refusals surfaced up front as disabled actions
 plus the reason. NEAR MATCHES clusters carry "Align names…": the canonical

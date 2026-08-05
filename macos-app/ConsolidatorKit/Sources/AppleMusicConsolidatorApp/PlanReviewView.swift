@@ -70,7 +70,7 @@ struct PlanReviewView: View {
                     // builds + persists the mandatory report) take its place.
                     AppKitActionButton(
                         identifier: M8ControlID.startOver,
-                        title: "Start over / new audit"
+                        title: "Start over"
                     ) {
                         model.startOver()
                     }
@@ -99,7 +99,7 @@ struct PlanReviewView: View {
             ContentUnavailableView(
                 "No plan to review",
                 systemImage: "doc.text.magnifyingglass",
-                description: Text("Run a read-only audit from the Source step first.")
+                description: Text("Run a read-only check from the Source step first.")
             )
         }
     }
@@ -531,7 +531,7 @@ private struct ArtifactsSection: View {
     var body: some View {
         GroupBox {
             VStack(alignment: .leading, spacing: 6) {
-                Text("Audit artifacts")
+                Text("Records")
                     .font(.headline)
                 artifactRow(label: "Plan JSON", path: paths.planJson)
                 artifactRow(label: "Detail CSV", path: paths.detailCsv)

@@ -128,7 +128,7 @@ nonisolated func applyFailureClassLabel(_ failureClass: ApplyFailureClass) -> St
             + "could not read the library back."
     case .sourceDrifted:
         return "Source drifted after a verified write \u{2014} the created target "
-            + "matches the plan, but the source changed after the audit."
+            + "matches the plan, but the source changed after the check."
     case .targetMismatch:
         return "Target mismatch \u{2014} the created target does not match the plan."
     }
@@ -138,19 +138,19 @@ nonisolated func applyFailureClassLabel(_ failureClass: ApplyFailureClass) -> St
 nonisolated func applyFailureClassGuidance(_ failureClass: ApplyFailureClass) -> String {
     switch failureClass {
     case .refusedBeforeWrite:
-        return "Nothing changed in Music. Re-audit when the refusal cause is resolved."
+        return "Nothing changed in Music. Re-check when the refusal cause is resolved."
     case .writerFailed:
         return "Inspect the target in Music; delete the leftover with the guarded "
-            + "gate, then re-audit."
+            + "gate, then re-check."
     case .unverifiable:
         return "Compare the target against the plan artifact manually, or delete "
-            + "the leftover with the guarded gate and re-audit."
+            + "the leftover with the guarded gate and re-check."
     case .sourceDrifted:
         return "The target is internally sound but was built from a source state "
-            + "that no longer exists. Keep it or delete it, then re-audit the "
+            + "that no longer exists. Keep it or delete it, then re-check the "
             + "changed source."
     case .targetMismatch:
-        return "Delete the leftover with the guarded gate and re-audit; never keep "
+        return "Delete the leftover with the guarded gate and re-check; never keep "
             + "an unverified target."
     }
 }

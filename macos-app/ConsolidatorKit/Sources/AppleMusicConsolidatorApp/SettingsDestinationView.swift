@@ -33,7 +33,7 @@ struct SettingsDestinationView: View {
                         // potentially-multiline Text here carries an
                         // explicit lineLimit.
                         Text(
-                            "Each audit writes a new .plan.json / .detail.csv / .summary.md "
+                            "Each check writes a new .plan.json / .detail.csv / .summary.md "
                                 + "triple. Existing artifacts are never overwritten."
                         )
                         .font(.caption)
@@ -70,7 +70,7 @@ struct SettingsDestinationView: View {
                         Text(
                             "Unattended batch runs keep every engine guard and end in a "
                                 + "mandatory run report; the listing cache serves the browser "
-                                + "only \u{2014} audits and applies always re-read Music live."
+                                + "only \u{2014} reads and applies always re-read Music live."
                         )
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -116,7 +116,7 @@ struct SettingsDestinationView: View {
 
     private func chooseOutputDirectory() {
         let panel = NSOpenPanel()
-        panel.title = "Choose the audit output directory"
+        panel.title = "Choose the output directory"
         panel.canChooseFiles = false
         panel.canChooseDirectories = true
         panel.canCreateDirectories = true

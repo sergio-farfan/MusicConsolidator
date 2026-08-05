@@ -423,8 +423,8 @@ struct BrowserInspector: View {
     private var emptyHint: some View {
         Text(
             model.mode == .merge
-                ? "Check groups to queue their merges (each gets its own audit, review, and confirm gate); select any row to inspect it, or a near match to see its rename hint."
-                : "Check the playlists to consolidate; each queued item gets its own audit, review, and confirm gate."
+                ? "Check groups to queue their merges (each gets its own read, review, and confirm gate); select any row to inspect it, or a near match to see its rename hint."
+                : "Check the playlists to consolidate; each queued item gets its own read, review, and confirm gate."
         )
         .font(.callout)
         .foregroundStyle(.secondary)
@@ -463,8 +463,8 @@ struct BrowserInspector: View {
             .font(.callout)
             Text(
                 "Copies are in ascending playlist-id order (the plan's copy order). "
-                    + "No dedup estimate is shown before the audit \u{2014} the read-only "
-                    + "audit computes the real numbers."
+                    + "No dedup estimate is shown before the check \u{2014} the read-only "
+                    + "check computes the real numbers."
             )
             .font(.caption)
             .foregroundStyle(.secondary)
@@ -648,7 +648,7 @@ struct BrowserInspector: View {
             HStack(spacing: 8) {
                 AppKitActionButton(
                     identifier: WaveBControlID.browserRenameAudit,
-                    title: "Audit rename\u{2026}"
+                    title: "Check rename\u{2026}"
                 ) {
                     let draft = model.browserRenameDraft
                     model.browserRenamePID = nil

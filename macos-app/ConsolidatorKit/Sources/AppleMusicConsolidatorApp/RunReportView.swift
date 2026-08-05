@@ -97,8 +97,8 @@ struct RunReportView: View {
                 }
                 Text(
                     "Every engine guard ran unchanged on every item: fresh live "
-                        + "audit, drift refusal, fingerprint check, readback "
-                        + "verification, never-repair, one apply per audit."
+                        + "read, drift refusal, fingerprint check, readback "
+                        + "verification, never-repair, one apply per check."
                 )
                 .font(.caption)
                 .foregroundStyle(.secondary)

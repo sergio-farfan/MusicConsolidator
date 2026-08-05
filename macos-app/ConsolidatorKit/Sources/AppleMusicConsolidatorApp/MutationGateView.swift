@@ -73,7 +73,7 @@ struct MutationGateView: View {
                     systemImage: "lock.shield",
                     description: Text(
                         "Start Delete\u{2026} or Rename\u{2026} from a browser row; "
-                            + "the gate arms after a fresh mutation audit."
+                            + "the gate arms after a fresh safety check."
                     )
                 )
             case .auditing(let started):
@@ -128,7 +128,7 @@ struct MutationGateView: View {
                     HStack(spacing: 8) {
                         ProgressView()
                             .controlSize(.small)
-                        Text("Running the mutation audit\u{2026}")
+                        Text("Running the safety check\u{2026}")
                             .bold()
                         Text("elapsed \(ProgressPhaseView.elapsedText(from: started, to: context.date))")
                             .monospacedDigit()
@@ -566,7 +566,7 @@ struct MutationGateView: View {
                         .font(.system(.caption, design: .monospaced))
                         .textSelection(.enabled)
                         .lineLimit(6)
-                    Text("Run a fresh mutation audit to try again; nothing was mutated.")
+                    Text("Run a fresh check to try again; nothing was mutated.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .lineLimit(2)

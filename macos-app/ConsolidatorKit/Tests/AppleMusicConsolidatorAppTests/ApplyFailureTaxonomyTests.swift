@@ -196,7 +196,7 @@ struct ApplyFailureCopyTests {
                 + "could not read the library back.")
         #expect(applyFailureClassLabel(.sourceDrifted)
             == "Source drifted after a verified write \u{2014} the created target "
-                + "matches the plan, but the source changed after the audit.")
+                + "matches the plan, but the source changed after the check.")
         #expect(applyFailureClassLabel(.targetMismatch)
             == "Target mismatch \u{2014} the created target does not match the plan.")
     }
@@ -204,19 +204,19 @@ struct ApplyFailureCopyTests {
     @Test("the five guidance lines are byte-exact (spec C1.1)")
     func guidance() {
         #expect(applyFailureClassGuidance(.refusedBeforeWrite)
-            == "Nothing changed in Music. Re-audit when the refusal cause is resolved.")
+            == "Nothing changed in Music. Re-check when the refusal cause is resolved.")
         #expect(applyFailureClassGuidance(.writerFailed)
             == "Inspect the target in Music; delete the leftover with the guarded "
-                + "gate, then re-audit.")
+                + "gate, then re-check.")
         #expect(applyFailureClassGuidance(.unverifiable)
             == "Compare the target against the plan artifact manually, or delete "
-                + "the leftover with the guarded gate and re-audit.")
+                + "the leftover with the guarded gate and re-check.")
         #expect(applyFailureClassGuidance(.sourceDrifted)
             == "The target is internally sound but was built from a source state "
-                + "that no longer exists. Keep it or delete it, then re-audit the "
+                + "that no longer exists. Keep it or delete it, then re-check the "
                 + "changed source.")
         #expect(applyFailureClassGuidance(.targetMismatch)
-            == "Delete the leftover with the guarded gate and re-audit; never keep "
+            == "Delete the leftover with the guarded gate and re-check; never keep "
                 + "an unverified target.")
     }
 

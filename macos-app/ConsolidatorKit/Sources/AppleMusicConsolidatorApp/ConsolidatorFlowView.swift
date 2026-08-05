@@ -58,13 +58,13 @@ struct ConsolidatorFlowView: View {
             Section("Status") {
                 statusRow("Mode", value: model.mode.displayName)
                 if let result = model.result {
-                    statusRow("Audited", value: result.sourceName)
+                    statusRow("Checked", value: result.sourceName)
                     statusRow(
                         "Output", value: trackCountText(copyCounts: [result.outputCount])
                     )
                 }
                 if model.isRunning {
-                    statusRow("Audit", value: "running\u{2026}")
+                    statusRow("Check", value: "running\u{2026}")
                 }
                 if model.isApplying {
                     statusRow("Apply", value: "running\u{2026}")
