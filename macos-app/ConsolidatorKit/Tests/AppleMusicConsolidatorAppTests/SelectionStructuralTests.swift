@@ -1,0 +1,110 @@
+// SelectionStructuralTests.swift
+// Wave A (spec A4) — offscreen structural pins for the browser selection
+// controls: Select all / Clear render on the MERGEABLE GROUPS header
+// (merge tab) and the ALL PLAYLISTS header (consolidate tab) ONLY, carry
+// the Cmd+A / Cmd+D key equivalents, sit within the window bounds, and
+// REALLY drive the model (performClick). Same harness rules as
+// StructuralViewTests: never-shown NSWindow, fixture-driven model, no
+// Music contact.
+
+import AppKit
+import SwiftUI
+import Testing
+import ConsolidatorCore
+@testable import AppleMusicConsolidatorApp
+
+private func selectionStructuralEntry(id: Int, name: String, pid: String, count: Int) -> String {
+    """
+    {"id": \(id), "name": "\(name)", "persistent_id": "\(pid)", \
+    "track_count": \(count), "smart": false, "special_kind": "none"}
+    """
+}
+
+/// Same shape as StructuralViewTests' fixture: one 2-copy group, one
+/// trailing-space near-match pair, two plain singletons -> groups=1,
+/// singletons=4 (S-C, S-D, S-E, S-F checkable on the consolidate tab).
+private func selectionStructuralWire() -> String {
+    let entries = [
+        selectionStructuralEntry(id: 10, name: "Trance 2022", pid: "S-A", count: 9),
+        selectionStructuralEntry(id: 20, name: "Trance 2022", pid: "S-B", count: 10),
+        selectionStructuralEntry(id: 30, name: "Kdrama", pid: "S-C", count: 7),
+        selectionStructuralEntry(id: 40, name: "Kdrama ", pid: "S-D", count: 9),
+        selectionStructuralEntry(id: 50, name: "Solo List", pid: "S-E", count: 4),
+        selectionStructuralEntry(id: 60, name: "Another List", pid: "S-F", count: 5),
+    ]
+    return "{\"playlists\": [\(entries.joined(separator: ", "))]}"
+}
+
+@MainActor
+private func loadedSelectionStructuralHarness(
+    mode: ConsolidatorMode
+) async throws -> ModelHarness {
+    let harness = try ModelHarness(
+        runner: ScriptedRunner(outputs: [selectionStructuralWire()]),
+        mode: mode,
+        playlistName: ""
+    )
+    harness.model.rescanLibrary()
+    await harness.model.scanTask?.value
+    return harness
+}
+
+@MainActor
+@Suite("Selection controls structural pins (A4)", .serialized)
+struct SelectionStructuralTests {
+
+    @Test("merge header shows Select all / Clear with key equivalents, within bounds")
+    func mergeHeaderButtons() async throws {
+        let harness = try await loadedSelectionStructuralHarness(mode: .merge)
+        defer { harness.cleanUp() }
+        let fixture = HostedFixture(
+            SourceSelectionView(model: harness.model), width: 1200, height: 800
+        )
+        defer { fixture.tearDown() }
+        let windowBox = NSRect(x: 0, y: 0, width: 1200, height: 800)
+
+        let selectAll = try #require(
+            view(under: fixture.hosting, axIdentifier: WaveAControlID.selectAll) as? NSButton
+        )
+        #expect(selectAll.keyEquivalent == "a")
+        #expect(selectAll.keyEquivalentModifierMask.contains(.command))
+        let selectAllFrame = selectAll.convert(selectAll.bounds, to: fixture.hosting)
+        #expect(windowBox.contains(selectAllFrame), "Select all at \(selectAllFrame)")
+
+        let clear = try #require(
+            view(under: fixture.hosting, axIdentifier: WaveAControlID.clearChecks) as? NSButton
+        )
+        #expect(clear.keyEquivalent == "d")
+        #expect(clear.keyEquivalentModifierMask.contains(.command))
+        let clearFrame = clear.convert(clear.bounds, to: fixture.hosting)
+        #expect(windowBox.contains(clearFrame), "Clear at \(clearFrame)")
+    }
+
+    @Test("consolidate header shows the buttons and they drive the model")
+    func consolidateHeaderButtonsDriveModel() async throws {
+        let harness = try await loadedSelectionStructuralHarness(mode: .consolidate)
+        defer { harness.cleanUp() }
+        let fixture = HostedFixture(
+            SourceSelectionView(model: harness.model), width: 1200, height: 800
+        )
+        defer { fixture.tearDown() }
+        let windowBox = NSRect(x: 0, y: 0, width: 1200, height: 800)
+
+        let selectAll = try #require(
+            view(under: fixture.hosting, axIdentifier: WaveAControlID.selectAll) as? NSButton
+        )
+        let selectAllFrame = selectAll.convert(selectAll.bounds, to: fixture.hosting)
+        #expect(windowBox.contains(selectAllFrame), "Select all at \(selectAllFrame)")
+
+        selectAll.performClick(nil)
+        // Every checkable row checks: the four singletons, near-match twins
+        // included; the two group members never check.
+        #expect(harness.model.checkedPersistentIds == ["S-C", "S-D", "S-E", "S-F"])
+
+        let clear = try #require(
+            view(under: fixture.hosting, axIdentifier: WaveAControlID.clearChecks) as? NSButton
+        )
+        clear.performClick(nil)
+        #expect(harness.model.checkedPersistentIds.isEmpty)
+    }
+}

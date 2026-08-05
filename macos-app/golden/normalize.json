@@ -1,0 +1,274 @@
+[
+  {
+    "input": "Hello World",
+    "expected": "hello world"
+  },
+  {
+    "input": "Rock Song",
+    "expected": "rock song"
+  },
+  {
+    "input": "already lower case",
+    "expected": "already lower case"
+  },
+  {
+    "input": "ALREADY UPPER CASE",
+    "expected": "already upper case"
+  },
+  {
+    "input": "Björk",
+    "expected": "björk"
+  },
+  {
+    "input": "Café Müller",
+    "expected": "café müller"
+  },
+  {
+    "input": "Naïve Résumé",
+    "expected": "naïve résumé"
+  },
+  {
+    "input": "Amélie",
+    "expected": "amélie"
+  },
+  {
+    "input": "Malmö",
+    "expected": "malmö"
+  },
+  {
+    "input": "Straße",
+    "expected": "strasse"
+  },
+  {
+    "input": "GROßE",
+    "expected": "grosse"
+  },
+  {
+    "input": "ẞ",
+    "expected": "ss"
+  },
+  {
+    "input": "Weiß nicht",
+    "expected": "weiss nicht"
+  },
+  {
+    "input": "ﬀice",
+    "expected": "ffice"
+  },
+  {
+    "input": "ﬁlm",
+    "expected": "film"
+  },
+  {
+    "input": "ﬂower",
+    "expected": "flower"
+  },
+  {
+    "input": "Soufflé",
+    "expected": "soufflé"
+  },
+  {
+    "input": "Rock’n Roll",
+    "expected": "rock'n roll"
+  },
+  {
+    "input": "‘Quoted’",
+    "expected": "'quoted'"
+  },
+  {
+    "input": "“Björk” — Song",
+    "expected": "\"björk\" - song"
+  },
+  {
+    "input": "“Björk”",
+    "expected": "\"björk\""
+  },
+  {
+    "input": "It’s a “test”",
+    "expected": "it's a \"test\""
+  },
+  {
+    "input": "Rock–Song",
+    "expected": "rock-song"
+  },
+  {
+    "input": "Rock—Song",
+    "expected": "rock-song"
+  },
+  {
+    "input": "  Björk—Song  ",
+    "expected": "björk-song"
+  },
+  {
+    "input": "Bjork—Song",
+    "expected": "bjork-song"
+  },
+  {
+    "input": "A–B—C",
+    "expected": "a-b-c"
+  },
+  {
+    "input": "  leading and trailing  ",
+    "expected": "leading and trailing"
+  },
+  {
+    "input": "tabs\tand\tmore\ttabs",
+    "expected": "tabs and more tabs"
+  },
+  {
+    "input": "line\nbreaks\n\nhere",
+    "expected": "line breaks here"
+  },
+  {
+    "input": "mixed \t \n whitespace   runs",
+    "expected": "mixed whitespace runs"
+  },
+  {
+    "input": "\n\t  \n",
+    "expected": ""
+  },
+  {
+    "input": "",
+    "expected": ""
+  },
+  {
+    "input": "Ａｂｃ１２３",
+    "expected": "abc123"
+  },
+  {
+    "input": "ＡＬＬ ＣＡＰＳ",
+    "expected": "all caps"
+  },
+  {
+    "input": "MiXeD CaSe TeXt",
+    "expected": "mixed case text"
+  },
+  {
+    "input": "PascalCaseWord",
+    "expected": "pascalcaseword"
+  },
+  {
+    "input": "snake_case_word",
+    "expected": "snake_case_word"
+  },
+  {
+    "input": "  “BJÖRK”— the  SÖNG  ",
+    "expected": "\"björk\"- the söng"
+  },
+  {
+    "input": "Straße’s “Best” — Café",
+    "expected": "strasse's \"best\" - café"
+  },
+  {
+    "input": "İstanbul",
+    "expected": "i̇stanbul"
+  },
+  {
+    "input": "İ",
+    "expected": "i̇"
+  },
+  {
+    "input": "ı",
+    "expected": "ı"
+  },
+  {
+    "input": "IİıI",
+    "expected": "ii̇ıi"
+  },
+  {
+    "input": "Γιώργος",
+    "expected": "γιώργοσ"
+  },
+  {
+    "input": "ΚΑΛΟΣ",
+    "expected": "καλοσ"
+  },
+  {
+    "input": "ΟΔΥΣΣΕΥΣ Σ ς σ",
+    "expected": "οδυσσευσ σ σ σ"
+  },
+  {
+    "input": "Track One",
+    "expected": "track one"
+  },
+  {
+    "input": "Track Two",
+    "expected": "track two"
+  },
+  {
+    "input": " Padded ",
+    "expected": "padded"
+  },
+  {
+    "input": "Café",
+    "expected": "café"
+  },
+  {
+    "input": "Björk",
+    "expected": "björk"
+  },
+  {
+    "input": "Café Müller",
+    "expected": "café müller"
+  },
+  {
+    "input": "​Song",
+    "expected": "​song"
+  },
+  {
+    "input": "Song​",
+    "expected": "song​"
+  },
+  {
+    "input": "So​ng",
+    "expected": "so​ng"
+  },
+  {
+    "input": "​",
+    "expected": "​"
+  },
+  {
+    "input": "ᎠᎡᎢ",
+    "expected": "ᎠᎡᎢ"
+  },
+  {
+    "input": "ꭰꭱꭲ",
+    "expected": "ᎠᎡᎢ"
+  },
+  {
+    "input": "AᎠb",
+    "expected": "aᎠb"
+  },
+  {
+    "input": "Aꭰb",
+    "expected": "aᎠb"
+  },
+  {
+    "input": "ᏰᏵ",
+    "expected": "ᏰᏵ"
+  },
+  {
+    "input": "ᏸᏽ",
+    "expected": "ᏰᏵ"
+  },
+  {
+    "input": "ᏣᎳᎩ ꮳꮃꭹ",
+    "expected": "ᏣᎳᎩ ᏣᎳᎩ"
+  },
+  {
+    "input": "ᲀ",
+    "expected": "в"
+  },
+  {
+    "input": "в",
+    "expected": "в"
+  },
+  {
+    "input": "ᲀᲁᲂᲃᲄᲅᲆᲇᲈ",
+    "expected": "вдосттъѣꙋ"
+  },
+  {
+    "input": "ᲀеᲂмᲄи",
+    "expected": "веомти"
+  }
+]
