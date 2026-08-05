@@ -89,7 +89,12 @@ struct MergeBrowserList: View {
                     Text("No same-name groups. Every playlist name is unique.")
                         .foregroundStyle(.secondary)
                 } else {
-                    ForEach(sections.groups, id: \.name) { group in
+                    ForEach(applyBrowserSort(
+                        sections.groups,
+                        key: model.browserSortKey,
+                        ascending: model.browserSortAscending,
+                        count: { $0.copies.reduce(0) { $0 + $1.trackCount } }
+                    ), id: \.name) { group in
                         HStack(spacing: 8) {
                             // M10: check a group to queue its merge. Checking
                             // is independent of the row highlight (which only
@@ -119,6 +124,7 @@ struct MergeBrowserList: View {
             } header: {
                 HStack(spacing: 8) {
                     Text("MERGEABLE GROUPS (\(sections.groups.count))")
+                    BrowserSortHeader(model: model)
                     Spacer()
                     AppKitActionButton(
                         identifier: WaveAControlID.selectAll,
@@ -218,7 +224,12 @@ struct ConsolidateBrowserList: View {
         let nearMatchNames = Set(sections.nearMatches.flatMap { $0.variants.map(\.name) })
         List {
             Section {
-                ForEach(sections.allPlaylists, id: \.persistentId) { listing in
+                ForEach(applyBrowserSort(
+                    sections.allPlaylists,
+                    key: model.browserSortKey,
+                    ascending: model.browserSortAscending,
+                    count: { $0.trackCount }
+                ), id: \.persistentId) { listing in
                     // Fix round (Wave A fix wave, finding 7): scalar-exact,
                     // matching the checkbox/selection discipline elsewhere
                     // in this file. A canonical-equivalence `Set(names)
@@ -270,6 +281,7 @@ struct ConsolidateBrowserList: View {
             } header: {
                 HStack(spacing: 8) {
                     Text("ALL PLAYLISTS (\(sections.allPlaylists.count))")
+                    BrowserSortHeader(model: model)
                     Spacer()
                     AppKitActionButton(
                         identifier: WaveAControlID.selectAll,
@@ -860,5 +872,33 @@ struct AlignNamesSheet: View {
     private func isSelected(_ name: String) -> Bool {
         guard let selected = selectedCanonical else { return false }
         return scalarExact(selected, name)
+    }
+}
+
+// MARK: - sort header (display-only ordering; all modes)
+
+/// Clickable Name/Tracks ordering. The active column shows its direction;
+/// clicking it flips, clicking the other column selects it ascending.
+struct BrowserSortHeader: View {
+    @Bindable var model: AuditFlowModel
+
+    var body: some View {
+        HStack(spacing: 4) {
+            sortButton(.name, label: "Name", id: WaveBControlID.sortByName)
+            sortButton(.count, label: "Tracks", id: WaveBControlID.sortByCount)
+        }
+        .controlSize(.small)
+    }
+
+    private func sortButton(_ key: BrowserSortKey, label: String, id: String) -> some View {
+        AppKitActionButton(
+            identifier: id,
+            title: model.browserSortKey == key
+                ? "\(label) \(model.browserSortAscending ? "\u{25B2}" : "\u{25BC}")"
+                : label,
+            help: "Order the list by \(label.lowercased()) (click again to reverse)."
+        ) {
+            model.toggleBrowserSort(key)
+        }
     }
 }
