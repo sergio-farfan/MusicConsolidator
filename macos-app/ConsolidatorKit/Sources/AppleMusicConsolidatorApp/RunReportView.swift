@@ -24,7 +24,15 @@ struct RunReportView: View {
                         judgmentPanel(report)
                     }
                     itemsPanel(report)
-                    artifactPanel
+                    // The report file itself is engine plumbing: it stays on
+                    // disk under reports/ (Cleanup discovery and the delete
+                    // accounting consume it as evidence) but the app never
+                    // shows a filesystem path. The panel renders ONLY in the
+                    // loud persistence-failure case; Save report… below
+                    // exports a copy anywhere the user wants.
+                    if model.runReportWriteFailure != nil {
+                        artifactFailurePanel
+                    }
                 }
                 .padding(20)
                 .frame(maxWidth: 880, alignment: .leading)
@@ -45,14 +53,19 @@ struct RunReportView: View {
                     .disabled(model.isMutationBusy)
                     AppKitActionButton(
                         identifier: M11ControlID.revealRunReport,
-                        title: "Reveal report artifact"
+                        title: "Save report\u{2026}"
                     ) {
-                        if let path = model.runReportPath {
-                            NSWorkspace.shared.activateFileViewerSelecting(
-                                [URL(fileURLWithPath: path)]
-                            )
+                        guard let path = model.runReportPath else { return }
+                        let source = URL(fileURLWithPath: path)
+                        let panel = NSSavePanel()
+                        panel.nameFieldStringValue = source.lastPathComponent
+                        panel.canCreateDirectories = true
+                        if panel.runModal() == .OK, let destination = panel.url {
+                            try? FileManager.default.removeItem(at: destination)
+                            try? FileManager.default.copyItem(at: source, to: destination)
                         }
                     }
+                    .disabled(model.runReportPath == nil)
                     Spacer()
                 }
                 .padding(.horizontal, 20)
@@ -109,18 +122,19 @@ struct RunReportView: View {
         }
     }
 
-    /// PROMINENT: everything the run decided on its own that a human should
-    /// look at once.
+    /// Informational record of everything the run decided on its own — the
+    /// run is DONE; nothing here is pending (wording per Sergio, 2026-08-05).
     private func judgmentPanel(_ report: BatchRunReport) -> some View {
         GroupBox {
             VStack(alignment: .leading, spacing: 10) {
                 Label(
-                    "Needs your review: \(report.judgmentItemCount) "
+                    "Auto-decided judgment calls ("
+                        + "\(report.judgmentItemCount) "
                         + (report.judgmentItemCount == 1 ? "item" : "items")
-                        + " with auto-decided judgment calls",
-                    systemImage: "exclamationmark.triangle.fill"
+                        + ") \u{2014} recorded for reference",
+                    systemImage: "checklist"
                 )
-                .foregroundStyle(.orange)
+                .foregroundStyle(.secondary)
                 .bold()
                 ForEach(report.items.filter(\.hasJudgmentItems)) { item in
                     VStack(alignment: .leading, spacing: 3) {
@@ -271,15 +285,15 @@ struct RunReportView: View {
         }
     }
 
-    private var artifactPanel: some View {
+    /// LOUD persistence-failure panel only (fix round 1, minor a): the
+    /// report is the mandatory artifact — a persistence failure is a red
+    /// headline with the verbatim reason, never a footnote. The SUCCESS case
+    /// renders nothing here: the on-disk artifact is engine plumbing, and
+    /// "Save report…" is the user-facing affordance.
+    private var artifactFailurePanel: some View {
         GroupBox {
             VStack(alignment: .leading, spacing: 4) {
-                Text("Report artifact")
-                    .font(.headline)
                 if let failure = model.runReportWriteFailure {
-                    // LOUD (fix round 1, minor a): the report is the
-                    // mandatory artifact — a persistence failure is a red
-                    // headline with the verbatim reason, never a footnote.
                     Label {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("REPORT NOT PERSISTED")
@@ -300,15 +314,6 @@ struct RunReportView: View {
                         Image(systemName: "xmark.octagon.fill")
                     }
                     .foregroundStyle(.red)
-                } else {
-                    IdentifierText(text: model.runReportPath ?? "\u{2014}")
-                    Text(
-                        "Persisted under the reports/ conventions (never overwritten); "
-                            + "the plan artifacts remain the durable record."
-                    )
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
