@@ -1,0 +1,378 @@
+// PlaylistListingTests.swift
+// M8 Part 1 — the playlist-enumeration read surface: the STATIC
+// `buildListPlaylistsJXA` script (zero parameters, zero interpolation — the
+// full text is pinned verbatim below so ANY interpolation of ANY value would
+// break the pin), the strict `parsePlaylistListing` wire gate (same
+// StrictJSONScanner pre-pass + fail-closed typed parsing as the other
+// reads), and `MusicBridgeSession.listPlaylists()` orchestration over
+// FakeRunner.
+//
+// SAFETY (M4 discipline, first new script text since M4): the enumeration
+// script tells Music, so it is COMPILE-ONLY here (osacompile -l JavaScript;
+// never executed, no osascript, no Apple events). Parse and session tests
+// replay canned wire text through FakeRunner only.
+
+import Foundation
+import Testing
+import ConsolidatorCore
+@testable import MusicBridge
+
+// MARK: - the pinned static script text
+
+/// The enumeration script, pinned VERBATIM. This is the load-bearing safety
+/// property of the surface: the builder takes no parameters, and its output
+/// must equal this constant byte-for-byte on every call — no user input, no
+/// plan data, nothing can reach the script text.
+private let expectedListPlaylistsJXA = """
+const Music = Application("/System/Applications/Music.app");
+
+const playlists = Music.userPlaylists().map(function (playlist) {
+    return {
+        id: playlist.id(),
+        name: playlist.name(),
+        persistent_id: playlist.persistentID(),
+        track_count: playlist.tracks().length,
+        smart: playlist.smart(),
+        special_kind: playlist.specialKind()
+    };
+});
+
+JSON.stringify({playlists: playlists});
+
+"""
+
+@Suite("List-playlists JXA builder (static, zero interpolation)")
+struct ListPlaylistsBuilderTests {
+
+    @Test("script text is the pinned constant, byte for byte")
+    func scriptTextIsPinned() {
+        expectByteEqual(
+            buildListPlaylistsJXA(),
+            expectedListPlaylistsJXA,
+            context: "buildListPlaylistsJXA"
+        )
+    }
+
+    @Test("builder is deterministic across calls")
+    func builderIsDeterministic() {
+        expectByteEqual(
+            buildListPlaylistsJXA(),
+            buildListPlaylistsJXA(),
+            context: "two calls"
+        )
+    }
+
+    @Test("enumeration mirrors the read JXA's inclusion set and app targeting")
+    func mirrorsReadJXASemantics() {
+        let listing = ByteText(buildListPlaylistsJXA())
+        let read = ByteText(buildReadJXA(name: "any"))
+
+        // Same absolute-path Application(...) targeting line as the read JXA
+        // (and tied back to the module constant without interpolating it into
+        // the production template).
+        let applicationLine = "const Music = Application(\(appleScriptString(musicAppPath)));"
+        #expect(listing.contains(applicationLine))
+        #expect(read.contains(applicationLine))
+
+        // Same enumeration root: every user playlist — smart playlists and
+        // folder playlists included, subscription playlists excluded — so the
+        // browser's groups always agree with what a subsequent audit reads.
+        #expect(listing.contains("Music.userPlaylists()"))
+        #expect(read.contains("Music.userPlaylists()"))
+
+        // The listing must NOT filter by name (that is the read script's job).
+        #expect(!listing.contains(".filter("))
+        #expect(!listing.contains("requestedName"))
+    }
+
+    @Test("script is read-only in shape: no writer keywords")
+    func scriptHasNoWriterShapes() {
+        let listing = ByteText(buildListPlaylistsJXA())
+        for forbidden in ["make", "delete", "duplicate", "move", "set ", "add("] {
+            #expect(!listing.contains(forbidden), "forbidden shape: \(forbidden)")
+        }
+    }
+
+    @Test(
+        "static enumeration script compiles (osacompile -l JavaScript; never executed)",
+        .enabled(if: appleScriptCompilerAndMusicAvailable)
+    )
+    func staticScriptCompiles() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("m8-jxa-compile-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let output = directory.appendingPathComponent("listing.scpt")
+        let result = try runTool(
+            osacompilePath,
+            arguments: ["-l", "JavaScript", "-o", output.path],
+            stdinText: buildListPlaylistsJXA()
+        )
+        #expect(result.status == 0, "\(result.stderr)")
+    }
+}
+
+// MARK: - wire fixtures
+
+private func listingEntry(
+    id: String = "100",
+    name: String = "Playlist",
+    persistentId: String = "PID0",
+    trackCount: String = "10",
+    smart: String = "false",
+    specialKind: String = "\"none\""
+) -> String {
+    """
+    {"id": \(id), "name": "\(name)", "persistent_id": "\(persistentId)", \
+    "track_count": \(trackCount), "smart": \(smart), "special_kind": \(specialKind)}
+    """
+}
+
+private func listingWire(_ entries: [String]) -> String {
+    "{\"playlists\": [\(entries.joined(separator: ", "))]}"
+}
+
+@Suite("Playlist listing strict parse")
+struct PlaylistListingParseTests {
+
+    @Test("parses a complete listing ordered by ascending playlist id")
+    func parsesCompleteListing() throws {
+        // Wire order deliberately NOT id order; duplicate names are LEGAL
+        // (they are the point of the surface).
+        let raw = listingWire([
+            listingEntry(id: "300", name: "Trance 2022", persistentId: "P-HIGH", trackCount: "10"),
+            listingEntry(id: "100", name: "Trance 2022", persistentId: "P-LOW", trackCount: "9"),
+            listingEntry(
+                id: "200", name: "Mixes", persistentId: "P-FOLDER",
+                trackCount: "42", smart: "false", specialKind: "\"folder\""
+            ),
+            listingEntry(
+                id: "250", name: "Top Rated", persistentId: "P-SMART",
+                trackCount: "25", smart: "true"
+            ),
+        ])
+
+        let listings = try parsePlaylistListing(raw: raw)
+
+        #expect(listings.count == 4)
+        #expect(listings.map(\.persistentId) == ["P-LOW", "P-FOLDER", "P-SMART", "P-HIGH"])
+        #expect(listings.map(\.playlistId) == [100, 200, 250, 300])
+        #expect(listings[0].name == "Trance 2022")
+        #expect(listings[3].name == "Trance 2022")
+        #expect(listings[0].trackCount == 9)
+        #expect(listings[1].specialKind == "folder")
+        #expect(listings[1].isSmart == false)
+        #expect(listings[2].isSmart == true)
+    }
+
+    @Test("equal ids keep wire order (stable sort, like parseAllCopies)")
+    func equalIdsKeepWireOrder() throws {
+        let raw = listingWire([
+            listingEntry(id: "7", name: "B", persistentId: "P-B"),
+            listingEntry(id: "7", name: "A", persistentId: "P-A"),
+        ])
+        let listings = try parsePlaylistListing(raw: raw)
+        #expect(listings.map(\.persistentId) == ["P-B", "P-A"])
+    }
+
+    @Test("duplicate names are legal; duplicate persistent IDs are rejected")
+    func duplicatePersistentIdsRejected() throws {
+        let legal = listingWire([
+            listingEntry(id: "1", name: "Same", persistentId: "P1"),
+            listingEntry(id: "2", name: "Same", persistentId: "P2"),
+            listingEntry(id: "3", name: "Same", persistentId: "P3"),
+        ])
+        #expect(try parsePlaylistListing(raw: legal).count == 3)
+
+        let dup = listingWire([
+            listingEntry(id: "1", name: "One", persistentId: "P1"),
+            listingEntry(id: "2", name: "Two", persistentId: "P1"),
+        ])
+        expectThrowsByteEqualMessage(
+            "playlist listing contains a duplicate persistent ID",
+            context: "duplicate pid"
+        ) {
+            _ = try parsePlaylistListing(raw: dup)
+        }
+    }
+
+    @Test("canonically-equivalent but scalar-different persistent IDs are distinct")
+    func scalarDifferentPidsAreDistinct() throws {
+        // NFC vs NFD: String == would call these duplicates; the scalar-exact
+        // gate must not.
+        let raw = listingWire([
+            listingEntry(id: "1", name: "One", persistentId: "Caf\\u00e9"),
+            listingEntry(id: "2", name: "Two", persistentId: "Cafe\\u0301"),
+        ])
+        let listings = try parsePlaylistListing(raw: raw)
+        #expect(listings.count == 2)
+    }
+
+    @Test("unicode and FEFF names are scalar-preserved")
+    func unicodeNamesScalarPreserved() throws {
+        let raw = listingWire([
+            listingEntry(id: "1", name: "\\ufeffKdrama", persistentId: "P1"),
+            listingEntry(id: "2", name: "Cafe\\u0301 \\u2014 Mix\\u200b", persistentId: "P2"),
+        ])
+        let listings = try parsePlaylistListing(raw: raw)
+        let feffName = scalarString(0xFEFF) + "Kdrama"
+        #expect(listings[0].name.unicodeScalars.elementsEqual(feffName.unicodeScalars))
+        let zwspName = "Cafe" + scalarString(0x301) + " " + scalarString(0x2014) + " Mix" + scalarString(0x200B)
+        #expect(listings[1].name.unicodeScalars.elementsEqual(zwspName.unicodeScalars))
+    }
+
+    @Test("huge-but-integral track counts parse; out-of-range and fractional fail closed")
+    func trackCountBoundaries() throws {
+        let huge = listingWire([listingEntry(trackCount: "1099511627776")]) // 2^40
+        #expect(try parsePlaylistListing(raw: huge)[0].trackCount == 1_099_511_627_776)
+
+        for hostile in ["1e300", "2.5", "9223372036854775808"] {
+            expectThrowsByteEqualMessage(
+                "playlist track_count must be an integer",
+                context: "track_count \(hostile)"
+            ) {
+                _ = try parsePlaylistListing(raw: listingWire([listingEntry(trackCount: hostile)]))
+            }
+        }
+
+        expectThrowsByteEqualMessage(
+            "playlist track_count must be a non-negative integer",
+            context: "negative track_count"
+        ) {
+            _ = try parsePlaylistListing(raw: listingWire([listingEntry(trackCount: "-1")]))
+        }
+    }
+
+    @Test("every missing key fails closed with a typed message")
+    func missingKeysFailClosed() {
+        let full: [(key: String, fragment: String, message: String)] = [
+            ("id", "\"id\": 100, ", "playlist id must be a number"),
+            ("name", "\"name\": \"N\", ", "playlist name must be a string"),
+            ("persistent_id", "\"persistent_id\": \"P\", ", "playlist persistent_id must be a string"),
+            ("track_count", "\"track_count\": 1, ", "playlist track_count must be an integer"),
+            ("smart", "\"smart\": false, ", "playlist smart must be a boolean"),
+            ("special_kind", "\"special_kind\": \"none\", ", "playlist special_kind must be a string"),
+        ]
+        for omitted in full {
+            let kept = full.filter { $0.key != omitted.key }.map(\.fragment).joined()
+            let entry = "{\(kept.dropLast(2))}"
+            expectThrowsByteEqualMessage(
+                omitted.message, context: "missing \(omitted.key)"
+            ) {
+                _ = try parsePlaylistListing(raw: listingWire([entry]))
+            }
+        }
+    }
+
+    @Test("every wrong-typed field fails closed with a typed message")
+    func wrongTypesFailClosed() {
+        let mutations: [(raw: String, message: String, context: String)] = [
+            (listingWire([listingEntry(id: "\"100\"")]),
+             "playlist id must be a number", "id string"),
+            (listingWire([listingEntry(id: "null")]),
+             "playlist id must be a number", "id null"),
+            (listingWire([listingEntry(trackCount: "null")]),
+             "playlist track_count must be an integer", "track_count null"),
+            (listingWire([listingEntry(trackCount: "true")]),
+             "playlist track_count must be an integer", "track_count boolean"),
+            (listingWire([listingEntry(smart: "\"yes\"")]),
+             "playlist smart must be a boolean", "smart string"),
+            (listingWire([listingEntry(smart: "1")]),
+             "playlist smart must be a boolean", "smart integer"),
+            (listingWire([listingEntry(specialKind: "null")]),
+             "playlist special_kind must be a string", "special_kind null"),
+            (listingWire([listingEntry(specialKind: "0")]),
+             "playlist special_kind must be a string", "special_kind integer"),
+        ]
+        for mutation in mutations {
+            expectThrowsByteEqualMessage(mutation.message, context: mutation.context) {
+                _ = try parsePlaylistListing(raw: mutation.raw)
+            }
+        }
+
+        // A dedicated wrong-type probe for name and persistent_id built as
+        // raw JSON (the fixture helper quotes them).
+        expectThrowsByteEqualMessage("playlist name must be a string", context: "name number") {
+            _ = try parsePlaylistListing(raw: listingWire([
+                "{\"id\": 1, \"name\": 3, \"persistent_id\": \"P\", \"track_count\": 1, \"smart\": false, \"special_kind\": \"none\"}"
+            ]))
+        }
+        expectThrowsByteEqualMessage(
+            "playlist persistent_id must be a string", context: "pid null"
+        ) {
+            _ = try parsePlaylistListing(raw: listingWire([
+                "{\"id\": 1, \"name\": \"N\", \"persistent_id\": null, \"track_count\": 1, \"smart\": false, \"special_kind\": \"none\"}"
+            ]))
+        }
+    }
+
+    @Test("structural mutations fail closed")
+    func structuralMutations() {
+        expectThrowsByteEqualMessage("Music returned invalid JSON", context: "not json") {
+            _ = try parsePlaylistListing(raw: "not json")
+        }
+        expectThrowsByteEqualMessage("Music returned invalid JSON", context: "trailing comma") {
+            _ = try parsePlaylistListing(raw: "{\"playlists\": [],}")
+        }
+        expectThrowsByteEqualMessage("Music returned invalid JSON", context: "leading BOM") {
+            _ = try parsePlaylistListing(raw: scalarString(0xFEFF) + "{\"playlists\": []}")
+        }
+        expectThrowsByteEqualMessage(
+            "Music playlist listing must be a JSON object", context: "top-level array"
+        ) {
+            _ = try parsePlaylistListing(raw: "[]")
+        }
+        expectThrowsByteEqualMessage(
+            "playlists must be a JSON array", context: "playlists not a list"
+        ) {
+            _ = try parsePlaylistListing(raw: "{\"playlists\": 3}")
+        }
+        expectThrowsByteEqualMessage(
+            "playlists must be a JSON array", context: "playlists missing"
+        ) {
+            _ = try parsePlaylistListing(raw: "{}")
+        }
+        expectThrowsByteEqualMessage(
+            "playlist listing entry must be a JSON object", context: "entry not an object"
+        ) {
+            _ = try parsePlaylistListing(raw: "{\"playlists\": [3]}")
+        }
+    }
+
+    @Test("empty listing parses to an empty array")
+    func emptyListingParses() throws {
+        #expect(try parsePlaylistListing(raw: "{\"playlists\": []}").isEmpty)
+    }
+}
+
+@Suite("listPlaylists session orchestration (FakeRunner)")
+struct ListPlaylistsSessionTests {
+
+    @Test("dispatches exactly one read command carrying the static script")
+    func dispatchesStaticScript() throws {
+        let raw = listingWire([listingEntry(id: "1", name: "One", persistentId: "P1")])
+        let runner = FakeRunner(outputs: [raw])
+
+        let listings = try MusicBridgeSession(runner: runner).listPlaylists()
+
+        #expect(listings.count == 1)
+        #expect(runner.calls == [.readJXA(script: buildListPlaylistsJXA())])
+    }
+
+    @Test("runner failures propagate without retries or writes")
+    func runnerFailurePropagates() {
+        let runner = FakeRunner(results: [.failure(MusicCommandError("automation failed"))])
+        #expect(throws: MusicCommandError.self) {
+            _ = try MusicBridgeSession(runner: runner).listPlaylists()
+        }
+        #expect(runner.calls.count == 1)
+    }
+
+    @Test("parse failures propagate as MusicBridgeError")
+    func parseFailurePropagates() {
+        let runner = FakeRunner(outputs: ["not json"])
+        expectThrowsByteEqualMessage("Music returned invalid JSON", context: "session parse") {
+            _ = try MusicBridgeSession(runner: runner).listPlaylists()
+        }
+    }
+}

@@ -1,0 +1,11 @@
+# Read-only library evidence (125MB each — exceeds GitHub's 100MB file limit; local only)
+Library*.xml
+
+# Build products (rebuild via macos-app/scripts/build-app.sh)
+macos-app/ConsolidatorKit/.build/
+macos-app/build/
+
+# SDD scratch workspace (durable records live under docs/superpowers/)
+.superpowers/
+
+.DS_Store

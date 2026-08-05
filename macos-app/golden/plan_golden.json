@@ -1,0 +1,2749 @@
+{
+  "build_plan_cases": [
+    {
+      "name": "fixture_musica_xtotal",
+      "source": {
+        "name": "#Musica xTotal",
+        "persistent_id": "PLAYLIST-123",
+        "tracks": [
+          {
+            "source_index": 0,
+            "database_id": 101,
+            "persistent_id": "TRACK-A",
+            "title": "Rock—Song",
+            "artist": "Björk",
+            "album": "Album One",
+            "duration_ms": 183456,
+            "kind": "Apple Music AAC audio file",
+            "bit_rate_kbps": 256,
+            "sample_rate_hz": 44100,
+            "cloud_status": "matched",
+            "is_file_track": false
+          },
+          {
+            "source_index": 1,
+            "database_id": 202,
+            "persistent_id": "TRACK-B",
+            "title": "Local Song",
+            "artist": "Artist",
+            "album": "",
+            "duration_ms": null,
+            "kind": "MPEG audio file",
+            "bit_rate_kbps": null,
+            "sample_rate_hz": null,
+            "cloud_status": "",
+            "is_file_track": true
+          }
+        ]
+      },
+      "expected": {
+        "source_playlist_name": "#Musica xTotal",
+        "source_playlist_persistent_id": "PLAYLIST-123",
+        "source_track_count": 2,
+        "winner_source_indexes": [
+          0,
+          1
+        ],
+        "decisions": [],
+        "non_eligible_source_indexes": [
+          1
+        ],
+        "output_tracks": [
+          {
+            "source_index": 0,
+            "database_id": 101,
+            "persistent_id": "TRACK-A",
+            "title": "Rock—Song",
+            "artist": "Björk",
+            "album": "Album One",
+            "duration_ms": 183456,
+            "kind": "Apple Music AAC audio file",
+            "bit_rate_kbps": 256,
+            "sample_rate_hz": 44100,
+            "cloud_status": "matched",
+            "is_file_track": false
+          },
+          {
+            "source_index": 1,
+            "database_id": 202,
+            "persistent_id": "TRACK-B",
+            "title": "Local Song",
+            "artist": "Artist",
+            "album": "",
+            "duration_ms": null,
+            "kind": "MPEG audio file",
+            "bit_rate_kbps": null,
+            "sample_rate_hz": null,
+            "cloud_status": "",
+            "is_file_track": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "prefers_available_then_higher_sample_rate",
+      "source": {
+        "name": "Source",
+        "persistent_id": "PLAYLIST",
+        "tracks": [
+          {
+            "source_index": 0,
+            "database_id": 1,
+            "persistent_id": "FIRST",
+            "title": "Rock—Song",
+            "artist": "Björk",
+            "album": "Album",
+            "duration_ms": 183000,
+            "kind": "Apple Music AAC audio file",
+            "bit_rate_kbps": 256,
+            "sample_rate_hz": 44100,
+            "cloud_status": "",
+            "is_file_track": false
+          },
+          {
+            "source_index": 1,
+            "database_id": 1,
+            "persistent_id": "OLD",
+            "title": "Rock—Song",
+            "artist": "Björk",
+            "album": "Album",
+            "duration_ms": 183000,
+            "kind": "AIFF audio file",
+            "bit_rate_kbps": 256,
+            "sample_rate_hz": 96000,
+            "cloud_status": "No Longer Available",
+            "is_file_track": true
+          },
+          {
+            "source_index": 2,
+            "database_id": 1,
+            "persistent_id": "BEST",
+            "title": "Rock—Song",
+            "artist": "Björk",
+            "album": "Album",
+            "duration_ms": 183000,
+            "kind": "Apple Music AAC audio file",
+            "bit_rate_kbps": 256,
+            "sample_rate_hz": 48000,
+            "cloud_status": "",
+            "is_file_track": false
+          }
+        ]
+      },
+      "expected": {
+        "source_playlist_name": "Source",
+        "source_playlist_persistent_id": "PLAYLIST",
+        "source_track_count": 3,
+        "winner_source_indexes": [
+          2
+        ],
+        "decisions": [
+          {
+            "first_source_index": 0,
+            "winner": {
+              "source_index": 2,
+              "database_id": 1,
+              "persistent_id": "BEST",
+              "title": "Rock—Song",
+              "artist": "Björk",
+              "album": "Album",
+              "duration_ms": 183000,
+              "kind": "Apple Music AAC audio file",
+              "bit_rate_kbps": 256,
+              "sample_rate_hz": 48000,
+              "cloud_status": "",
+              "is_file_track": false
+            },
+            "omitted": [
+              {
+                "source_index": 0,
+                "database_id": 1,
+                "persistent_id": "FIRST",
+                "title": "Rock—Song",
+                "artist": "Björk",
+                "album": "Album",
+                "duration_ms": 183000,
+                "kind": "Apple Music AAC audio file",
+                "bit_rate_kbps": 256,
+                "sample_rate_hz": 44100,
+                "cloud_status": "",
+                "is_file_track": false
+              },
+              {
+                "source_index": 1,
+                "database_id": 1,
+                "persistent_id": "OLD",
+                "title": "Rock—Song",
+                "artist": "Björk",
+                "album": "Album",
+                "duration_ms": 183000,
+                "kind": "AIFF audio file",
+                "bit_rate_kbps": 256,
+                "sample_rate_hz": 96000,
+                "cloud_status": "No Longer Available",
+                "is_file_track": true
+              }
+            ],
+            "reason_by_omitted_index": [
+              [
+                0,
+                "sample rate"
+              ],
+              [
+                1,
+                "available"
+              ]
+            ]
+          }
+        ],
+        "non_eligible_source_indexes": [],
+        "output_tracks": [
+          {
+            "source_index": 2,
+            "database_id": 1,
+            "persistent_id": "BEST",
+            "title": "Rock—Song",
+            "artist": "Björk",
+            "album": "Album",
+            "duration_ms": 183000,
+            "kind": "Apple Music AAC audio file",
+            "bit_rate_kbps": 256,
+            "sample_rate_hz": 48000,
+            "cloud_status": "",
+            "is_file_track": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "never_collapses_artist_spelling_or_duration",
+      "source": {
+        "name": "Source",
+        "persistent_id": "PLAYLIST",
+        "tracks": [
+          {
+            "source_index": 0,
+            "database_id": 1,
+            "persistent_id": "ABC",
+            "title": "Rock—Song",
+            "artist": "Jordan Léser",
+            "album": "Album",
+            "duration_ms": 192000,
+            "kind": "Apple Music AAC audio file",
+            "bit_rate_kbps": 256,
+            "sample_rate_hz": 44100,
+            "cloud_status": "",
+            "is_file_track": false
+          },
+          {
+            "source_index": 1,
+            "database_id": 1,
+            "persistent_id": "ABC",
+            "title": "Rock—Song",
+            "artist": "Jordan Laser",
+            "album": "Album",
+            "duration_ms": 192000,
+            "kind": "Apple Music AAC audio file",
+            "bit_rate_kbps": 256,
+            "sample_rate_hz": 44100,
+            "cloud_status": "",
+            "is_file_track": false
+          },
+          {
+            "source_index": 2,
+            "database_id": 1,
+            "persistent_id": "ABC",
+            "title": "Rock—Song",
+            "artist": "Jordan Léser",
+            "album": "Album",
+            "duration_ms": 192001,
+            "kind": "Apple Music AAC audio file",
+            "bit_rate_kbps": 256,
+            "sample_rate_hz": 44100,
+            "cloud_status": "",
+            "is_file_track": false
+          }
+        ]
+      },
+      "expected": {
+        "source_playlist_name": "Source",
+        "source_playlist_persistent_id": "PLAYLIST",
+        "source_track_count": 3,
+        "winner_source_indexes": [
+          0,
+          1,
+          2
+        ],
+        "decisions": [],
+        "non_eligible_source_indexes": [],
+        "output_tracks": [
+          {
+            "source_index": 0,
+            "database_id": 1,
+            "persistent_id": "ABC",
+            "title": "Rock—Song",
+            "artist": "Jordan Léser",
+            "album": "Album",
+            "duration_ms": 192000,
+            "kind": "Apple Music AAC audio file",
+            "bit_rate_kbps": 256,
+            "sample_rate_hz": 44100,
+            "cloud_status": "",
+            "is_file_track": false
+          },
+          {
+            "source_index": 1,
+            "database_id": 1,
+            "persistent_id": "ABC",
+            "title": "Rock—Song",
+            "artist": "Jordan Laser",
+            "album": "Album",
+            "duration_ms": 192000,
+            "kind": "Apple Music AAC audio file",
+            "bit_rate_kbps": 256,
+            "sample_rate_hz": 44100,
+            "cloud_status": "",
+            "is_file_track": false
+          },
+          {
+            "source_index": 2,
+            "database_id": 1,
+            "persistent_id": "ABC",
+            "title": "Rock—Song",
+            "artist": "Jordan Léser",
+            "album": "Album",
+            "duration_ms": 192001,
+            "kind": "Apple Music AAC audio file",
+            "bit_rate_kbps": 256,
+            "sample_rate_hz": 44100,
+            "cloud_status": "",
+            "is_file_track": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "non_eligible_retained_in_place",
+      "source": {
+        "name": "Source",
+        "persistent_id": "PLAYLIST",
+        "tracks": [
+          {
+            "source_index": 0,
+            "database_id": 1,
+            "persistent_id": "ABC",
+            "title": "",
+            "artist": "Björk",
+            "album": "Album",
+            "duration_ms": 183000,
+            "kind": "Apple Music AAC audio file",
+            "bit_rate_kbps": 256,
+            "sample_rate_hz": 44100,
+            "cloud_status": "",
+            "is_file_track": false
+          },
+          {
+            "source_index": 1,
+            "database_id": 1,
+            "persistent_id": "LOW",
+            "title": "Rock—Song",
+            "artist": "Björk",
+            "album": "Album",
+            "duration_ms": 183000,
+            "kind": "Apple Music AAC audio file",
+            "bit_rate_kbps": 128,
+            "sample_rate_hz": 44100,
+            "cloud_status": "",
+            "is_file_track": false
+          },
+          {
+            "source_index": 2,
+            "database_id": 1,
+            "persistent_id": "HIGH",
+            "title": "Rock—Song",
+            "artist": "Björk",
+            "album": "Album",
+            "duration_ms": 183000,
+            "kind": "Apple Music AAC audio file",
+            "bit_rate_kbps": 320,
+            "sample_rate_hz": 44100,
+            "cloud_status": "",
+            "is_file_track": false
+          },
+          {
+            "source_index": 3,
+            "database_id": 1,
+            "persistent_id": "NO_ARTIST",
+            "title": "Rock—Song",
+            "artist": "",
+            "album": "Album",
+            "duration_ms": 183000,
+            "kind": "Apple Music AAC audio file",
+            "bit_rate_kbps": 256,
+            "sample_rate_hz": 44100,
+            "cloud_status": "",
+            "is_file_track": false
+          }
+        ]
+      },
+      "expected": {
+        "source_playlist_name": "Source",
+        "source_playlist_persistent_id": "PLAYLIST",
+        "source_track_count": 4,
+        "winner_source_indexes": [
+          0,
+          2,
+          3
+        ],
+        "decisions": [
+          {
+            "first_source_index": 1,
+            "winner": {
+              "source_index": 2,
+              "database_id": 1,
+              "persistent_id": "HIGH",
+              "title": "Rock—Song",
+              "artist": "Björk",
+              "album": "Album",
+              "duration_ms": 183000,
+              "kind": "Apple Music AAC audio file",
+              "bit_rate_kbps": 320,
+              "sample_rate_hz": 44100,
+              "cloud_status": "",
+              "is_file_track": false
+            },
+            "omitted": [
+              {
+                "source_index": 1,
+                "database_id": 1,
+                "persistent_id": "LOW",
+                "title": "Rock—Song",
+                "artist": "Björk",
+                "album": "Album",
+                "duration_ms": 183000,
+                "kind": "Apple Music AAC audio file",
+                "bit_rate_kbps": 128,
+                "sample_rate_hz": 44100,
+                "cloud_status": "",
+                "is_file_track": false
+              }
+            ],
+            "reason_by_omitted_index": [
+              [
+                1,
+                "bit rate"
+              ]
+            ]
+          }
+        ],
+        "non_eligible_source_indexes": [
+          0,
+          3
+        ],
+        "output_tracks": [
+          {
+            "source_index": 0,
+            "database_id": 1,
+            "persistent_id": "ABC",
+            "title": "",
+            "artist": "Björk",
+            "album": "Album",
+            "duration_ms": 183000,
+            "kind": "Apple Music AAC audio file",
+            "bit_rate_kbps": 256,
+            "sample_rate_hz": 44100,
+            "cloud_status": "",
+            "is_file_track": false
+          },
+          {
+            "source_index": 2,
+            "database_id": 1,
+            "persistent_id": "HIGH",
+            "title": "Rock—Song",
+            "artist": "Björk",
+            "album": "Album",
+            "duration_ms": 183000,
+            "kind": "Apple Music AAC audio file",
+            "bit_rate_kbps": 320,
+            "sample_rate_hz": 44100,
+            "cloud_status": "",
+            "is_file_track": false
+          },
+          {
+            "source_index": 3,
+            "database_id": 1,
+            "persistent_id": "NO_ARTIST",
+            "title": "Rock—Song",
+            "artist": "",
+            "album": "Album",
+            "duration_ms": 183000,
+            "kind": "Apple Music AAC audio file",
+            "bit_rate_kbps": 256,
+            "sample_rate_hz": 44100,
+            "cloud_status": "",
+            "is_file_track": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "first_decisive_quality_difference",
+      "source": {
+        "name": "Source",
+        "persistent_id": "PLAYLIST",
+        "tracks": [
+          {
+            "source_index": 0,
+            "database_id": 1,
+            "persistent_id": "UNAVAILABLE",
+            "title": "Rock—Song",
+            "artist": "Björk",
+            "album": "Album",
+            "duration_ms": 183000,
+            "kind": "Apple Music AAC audio file",
+            "bit_rate_kbps": 256,
+            "sample_rate_hz": 44100,
+            "cloud_status": "no longer available",
+            "is_file_track": false
+          },
+          {
+            "source_index": 1,
+            "database_id": 1,
+            "persistent_id": "LOW_RATE",
+            "title": "Rock—Song",
+            "artist": "Björk",
+            "album": "Album",
+            "duration_ms": 183000,
+            "kind": "Apple Music AAC audio file",
+            "bit_rate_kbps": 256,
+            "sample_rate_hz": 44100,
+            "cloud_status": "",
+            "is_file_track": false
+          },
+          {
+            "source_index": 2,
+            "database_id": 1,
+            "persistent_id": "WIN",
+            "title": "Rock—Song",
+            "artist": "Björk",
+            "album": "Album",
+            "duration_ms": 183000,
+            "kind": "Apple Music AAC audio file",
+            "bit_rate_kbps": 256,
+            "sample_rate_hz": 48000,
+            "cloud_status": "",
+            "is_file_track": false
+          }
+        ]
+      },
+      "expected": {
+        "source_playlist_name": "Source",
+        "source_playlist_persistent_id": "PLAYLIST",
+        "source_track_count": 3,
+        "winner_source_indexes": [
+          2
+        ],
+        "decisions": [
+          {
+            "first_source_index": 0,
+            "winner": {
+              "source_index": 2,
+              "database_id": 1,
+              "persistent_id": "WIN",
+              "title": "Rock—Song",
+              "artist": "Björk",
+              "album": "Album",
+              "duration_ms": 183000,
+              "kind": "Apple Music AAC audio file",
+              "bit_rate_kbps": 256,
+              "sample_rate_hz": 48000,
+              "cloud_status": "",
+              "is_file_track": false
+            },
+            "omitted": [
+              {
+                "source_index": 0,
+                "database_id": 1,
+                "persistent_id": "UNAVAILABLE",
+                "title": "Rock—Song",
+                "artist": "Björk",
+                "album": "Album",
+                "duration_ms": 183000,
+                "kind": "Apple Music AAC audio file",
+                "bit_rate_kbps": 256,
+                "sample_rate_hz": 44100,
+                "cloud_status": "no longer available",
+                "is_file_track": false
+              },
+              {
+                "source_index": 1,
+                "database_id": 1,
+                "persistent_id": "LOW_RATE",
+                "title": "Rock—Song",
+                "artist": "Björk",
+                "album": "Album",
+                "duration_ms": 183000,
+                "kind": "Apple Music AAC audio file",
+                "bit_rate_kbps": 256,
+                "sample_rate_hz": 44100,
+                "cloud_status": "",
+                "is_file_track": false
+              }
+            ],
+            "reason_by_omitted_index": [
+              [
+                0,
+                "available"
+              ],
+              [
+                1,
+                "sample rate"
+              ]
+            ]
+          }
+        ],
+        "non_eligible_source_indexes": [],
+        "output_tracks": [
+          {
+            "source_index": 2,
+            "database_id": 1,
+            "persistent_id": "WIN",
+            "title": "Rock—Song",
+            "artist": "Björk",
+            "album": "Album",
+            "duration_ms": 183000,
+            "kind": "Apple Music AAC audio file",
+            "bit_rate_kbps": 256,
+            "sample_rate_hz": 48000,
+            "cloud_status": "",
+            "is_file_track": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "lossless_before_sample_rate",
+      "source": {
+        "name": "Source",
+        "persistent_id": "PLAYLIST",
+        "tracks": [
+          {
+            "source_index": 0,
+            "database_id": 1,
+            "persistent_id": "LOSSY",
+            "title": "Rock—Song",
+            "artist": "Björk",
+            "album": "Album",
+            "duration_ms": 183000,
+            "kind": "Apple Music AAC audio file",
+            "bit_rate_kbps": 256,
+            "sample_rate_hz": 96000,
+            "cloud_status": "",
+            "is_file_track": false
+          },
+          {
+            "source_index": 1,
+            "database_id": 1,
+            "persistent_id": "LOSSLESS",
+            "title": "Rock—Song",
+            "artist": "Björk",
+            "album": "Album",
+            "duration_ms": 183000,
+            "kind": "AIFF audio file",
+            "bit_rate_kbps": 256,
+            "sample_rate_hz": 44100,
+            "cloud_status": "",
+            "is_file_track": false
+          }
+        ]
+      },
+      "expected": {
+        "source_playlist_name": "Source",
+        "source_playlist_persistent_id": "PLAYLIST",
+        "source_track_count": 2,
+        "winner_source_indexes": [
+          1
+        ],
+        "decisions": [
+          {
+            "first_source_index": 0,
+            "winner": {
+              "source_index": 1,
+              "database_id": 1,
+              "persistent_id": "LOSSLESS",
+              "title": "Rock—Song",
+              "artist": "Björk",
+              "album": "Album",
+              "duration_ms": 183000,
+              "kind": "AIFF audio file",
+              "bit_rate_kbps": 256,
+              "sample_rate_hz": 44100,
+              "cloud_status": "",
+              "is_file_track": false
+            },
+            "omitted": [
+              {
+                "source_index": 0,
+                "database_id": 1,
+                "persistent_id": "LOSSY",
+                "title": "Rock—Song",
+                "artist": "Björk",
+                "album": "Album",
+                "duration_ms": 183000,
+                "kind": "Apple Music AAC audio file",
+                "bit_rate_kbps": 256,
+                "sample_rate_hz": 96000,
+                "cloud_status": "",
+                "is_file_track": false
+              }
+            ],
+            "reason_by_omitted_index": [
+              [
+                0,
+                "lossless kind"
+              ]
+            ]
+          }
+        ],
+        "non_eligible_source_indexes": [],
+        "output_tracks": [
+          {
+            "source_index": 1,
+            "database_id": 1,
+            "persistent_id": "LOSSLESS",
+            "title": "Rock—Song",
+            "artist": "Björk",
+            "album": "Album",
+            "duration_ms": 183000,
+            "kind": "AIFF audio file",
+            "bit_rate_kbps": 256,
+            "sample_rate_hz": 44100,
+            "cloud_status": "",
+            "is_file_track": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "bit_rate_after_prior_ties",
+      "source": {
+        "name": "Source",
+        "persistent_id": "PLAYLIST",
+        "tracks": [
+          {
+            "source_index": 0,
+            "database_id": 1,
+            "persistent_id": "LOW",
+            "title": "Rock—Song",
+            "artist": "Björk",
+            "album": "Album",
+            "duration_ms": 183000,
+            "kind": "Apple Music AAC audio file",
+            "bit_rate_kbps": 128,
+            "sample_rate_hz": 44100,
+            "cloud_status": "",
+            "is_file_track": false
+          },
+          {
+            "source_index": 1,
+            "database_id": 1,
+            "persistent_id": "HIGH",
+            "title": "Rock—Song",
+            "artist": "Björk",
+            "album": "Album",
+            "duration_ms": 183000,
+            "kind": "Apple Music AAC audio file",
+            "bit_rate_kbps": 320,
+            "sample_rate_hz": 44100,
+            "cloud_status": "",
+            "is_file_track": false
+          }
+        ]
+      },
+      "expected": {
+        "source_playlist_name": "Source",
+        "source_playlist_persistent_id": "PLAYLIST",
+        "source_track_count": 2,
+        "winner_source_indexes": [
+          1
+        ],
+        "decisions": [
+          {
+            "first_source_index": 0,
+            "winner": {
+              "source_index": 1,
+              "database_id": 1,
+              "persistent_id": "HIGH",
+              "title": "Rock—Song",
+              "artist": "Björk",
+              "album": "Album",
+              "duration_ms": 183000,
+              "kind": "Apple Music AAC audio file",
+              "bit_rate_kbps": 320,
+              "sample_rate_hz": 44100,
+              "cloud_status": "",
+              "is_file_track": false
+            },
+            "omitted": [
+              {
+                "source_index": 0,
+                "database_id": 1,
+                "persistent_id": "LOW",
+                "title": "Rock—Song",
+                "artist": "Björk",
+                "album": "Album",
+                "duration_ms": 183000,
+                "kind": "Apple Music AAC audio file",
+                "bit_rate_kbps": 128,
+                "sample_rate_hz": 44100,
+                "cloud_status": "",
+                "is_file_track": false
+              }
+            ],
+            "reason_by_omitted_index": [
+              [
+                0,
+                "bit rate"
+              ]
+            ]
+          }
+        ],
+        "non_eligible_source_indexes": [],
+        "output_tracks": [
+          {
+            "source_index": 1,
+            "database_id": 1,
+            "persistent_id": "HIGH",
+            "title": "Rock—Song",
+            "artist": "Björk",
+            "album": "Album",
+            "duration_ms": 183000,
+            "kind": "Apple Music AAC audio file",
+            "bit_rate_kbps": 320,
+            "sample_rate_hz": 44100,
+            "cloud_status": "",
+            "is_file_track": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "source_order_after_quality_ties",
+      "source": {
+        "name": "Source",
+        "persistent_id": "PLAYLIST",
+        "tracks": [
+          {
+            "source_index": 8,
+            "database_id": 1,
+            "persistent_id": "LATER",
+            "title": "Rock—Song",
+            "artist": "Björk",
+            "album": "Album",
+            "duration_ms": 183000,
+            "kind": "Apple Music AAC audio file",
+            "bit_rate_kbps": 256,
+            "sample_rate_hz": 44100,
+            "cloud_status": "",
+            "is_file_track": false
+          },
+          {
+            "source_index": 3,
+            "database_id": 1,
+            "persistent_id": "EARLIER",
+            "title": "Rock—Song",
+            "artist": "Björk",
+            "album": "Album",
+            "duration_ms": 183000,
+            "kind": "Apple Music AAC audio file",
+            "bit_rate_kbps": 256,
+            "sample_rate_hz": 44100,
+            "cloud_status": "",
+            "is_file_track": false
+          }
+        ]
+      },
+      "expected": {
+        "source_playlist_name": "Source",
+        "source_playlist_persistent_id": "PLAYLIST",
+        "source_track_count": 2,
+        "winner_source_indexes": [
+          3
+        ],
+        "decisions": [
+          {
+            "first_source_index": 3,
+            "winner": {
+              "source_index": 3,
+              "database_id": 1,
+              "persistent_id": "EARLIER",
+              "title": "Rock—Song",
+              "artist": "Björk",
+              "album": "Album",
+              "duration_ms": 183000,
+              "kind": "Apple Music AAC audio file",
+              "bit_rate_kbps": 256,
+              "sample_rate_hz": 44100,
+              "cloud_status": "",
+              "is_file_track": false
+            },
+            "omitted": [
+              {
+                "source_index": 8,
+                "database_id": 1,
+                "persistent_id": "LATER",
+                "title": "Rock—Song",
+                "artist": "Björk",
+                "album": "Album",
+                "duration_ms": 183000,
+                "kind": "Apple Music AAC audio file",
+                "bit_rate_kbps": 256,
+                "sample_rate_hz": 44100,
+                "cloud_status": "",
+                "is_file_track": false
+              }
+            ],
+            "reason_by_omitted_index": [
+              [
+                8,
+                "source order"
+              ]
+            ]
+          }
+        ],
+        "non_eligible_source_indexes": [],
+        "output_tracks": [
+          {
+            "source_index": 3,
+            "database_id": 1,
+            "persistent_id": "EARLIER",
+            "title": "Rock—Song",
+            "artist": "Björk",
+            "album": "Album",
+            "duration_ms": 183000,
+            "kind": "Apple Music AAC audio file",
+            "bit_rate_kbps": 256,
+            "sample_rate_hz": 44100,
+            "cloud_status": "",
+            "is_file_track": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "persistent_id_after_source_order_ties",
+      "source": {
+        "name": "Source",
+        "persistent_id": "PLAYLIST",
+        "tracks": [
+          {
+            "source_index": 0,
+            "database_id": 1,
+            "persistent_id": "ZZZ",
+            "title": "Rock—Song",
+            "artist": "Björk",
+            "album": "Album",
+            "duration_ms": 183000,
+            "kind": "Apple Music AAC audio file",
+            "bit_rate_kbps": 256,
+            "sample_rate_hz": 44100,
+            "cloud_status": "",
+            "is_file_track": false
+          },
+          {
+            "source_index": 0,
+            "database_id": 1,
+            "persistent_id": "AAA",
+            "title": "Rock—Song",
+            "artist": "Björk",
+            "album": "Album",
+            "duration_ms": 183000,
+            "kind": "Apple Music AAC audio file",
+            "bit_rate_kbps": 256,
+            "sample_rate_hz": 44100,
+            "cloud_status": "",
+            "is_file_track": false
+          }
+        ]
+      },
+      "expected": {
+        "source_playlist_name": "Source",
+        "source_playlist_persistent_id": "PLAYLIST",
+        "source_track_count": 2,
+        "winner_source_indexes": [
+          0
+        ],
+        "decisions": [
+          {
+            "first_source_index": 0,
+            "winner": {
+              "source_index": 0,
+              "database_id": 1,
+              "persistent_id": "AAA",
+              "title": "Rock—Song",
+              "artist": "Björk",
+              "album": "Album",
+              "duration_ms": 183000,
+              "kind": "Apple Music AAC audio file",
+              "bit_rate_kbps": 256,
+              "sample_rate_hz": 44100,
+              "cloud_status": "",
+              "is_file_track": false
+            },
+            "omitted": [
+              {
+                "source_index": 0,
+                "database_id": 1,
+                "persistent_id": "ZZZ",
+                "title": "Rock—Song",
+                "artist": "Björk",
+                "album": "Album",
+                "duration_ms": 183000,
+                "kind": "Apple Music AAC audio file",
+                "bit_rate_kbps": 256,
+                "sample_rate_hz": 44100,
+                "cloud_status": "",
+                "is_file_track": false
+              }
+            ],
+            "reason_by_omitted_index": [
+              [
+                0,
+                "persistent ID"
+              ]
+            ]
+          }
+        ],
+        "non_eligible_source_indexes": [],
+        "output_tracks": null
+      }
+    },
+    {
+      "name": "unavailable_only_group",
+      "source": {
+        "name": "Source",
+        "persistent_id": "PLAYLIST",
+        "tracks": [
+          {
+            "source_index": 0,
+            "database_id": 1,
+            "persistent_id": "GONE_LOW",
+            "title": "Rock—Song",
+            "artist": "Björk",
+            "album": "Album",
+            "duration_ms": 183000,
+            "kind": "Apple Music AAC audio file",
+            "bit_rate_kbps": 256,
+            "sample_rate_hz": 44100,
+            "cloud_status": "No Longer Available",
+            "is_file_track": false
+          },
+          {
+            "source_index": 1,
+            "database_id": 1,
+            "persistent_id": "GONE_HIGH",
+            "title": "Rock—Song",
+            "artist": "Björk",
+            "album": "Album",
+            "duration_ms": 183000,
+            "kind": "Apple Music AAC audio file",
+            "bit_rate_kbps": 256,
+            "sample_rate_hz": 48000,
+            "cloud_status": "no longer available",
+            "is_file_track": false
+          }
+        ]
+      },
+      "expected": {
+        "source_playlist_name": "Source",
+        "source_playlist_persistent_id": "PLAYLIST",
+        "source_track_count": 2,
+        "winner_source_indexes": [
+          1
+        ],
+        "decisions": [
+          {
+            "first_source_index": 0,
+            "winner": {
+              "source_index": 1,
+              "database_id": 1,
+              "persistent_id": "GONE_HIGH",
+              "title": "Rock—Song",
+              "artist": "Björk",
+              "album": "Album",
+              "duration_ms": 183000,
+              "kind": "Apple Music AAC audio file",
+              "bit_rate_kbps": 256,
+              "sample_rate_hz": 48000,
+              "cloud_status": "no longer available",
+              "is_file_track": false
+            },
+            "omitted": [
+              {
+                "source_index": 0,
+                "database_id": 1,
+                "persistent_id": "GONE_LOW",
+                "title": "Rock—Song",
+                "artist": "Björk",
+                "album": "Album",
+                "duration_ms": 183000,
+                "kind": "Apple Music AAC audio file",
+                "bit_rate_kbps": 256,
+                "sample_rate_hz": 44100,
+                "cloud_status": "No Longer Available",
+                "is_file_track": false
+              }
+            ],
+            "reason_by_omitted_index": [
+              [
+                0,
+                "sample rate"
+              ]
+            ]
+          }
+        ],
+        "non_eligible_source_indexes": [],
+        "output_tracks": [
+          {
+            "source_index": 1,
+            "database_id": 1,
+            "persistent_id": "GONE_HIGH",
+            "title": "Rock—Song",
+            "artist": "Björk",
+            "album": "Album",
+            "duration_ms": 183000,
+            "kind": "Apple Music AAC audio file",
+            "bit_rate_kbps": 256,
+            "sample_rate_hz": 48000,
+            "cloud_status": "no longer available",
+            "is_file_track": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "all_non_eligible",
+      "source": {
+        "name": "Source",
+        "persistent_id": "PLAYLIST",
+        "tracks": [
+          {
+            "source_index": 0,
+            "database_id": 1,
+            "persistent_id": "NO_TITLE",
+            "title": "",
+            "artist": "Björk",
+            "album": "Album",
+            "duration_ms": 183000,
+            "kind": "Apple Music AAC audio file",
+            "bit_rate_kbps": 256,
+            "sample_rate_hz": 44100,
+            "cloud_status": "",
+            "is_file_track": false
+          },
+          {
+            "source_index": 1,
+            "database_id": 1,
+            "persistent_id": "BLANK_ARTIST",
+            "title": "Rock—Song",
+            "artist": "   ",
+            "album": "Album",
+            "duration_ms": 183000,
+            "kind": "Apple Music AAC audio file",
+            "bit_rate_kbps": 256,
+            "sample_rate_hz": 44100,
+            "cloud_status": "",
+            "is_file_track": false
+          },
+          {
+            "source_index": 2,
+            "database_id": 1,
+            "persistent_id": "NO_DURATION",
+            "title": "Rock—Song",
+            "artist": "Björk",
+            "album": "Album",
+            "duration_ms": null,
+            "kind": "Apple Music AAC audio file",
+            "bit_rate_kbps": 256,
+            "sample_rate_hz": 44100,
+            "cloud_status": "",
+            "is_file_track": false
+          }
+        ]
+      },
+      "expected": {
+        "source_playlist_name": "Source",
+        "source_playlist_persistent_id": "PLAYLIST",
+        "source_track_count": 3,
+        "winner_source_indexes": [
+          0,
+          1,
+          2
+        ],
+        "decisions": [],
+        "non_eligible_source_indexes": [
+          0,
+          1,
+          2
+        ],
+        "output_tracks": [
+          {
+            "source_index": 0,
+            "database_id": 1,
+            "persistent_id": "NO_TITLE",
+            "title": "",
+            "artist": "Björk",
+            "album": "Album",
+            "duration_ms": 183000,
+            "kind": "Apple Music AAC audio file",
+            "bit_rate_kbps": 256,
+            "sample_rate_hz": 44100,
+            "cloud_status": "",
+            "is_file_track": false
+          },
+          {
+            "source_index": 1,
+            "database_id": 1,
+            "persistent_id": "BLANK_ARTIST",
+            "title": "Rock—Song",
+            "artist": "   ",
+            "album": "Album",
+            "duration_ms": 183000,
+            "kind": "Apple Music AAC audio file",
+            "bit_rate_kbps": 256,
+            "sample_rate_hz": 44100,
+            "cloud_status": "",
+            "is_file_track": false
+          },
+          {
+            "source_index": 2,
+            "database_id": 1,
+            "persistent_id": "NO_DURATION",
+            "title": "Rock—Song",
+            "artist": "Björk",
+            "album": "Album",
+            "duration_ms": null,
+            "kind": "Apple Music AAC audio file",
+            "bit_rate_kbps": 256,
+            "sample_rate_hz": 44100,
+            "cloud_status": "",
+            "is_file_track": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "winner_at_earliest_index_ordering",
+      "source": {
+        "name": "Source",
+        "persistent_id": "PLAYLIST",
+        "tracks": [
+          {
+            "source_index": 0,
+            "database_id": 1,
+            "persistent_id": "DUP_LOW",
+            "title": "Rock—Song",
+            "artist": "Björk",
+            "album": "Album",
+            "duration_ms": 183000,
+            "kind": "Apple Music AAC audio file",
+            "bit_rate_kbps": 256,
+            "sample_rate_hz": 44100,
+            "cloud_status": "",
+            "is_file_track": false
+          },
+          {
+            "source_index": 1,
+            "database_id": 1,
+            "persistent_id": "UNIQUE",
+            "title": "Unique",
+            "artist": "Björk",
+            "album": "Album",
+            "duration_ms": 183000,
+            "kind": "Apple Music AAC audio file",
+            "bit_rate_kbps": 256,
+            "sample_rate_hz": 44100,
+            "cloud_status": "",
+            "is_file_track": false
+          },
+          {
+            "source_index": 2,
+            "database_id": 1,
+            "persistent_id": "DUP_HIGH",
+            "title": "Rock—Song",
+            "artist": "Björk",
+            "album": "Album",
+            "duration_ms": 183000,
+            "kind": "Apple Music AAC audio file",
+            "bit_rate_kbps": 256,
+            "sample_rate_hz": 96000,
+            "cloud_status": "",
+            "is_file_track": false
+          }
+        ]
+      },
+      "expected": {
+        "source_playlist_name": "Source",
+        "source_playlist_persistent_id": "PLAYLIST",
+        "source_track_count": 3,
+        "winner_source_indexes": [
+          2,
+          1
+        ],
+        "decisions": [
+          {
+            "first_source_index": 0,
+            "winner": {
+              "source_index": 2,
+              "database_id": 1,
+              "persistent_id": "DUP_HIGH",
+              "title": "Rock—Song",
+              "artist": "Björk",
+              "album": "Album",
+              "duration_ms": 183000,
+              "kind": "Apple Music AAC audio file",
+              "bit_rate_kbps": 256,
+              "sample_rate_hz": 96000,
+              "cloud_status": "",
+              "is_file_track": false
+            },
+            "omitted": [
+              {
+                "source_index": 0,
+                "database_id": 1,
+                "persistent_id": "DUP_LOW",
+                "title": "Rock—Song",
+                "artist": "Björk",
+                "album": "Album",
+                "duration_ms": 183000,
+                "kind": "Apple Music AAC audio file",
+                "bit_rate_kbps": 256,
+                "sample_rate_hz": 44100,
+                "cloud_status": "",
+                "is_file_track": false
+              }
+            ],
+            "reason_by_omitted_index": [
+              [
+                0,
+                "sample rate"
+              ]
+            ]
+          }
+        ],
+        "non_eligible_source_indexes": [],
+        "output_tracks": [
+          {
+            "source_index": 2,
+            "database_id": 1,
+            "persistent_id": "DUP_HIGH",
+            "title": "Rock—Song",
+            "artist": "Björk",
+            "album": "Album",
+            "duration_ms": 183000,
+            "kind": "Apple Music AAC audio file",
+            "bit_rate_kbps": 256,
+            "sample_rate_hz": 96000,
+            "cloud_status": "",
+            "is_file_track": false
+          },
+          {
+            "source_index": 1,
+            "database_id": 1,
+            "persistent_id": "UNIQUE",
+            "title": "Unique",
+            "artist": "Björk",
+            "album": "Album",
+            "duration_ms": 183000,
+            "kind": "Apple Music AAC audio file",
+            "bit_rate_kbps": 256,
+            "sample_rate_hz": 44100,
+            "cloud_status": "",
+            "is_file_track": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "empty_playlist",
+      "source": {
+        "name": "Empty",
+        "persistent_id": "PLAYLIST-EMPTY",
+        "tracks": []
+      },
+      "expected": {
+        "source_playlist_name": "Empty",
+        "source_playlist_persistent_id": "PLAYLIST-EMPTY",
+        "source_track_count": 0,
+        "winner_source_indexes": [],
+        "decisions": [],
+        "non_eligible_source_indexes": [],
+        "output_tracks": []
+      }
+    },
+    {
+      "name": "scalar_different_canonically_equivalent_pair",
+      "source": {
+        "name": "Source",
+        "persistent_id": "PLAYLIST",
+        "tracks": [
+          {
+            "source_index": 0,
+            "database_id": 1,
+            "persistent_id": "P0",
+            "title": "ΐ",
+            "artist": "Björk",
+            "album": "Album",
+            "duration_ms": 183000,
+            "kind": "Apple Music AAC audio file",
+            "bit_rate_kbps": 256,
+            "sample_rate_hz": 44100,
+            "cloud_status": "",
+            "is_file_track": false
+          },
+          {
+            "source_index": 1,
+            "database_id": 1,
+            "persistent_id": "P1",
+            "title": "Ϊ́",
+            "artist": "Björk",
+            "album": "Album",
+            "duration_ms": 183000,
+            "kind": "Apple Music AAC audio file",
+            "bit_rate_kbps": 256,
+            "sample_rate_hz": 44100,
+            "cloud_status": "",
+            "is_file_track": false
+          }
+        ]
+      },
+      "expected": {
+        "source_playlist_name": "Source",
+        "source_playlist_persistent_id": "PLAYLIST",
+        "source_track_count": 2,
+        "winner_source_indexes": [
+          0,
+          1
+        ],
+        "decisions": [],
+        "non_eligible_source_indexes": [],
+        "output_tracks": [
+          {
+            "source_index": 0,
+            "database_id": 1,
+            "persistent_id": "P0",
+            "title": "ΐ",
+            "artist": "Björk",
+            "album": "Album",
+            "duration_ms": 183000,
+            "kind": "Apple Music AAC audio file",
+            "bit_rate_kbps": 256,
+            "sample_rate_hz": 44100,
+            "cloud_status": "",
+            "is_file_track": false
+          },
+          {
+            "source_index": 1,
+            "database_id": 1,
+            "persistent_id": "P1",
+            "title": "Ϊ́",
+            "artist": "Björk",
+            "album": "Album",
+            "duration_ms": 183000,
+            "kind": "Apple Music AAC audio file",
+            "bit_rate_kbps": 256,
+            "sample_rate_hz": 44100,
+            "cloud_status": "",
+            "is_file_track": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "provenance_mixed_actions",
+      "source": {
+        "name": "#Musica xTotal",
+        "persistent_id": "PLAYLIST",
+        "tracks": [
+          {
+            "source_index": 0,
+            "database_id": 100,
+            "persistent_id": "OMITTED",
+            "title": "Same",
+            "artist": "Artist",
+            "album": "Old",
+            "duration_ms": 180001,
+            "kind": "Apple Music AAC audio file",
+            "bit_rate_kbps": 128,
+            "sample_rate_hz": 44100,
+            "cloud_status": "No Longer Available",
+            "is_file_track": false
+          },
+          {
+            "source_index": 1,
+            "database_id": 101,
+            "persistent_id": "WINNER",
+            "title": "Same",
+            "artist": "Artist",
+            "album": "Master",
+            "duration_ms": 180001,
+            "kind": "AIFF audio file",
+            "bit_rate_kbps": 1411,
+            "sample_rate_hz": 96000,
+            "cloud_status": "matched",
+            "is_file_track": true
+          },
+          {
+            "source_index": 2,
+            "database_id": 102,
+            "persistent_id": "UNIQUE",
+            "title": "Unique",
+            "artist": "Solo",
+            "album": "Only",
+            "duration_ms": 200002,
+            "kind": "Apple Music AAC audio file",
+            "bit_rate_kbps": 256,
+            "sample_rate_hz": 48000,
+            "cloud_status": "uploaded",
+            "is_file_track": false
+          },
+          {
+            "source_index": 3,
+            "database_id": 103,
+            "persistent_id": "NONELIGIBLE",
+            "title": "Missing Artist",
+            "artist": "",
+            "album": "Unknown",
+            "duration_ms": 210003,
+            "kind": "MPEG audio file",
+            "bit_rate_kbps": null,
+            "sample_rate_hz": null,
+            "cloud_status": "",
+            "is_file_track": true
+          }
+        ]
+      },
+      "expected": {
+        "source_playlist_name": "#Musica xTotal",
+        "source_playlist_persistent_id": "PLAYLIST",
+        "source_track_count": 4,
+        "winner_source_indexes": [
+          1,
+          2,
+          3
+        ],
+        "decisions": [
+          {
+            "first_source_index": 0,
+            "winner": {
+              "source_index": 1,
+              "database_id": 101,
+              "persistent_id": "WINNER",
+              "title": "Same",
+              "artist": "Artist",
+              "album": "Master",
+              "duration_ms": 180001,
+              "kind": "AIFF audio file",
+              "bit_rate_kbps": 1411,
+              "sample_rate_hz": 96000,
+              "cloud_status": "matched",
+              "is_file_track": true
+            },
+            "omitted": [
+              {
+                "source_index": 0,
+                "database_id": 100,
+                "persistent_id": "OMITTED",
+                "title": "Same",
+                "artist": "Artist",
+                "album": "Old",
+                "duration_ms": 180001,
+                "kind": "Apple Music AAC audio file",
+                "bit_rate_kbps": 128,
+                "sample_rate_hz": 44100,
+                "cloud_status": "No Longer Available",
+                "is_file_track": false
+              }
+            ],
+            "reason_by_omitted_index": [
+              [
+                0,
+                "available"
+              ]
+            ]
+          }
+        ],
+        "non_eligible_source_indexes": [
+          3
+        ],
+        "output_tracks": [
+          {
+            "source_index": 1,
+            "database_id": 101,
+            "persistent_id": "WINNER",
+            "title": "Same",
+            "artist": "Artist",
+            "album": "Master",
+            "duration_ms": 180001,
+            "kind": "AIFF audio file",
+            "bit_rate_kbps": 1411,
+            "sample_rate_hz": 96000,
+            "cloud_status": "matched",
+            "is_file_track": true
+          },
+          {
+            "source_index": 2,
+            "database_id": 102,
+            "persistent_id": "UNIQUE",
+            "title": "Unique",
+            "artist": "Solo",
+            "album": "Only",
+            "duration_ms": 200002,
+            "kind": "Apple Music AAC audio file",
+            "bit_rate_kbps": 256,
+            "sample_rate_hz": 48000,
+            "cloud_status": "uploaded",
+            "is_file_track": false
+          },
+          {
+            "source_index": 3,
+            "database_id": 103,
+            "persistent_id": "NONELIGIBLE",
+            "title": "Missing Artist",
+            "artist": "",
+            "album": "Unknown",
+            "duration_ms": 210003,
+            "kind": "MPEG audio file",
+            "bit_rate_kbps": null,
+            "sample_rate_hz": null,
+            "cloud_status": "",
+            "is_file_track": true
+          }
+        ]
+      }
+    }
+  ],
+  "build_merge_plan_cases": [
+    {
+      "name": "fixture_single_copy",
+      "merged_name": "#Musica xTotal",
+      "copies": [
+        {
+          "name": "#Musica xTotal",
+          "persistent_id": "PLAYLIST-123",
+          "tracks": [
+            {
+              "source_index": 0,
+              "database_id": 101,
+              "persistent_id": "TRACK-A",
+              "title": "Rock—Song",
+              "artist": "Björk",
+              "album": "Album One",
+              "duration_ms": 183456,
+              "kind": "Apple Music AAC audio file",
+              "bit_rate_kbps": 256,
+              "sample_rate_hz": 44100,
+              "cloud_status": "matched",
+              "is_file_track": false
+            },
+            {
+              "source_index": 1,
+              "database_id": 202,
+              "persistent_id": "TRACK-B",
+              "title": "Local Song",
+              "artist": "Artist",
+              "album": "",
+              "duration_ms": null,
+              "kind": "MPEG audio file",
+              "bit_rate_kbps": null,
+              "sample_rate_hz": null,
+              "cloud_status": "",
+              "is_file_track": true
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "merged_playlist_source_name": "#Musica xTotal",
+        "winner_source_indexes": [
+          0,
+          1
+        ],
+        "decisions": [],
+        "non_eligible_source_indexes": [
+          1
+        ],
+        "combined_track_count": 2,
+        "copy_boundaries": [
+          2
+        ],
+        "combined_tracks": [
+          {
+            "source_index": 0,
+            "database_id": 101,
+            "persistent_id": "TRACK-A",
+            "title": "Rock—Song",
+            "artist": "Björk",
+            "album": "Album One",
+            "duration_ms": 183456,
+            "kind": "Apple Music AAC audio file",
+            "bit_rate_kbps": 256,
+            "sample_rate_hz": 44100,
+            "cloud_status": "matched",
+            "is_file_track": false
+          },
+          {
+            "source_index": 1,
+            "database_id": 202,
+            "persistent_id": "TRACK-B",
+            "title": "Local Song",
+            "artist": "Artist",
+            "album": "",
+            "duration_ms": null,
+            "kind": "MPEG audio file",
+            "bit_rate_kbps": null,
+            "sample_rate_hz": null,
+            "cloud_status": "",
+            "is_file_track": true
+          }
+        ],
+        "output_tracks": [
+          {
+            "source_index": 0,
+            "database_id": 101,
+            "persistent_id": "TRACK-A",
+            "title": "Rock—Song",
+            "artist": "Björk",
+            "album": "Album One",
+            "duration_ms": 183456,
+            "kind": "Apple Music AAC audio file",
+            "bit_rate_kbps": 256,
+            "sample_rate_hz": 44100,
+            "cloud_status": "matched",
+            "is_file_track": false
+          },
+          {
+            "source_index": 1,
+            "database_id": 202,
+            "persistent_id": "TRACK-B",
+            "title": "Local Song",
+            "artist": "Artist",
+            "album": "",
+            "duration_ms": null,
+            "kind": "MPEG audio file",
+            "bit_rate_kbps": null,
+            "sample_rate_hz": null,
+            "cloud_status": "",
+            "is_file_track": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "fixture_two_copies",
+      "merged_name": "#Musica xTotal",
+      "copies": [
+        {
+          "name": "#Musica xTotal",
+          "persistent_id": "PLAYLIST-123",
+          "tracks": [
+            {
+              "source_index": 0,
+              "database_id": 101,
+              "persistent_id": "TRACK-A",
+              "title": "Rock—Song",
+              "artist": "Björk",
+              "album": "Album One",
+              "duration_ms": 183456,
+              "kind": "Apple Music AAC audio file",
+              "bit_rate_kbps": 256,
+              "sample_rate_hz": 44100,
+              "cloud_status": "matched",
+              "is_file_track": false
+            },
+            {
+              "source_index": 1,
+              "database_id": 202,
+              "persistent_id": "TRACK-B",
+              "title": "Local Song",
+              "artist": "Artist",
+              "album": "",
+              "duration_ms": null,
+              "kind": "MPEG audio file",
+              "bit_rate_kbps": null,
+              "sample_rate_hz": null,
+              "cloud_status": "",
+              "is_file_track": true
+            }
+          ]
+        },
+        {
+          "name": "#Musica xTotal",
+          "persistent_id": "PLAYLIST-456",
+          "tracks": [
+            {
+              "source_index": 0,
+              "database_id": 101,
+              "persistent_id": "TRACK-A",
+              "title": "Rock—Song",
+              "artist": "Björk",
+              "album": "Album One",
+              "duration_ms": 183456,
+              "kind": "Apple Music AAC audio file",
+              "bit_rate_kbps": 256,
+              "sample_rate_hz": 44100,
+              "cloud_status": "matched",
+              "is_file_track": false
+            },
+            {
+              "source_index": 1,
+              "database_id": 202,
+              "persistent_id": "TRACK-B",
+              "title": "Local Song",
+              "artist": "Artist",
+              "album": "",
+              "duration_ms": null,
+              "kind": "MPEG audio file",
+              "bit_rate_kbps": null,
+              "sample_rate_hz": null,
+              "cloud_status": "",
+              "is_file_track": true
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "merged_playlist_source_name": "#Musica xTotal",
+        "winner_source_indexes": [
+          0,
+          1,
+          3
+        ],
+        "decisions": [
+          {
+            "first_source_index": 0,
+            "winner": {
+              "source_index": 0,
+              "database_id": 101,
+              "persistent_id": "TRACK-A",
+              "title": "Rock—Song",
+              "artist": "Björk",
+              "album": "Album One",
+              "duration_ms": 183456,
+              "kind": "Apple Music AAC audio file",
+              "bit_rate_kbps": 256,
+              "sample_rate_hz": 44100,
+              "cloud_status": "matched",
+              "is_file_track": false
+            },
+            "omitted": [
+              {
+                "source_index": 2,
+                "database_id": 101,
+                "persistent_id": "TRACK-A",
+                "title": "Rock—Song",
+                "artist": "Björk",
+                "album": "Album One",
+                "duration_ms": 183456,
+                "kind": "Apple Music AAC audio file",
+                "bit_rate_kbps": 256,
+                "sample_rate_hz": 44100,
+                "cloud_status": "matched",
+                "is_file_track": false
+              }
+            ],
+            "reason_by_omitted_index": [
+              [
+                2,
+                "source order"
+              ]
+            ]
+          }
+        ],
+        "non_eligible_source_indexes": [
+          1,
+          3
+        ],
+        "combined_track_count": 4,
+        "copy_boundaries": [
+          2,
+          4
+        ],
+        "combined_tracks": [
+          {
+            "source_index": 0,
+            "database_id": 101,
+            "persistent_id": "TRACK-A",
+            "title": "Rock—Song",
+            "artist": "Björk",
+            "album": "Album One",
+            "duration_ms": 183456,
+            "kind": "Apple Music AAC audio file",
+            "bit_rate_kbps": 256,
+            "sample_rate_hz": 44100,
+            "cloud_status": "matched",
+            "is_file_track": false
+          },
+          {
+            "source_index": 1,
+            "database_id": 202,
+            "persistent_id": "TRACK-B",
+            "title": "Local Song",
+            "artist": "Artist",
+            "album": "",
+            "duration_ms": null,
+            "kind": "MPEG audio file",
+            "bit_rate_kbps": null,
+            "sample_rate_hz": null,
+            "cloud_status": "",
+            "is_file_track": true
+          },
+          {
+            "source_index": 2,
+            "database_id": 101,
+            "persistent_id": "TRACK-A",
+            "title": "Rock—Song",
+            "artist": "Björk",
+            "album": "Album One",
+            "duration_ms": 183456,
+            "kind": "Apple Music AAC audio file",
+            "bit_rate_kbps": 256,
+            "sample_rate_hz": 44100,
+            "cloud_status": "matched",
+            "is_file_track": false
+          },
+          {
+            "source_index": 3,
+            "database_id": 202,
+            "persistent_id": "TRACK-B",
+            "title": "Local Song",
+            "artist": "Artist",
+            "album": "",
+            "duration_ms": null,
+            "kind": "MPEG audio file",
+            "bit_rate_kbps": null,
+            "sample_rate_hz": null,
+            "cloud_status": "",
+            "is_file_track": true
+          }
+        ],
+        "output_tracks": [
+          {
+            "source_index": 0,
+            "database_id": 101,
+            "persistent_id": "TRACK-A",
+            "title": "Rock—Song",
+            "artist": "Björk",
+            "album": "Album One",
+            "duration_ms": 183456,
+            "kind": "Apple Music AAC audio file",
+            "bit_rate_kbps": 256,
+            "sample_rate_hz": 44100,
+            "cloud_status": "matched",
+            "is_file_track": false
+          },
+          {
+            "source_index": 1,
+            "database_id": 202,
+            "persistent_id": "TRACK-B",
+            "title": "Local Song",
+            "artist": "Artist",
+            "album": "",
+            "duration_ms": null,
+            "kind": "MPEG audio file",
+            "bit_rate_kbps": null,
+            "sample_rate_hz": null,
+            "cloud_status": "",
+            "is_file_track": true
+          },
+          {
+            "source_index": 3,
+            "database_id": 202,
+            "persistent_id": "TRACK-B",
+            "title": "Local Song",
+            "artist": "Artist",
+            "album": "",
+            "duration_ms": null,
+            "kind": "MPEG audio file",
+            "bit_rate_kbps": null,
+            "sample_rate_hz": null,
+            "cloud_status": "",
+            "is_file_track": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "cross_copy_duplicate_prefers_quality",
+      "merged_name": "90s Techno",
+      "copies": [
+        {
+          "name": "90s Techno",
+          "persistent_id": "PID-A",
+          "tracks": [
+            {
+              "source_index": 0,
+              "database_id": 1,
+              "persistent_id": "LOSSY",
+              "title": "Firestarter",
+              "artist": "The Prodigy",
+              "album": "Album",
+              "duration_ms": 280000,
+              "kind": "Apple Music AAC audio file",
+              "bit_rate_kbps": 256,
+              "sample_rate_hz": 44100,
+              "cloud_status": "",
+              "is_file_track": false
+            },
+            {
+              "source_index": 1,
+              "database_id": 2,
+              "persistent_id": "ONLY-A",
+              "title": "Around the World",
+              "artist": "Daft Punk",
+              "album": "Album",
+              "duration_ms": 430000,
+              "kind": "Apple Music AAC audio file",
+              "bit_rate_kbps": 256,
+              "sample_rate_hz": 44100,
+              "cloud_status": "",
+              "is_file_track": false
+            }
+          ]
+        },
+        {
+          "name": "90s Techno",
+          "persistent_id": "PID-B",
+          "tracks": [
+            {
+              "source_index": 0,
+              "database_id": 3,
+              "persistent_id": "LOSSLESS",
+              "title": "Firestarter",
+              "artist": "The Prodigy",
+              "album": "Album",
+              "duration_ms": 280000,
+              "kind": "AIFF audio file",
+              "bit_rate_kbps": 256,
+              "sample_rate_hz": 96000,
+              "cloud_status": "",
+              "is_file_track": false
+            },
+            {
+              "source_index": 1,
+              "database_id": 4,
+              "persistent_id": "ONLY-B",
+              "title": "Enjoy the Silence",
+              "artist": "Depeche Mode",
+              "album": "Album",
+              "duration_ms": 370000,
+              "kind": "Apple Music AAC audio file",
+              "bit_rate_kbps": 256,
+              "sample_rate_hz": 44100,
+              "cloud_status": "",
+              "is_file_track": false
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "merged_playlist_source_name": "90s Techno",
+        "winner_source_indexes": [
+          2,
+          1,
+          3
+        ],
+        "decisions": [
+          {
+            "first_source_index": 0,
+            "winner": {
+              "source_index": 2,
+              "database_id": 3,
+              "persistent_id": "LOSSLESS",
+              "title": "Firestarter",
+              "artist": "The Prodigy",
+              "album": "Album",
+              "duration_ms": 280000,
+              "kind": "AIFF audio file",
+              "bit_rate_kbps": 256,
+              "sample_rate_hz": 96000,
+              "cloud_status": "",
+              "is_file_track": false
+            },
+            "omitted": [
+              {
+                "source_index": 0,
+                "database_id": 1,
+                "persistent_id": "LOSSY",
+                "title": "Firestarter",
+                "artist": "The Prodigy",
+                "album": "Album",
+                "duration_ms": 280000,
+                "kind": "Apple Music AAC audio file",
+                "bit_rate_kbps": 256,
+                "sample_rate_hz": 44100,
+                "cloud_status": "",
+                "is_file_track": false
+              }
+            ],
+            "reason_by_omitted_index": [
+              [
+                0,
+                "lossless kind"
+              ]
+            ]
+          }
+        ],
+        "non_eligible_source_indexes": [],
+        "combined_track_count": 4,
+        "copy_boundaries": [
+          2,
+          4
+        ],
+        "combined_tracks": [
+          {
+            "source_index": 0,
+            "database_id": 1,
+            "persistent_id": "LOSSY",
+            "title": "Firestarter",
+            "artist": "The Prodigy",
+            "album": "Album",
+            "duration_ms": 280000,
+            "kind": "Apple Music AAC audio file",
+            "bit_rate_kbps": 256,
+            "sample_rate_hz": 44100,
+            "cloud_status": "",
+            "is_file_track": false
+          },
+          {
+            "source_index": 1,
+            "database_id": 2,
+            "persistent_id": "ONLY-A",
+            "title": "Around the World",
+            "artist": "Daft Punk",
+            "album": "Album",
+            "duration_ms": 430000,
+            "kind": "Apple Music AAC audio file",
+            "bit_rate_kbps": 256,
+            "sample_rate_hz": 44100,
+            "cloud_status": "",
+            "is_file_track": false
+          },
+          {
+            "source_index": 2,
+            "database_id": 3,
+            "persistent_id": "LOSSLESS",
+            "title": "Firestarter",
+            "artist": "The Prodigy",
+            "album": "Album",
+            "duration_ms": 280000,
+            "kind": "AIFF audio file",
+            "bit_rate_kbps": 256,
+            "sample_rate_hz": 96000,
+            "cloud_status": "",
+            "is_file_track": false
+          },
+          {
+            "source_index": 3,
+            "database_id": 4,
+            "persistent_id": "ONLY-B",
+            "title": "Enjoy the Silence",
+            "artist": "Depeche Mode",
+            "album": "Album",
+            "duration_ms": 370000,
+            "kind": "Apple Music AAC audio file",
+            "bit_rate_kbps": 256,
+            "sample_rate_hz": 44100,
+            "cloud_status": "",
+            "is_file_track": false
+          }
+        ],
+        "output_tracks": [
+          {
+            "source_index": 2,
+            "database_id": 3,
+            "persistent_id": "LOSSLESS",
+            "title": "Firestarter",
+            "artist": "The Prodigy",
+            "album": "Album",
+            "duration_ms": 280000,
+            "kind": "AIFF audio file",
+            "bit_rate_kbps": 256,
+            "sample_rate_hz": 96000,
+            "cloud_status": "",
+            "is_file_track": false
+          },
+          {
+            "source_index": 1,
+            "database_id": 2,
+            "persistent_id": "ONLY-A",
+            "title": "Around the World",
+            "artist": "Daft Punk",
+            "album": "Album",
+            "duration_ms": 430000,
+            "kind": "Apple Music AAC audio file",
+            "bit_rate_kbps": 256,
+            "sample_rate_hz": 44100,
+            "cloud_status": "",
+            "is_file_track": false
+          },
+          {
+            "source_index": 3,
+            "database_id": 4,
+            "persistent_id": "ONLY-B",
+            "title": "Enjoy the Silence",
+            "artist": "Depeche Mode",
+            "album": "Album",
+            "duration_ms": 370000,
+            "kind": "Apple Music AAC audio file",
+            "bit_rate_kbps": 256,
+            "sample_rate_hz": 44100,
+            "cloud_status": "",
+            "is_file_track": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "three_copies",
+      "merged_name": "90s Techno",
+      "copies": [
+        {
+          "name": "90s Techno",
+          "persistent_id": "PID-A",
+          "tracks": [
+            {
+              "source_index": 0,
+              "database_id": 1,
+              "persistent_id": "LOSSY",
+              "title": "Firestarter",
+              "artist": "The Prodigy",
+              "album": "Album",
+              "duration_ms": 280000,
+              "kind": "Apple Music AAC audio file",
+              "bit_rate_kbps": 256,
+              "sample_rate_hz": 44100,
+              "cloud_status": "",
+              "is_file_track": false
+            },
+            {
+              "source_index": 1,
+              "database_id": 2,
+              "persistent_id": "ONLY-A",
+              "title": "Around the World",
+              "artist": "Daft Punk",
+              "album": "Album",
+              "duration_ms": 430000,
+              "kind": "Apple Music AAC audio file",
+              "bit_rate_kbps": 256,
+              "sample_rate_hz": 44100,
+              "cloud_status": "",
+              "is_file_track": false
+            }
+          ]
+        },
+        {
+          "name": "90s Techno",
+          "persistent_id": "PID-B",
+          "tracks": [
+            {
+              "source_index": 0,
+              "database_id": 3,
+              "persistent_id": "LOSSLESS",
+              "title": "Firestarter",
+              "artist": "The Prodigy",
+              "album": "Album",
+              "duration_ms": 280000,
+              "kind": "AIFF audio file",
+              "bit_rate_kbps": 256,
+              "sample_rate_hz": 96000,
+              "cloud_status": "",
+              "is_file_track": false
+            },
+            {
+              "source_index": 1,
+              "database_id": 4,
+              "persistent_id": "ONLY-B",
+              "title": "Enjoy the Silence",
+              "artist": "Depeche Mode",
+              "album": "Album",
+              "duration_ms": 370000,
+              "kind": "Apple Music AAC audio file",
+              "bit_rate_kbps": 256,
+              "sample_rate_hz": 44100,
+              "cloud_status": "",
+              "is_file_track": false
+            }
+          ]
+        },
+        {
+          "name": "90s Techno",
+          "persistent_id": "PID-C",
+          "tracks": [
+            {
+              "source_index": 0,
+              "database_id": 5,
+              "persistent_id": "ONLY-C",
+              "title": "Sandstorm",
+              "artist": "Darude",
+              "album": "Album",
+              "duration_ms": 350000,
+              "kind": "Apple Music AAC audio file",
+              "bit_rate_kbps": 256,
+              "sample_rate_hz": 44100,
+              "cloud_status": "",
+              "is_file_track": false
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "merged_playlist_source_name": "90s Techno",
+        "winner_source_indexes": [
+          2,
+          1,
+          3,
+          4
+        ],
+        "decisions": [
+          {
+            "first_source_index": 0,
+            "winner": {
+              "source_index": 2,
+              "database_id": 3,
+              "persistent_id": "LOSSLESS",
+              "title": "Firestarter",
+              "artist": "The Prodigy",
+              "album": "Album",
+              "duration_ms": 280000,
+              "kind": "AIFF audio file",
+              "bit_rate_kbps": 256,
+              "sample_rate_hz": 96000,
+              "cloud_status": "",
+              "is_file_track": false
+            },
+            "omitted": [
+              {
+                "source_index": 0,
+                "database_id": 1,
+                "persistent_id": "LOSSY",
+                "title": "Firestarter",
+                "artist": "The Prodigy",
+                "album": "Album",
+                "duration_ms": 280000,
+                "kind": "Apple Music AAC audio file",
+                "bit_rate_kbps": 256,
+                "sample_rate_hz": 44100,
+                "cloud_status": "",
+                "is_file_track": false
+              }
+            ],
+            "reason_by_omitted_index": [
+              [
+                0,
+                "lossless kind"
+              ]
+            ]
+          }
+        ],
+        "non_eligible_source_indexes": [],
+        "combined_track_count": 5,
+        "copy_boundaries": [
+          2,
+          4,
+          5
+        ],
+        "combined_tracks": [
+          {
+            "source_index": 0,
+            "database_id": 1,
+            "persistent_id": "LOSSY",
+            "title": "Firestarter",
+            "artist": "The Prodigy",
+            "album": "Album",
+            "duration_ms": 280000,
+            "kind": "Apple Music AAC audio file",
+            "bit_rate_kbps": 256,
+            "sample_rate_hz": 44100,
+            "cloud_status": "",
+            "is_file_track": false
+          },
+          {
+            "source_index": 1,
+            "database_id": 2,
+            "persistent_id": "ONLY-A",
+            "title": "Around the World",
+            "artist": "Daft Punk",
+            "album": "Album",
+            "duration_ms": 430000,
+            "kind": "Apple Music AAC audio file",
+            "bit_rate_kbps": 256,
+            "sample_rate_hz": 44100,
+            "cloud_status": "",
+            "is_file_track": false
+          },
+          {
+            "source_index": 2,
+            "database_id": 3,
+            "persistent_id": "LOSSLESS",
+            "title": "Firestarter",
+            "artist": "The Prodigy",
+            "album": "Album",
+            "duration_ms": 280000,
+            "kind": "AIFF audio file",
+            "bit_rate_kbps": 256,
+            "sample_rate_hz": 96000,
+            "cloud_status": "",
+            "is_file_track": false
+          },
+          {
+            "source_index": 3,
+            "database_id": 4,
+            "persistent_id": "ONLY-B",
+            "title": "Enjoy the Silence",
+            "artist": "Depeche Mode",
+            "album": "Album",
+            "duration_ms": 370000,
+            "kind": "Apple Music AAC audio file",
+            "bit_rate_kbps": 256,
+            "sample_rate_hz": 44100,
+            "cloud_status": "",
+            "is_file_track": false
+          },
+          {
+            "source_index": 4,
+            "database_id": 5,
+            "persistent_id": "ONLY-C",
+            "title": "Sandstorm",
+            "artist": "Darude",
+            "album": "Album",
+            "duration_ms": 350000,
+            "kind": "Apple Music AAC audio file",
+            "bit_rate_kbps": 256,
+            "sample_rate_hz": 44100,
+            "cloud_status": "",
+            "is_file_track": false
+          }
+        ],
+        "output_tracks": [
+          {
+            "source_index": 2,
+            "database_id": 3,
+            "persistent_id": "LOSSLESS",
+            "title": "Firestarter",
+            "artist": "The Prodigy",
+            "album": "Album",
+            "duration_ms": 280000,
+            "kind": "AIFF audio file",
+            "bit_rate_kbps": 256,
+            "sample_rate_hz": 96000,
+            "cloud_status": "",
+            "is_file_track": false
+          },
+          {
+            "source_index": 1,
+            "database_id": 2,
+            "persistent_id": "ONLY-A",
+            "title": "Around the World",
+            "artist": "Daft Punk",
+            "album": "Album",
+            "duration_ms": 430000,
+            "kind": "Apple Music AAC audio file",
+            "bit_rate_kbps": 256,
+            "sample_rate_hz": 44100,
+            "cloud_status": "",
+            "is_file_track": false
+          },
+          {
+            "source_index": 3,
+            "database_id": 4,
+            "persistent_id": "ONLY-B",
+            "title": "Enjoy the Silence",
+            "artist": "Depeche Mode",
+            "album": "Album",
+            "duration_ms": 370000,
+            "kind": "Apple Music AAC audio file",
+            "bit_rate_kbps": 256,
+            "sample_rate_hz": 44100,
+            "cloud_status": "",
+            "is_file_track": false
+          },
+          {
+            "source_index": 4,
+            "database_id": 5,
+            "persistent_id": "ONLY-C",
+            "title": "Sandstorm",
+            "artist": "Darude",
+            "album": "Album",
+            "duration_ms": 350000,
+            "kind": "Apple Music AAC audio file",
+            "bit_rate_kbps": 256,
+            "sample_rate_hz": 44100,
+            "cloud_status": "",
+            "is_file_track": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "merge_with_empty_middle_copy",
+      "merged_name": "90s Techno",
+      "copies": [
+        {
+          "name": "90s Techno",
+          "persistent_id": "PID-A",
+          "tracks": [
+            {
+              "source_index": 0,
+              "database_id": 1,
+              "persistent_id": "LOSSY",
+              "title": "Firestarter",
+              "artist": "The Prodigy",
+              "album": "Album",
+              "duration_ms": 280000,
+              "kind": "Apple Music AAC audio file",
+              "bit_rate_kbps": 256,
+              "sample_rate_hz": 44100,
+              "cloud_status": "",
+              "is_file_track": false
+            },
+            {
+              "source_index": 1,
+              "database_id": 2,
+              "persistent_id": "ONLY-A",
+              "title": "Around the World",
+              "artist": "Daft Punk",
+              "album": "Album",
+              "duration_ms": 430000,
+              "kind": "Apple Music AAC audio file",
+              "bit_rate_kbps": 256,
+              "sample_rate_hz": 44100,
+              "cloud_status": "",
+              "is_file_track": false
+            }
+          ]
+        },
+        {
+          "name": "90s Techno",
+          "persistent_id": "PID-EMPTY",
+          "tracks": []
+        },
+        {
+          "name": "90s Techno",
+          "persistent_id": "PID-B",
+          "tracks": [
+            {
+              "source_index": 0,
+              "database_id": 3,
+              "persistent_id": "LOSSLESS",
+              "title": "Firestarter",
+              "artist": "The Prodigy",
+              "album": "Album",
+              "duration_ms": 280000,
+              "kind": "AIFF audio file",
+              "bit_rate_kbps": 256,
+              "sample_rate_hz": 96000,
+              "cloud_status": "",
+              "is_file_track": false
+            },
+            {
+              "source_index": 1,
+              "database_id": 4,
+              "persistent_id": "ONLY-B",
+              "title": "Enjoy the Silence",
+              "artist": "Depeche Mode",
+              "album": "Album",
+              "duration_ms": 370000,
+              "kind": "Apple Music AAC audio file",
+              "bit_rate_kbps": 256,
+              "sample_rate_hz": 44100,
+              "cloud_status": "",
+              "is_file_track": false
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "merged_playlist_source_name": "90s Techno",
+        "winner_source_indexes": [
+          2,
+          1,
+          3
+        ],
+        "decisions": [
+          {
+            "first_source_index": 0,
+            "winner": {
+              "source_index": 2,
+              "database_id": 3,
+              "persistent_id": "LOSSLESS",
+              "title": "Firestarter",
+              "artist": "The Prodigy",
+              "album": "Album",
+              "duration_ms": 280000,
+              "kind": "AIFF audio file",
+              "bit_rate_kbps": 256,
+              "sample_rate_hz": 96000,
+              "cloud_status": "",
+              "is_file_track": false
+            },
+            "omitted": [
+              {
+                "source_index": 0,
+                "database_id": 1,
+                "persistent_id": "LOSSY",
+                "title": "Firestarter",
+                "artist": "The Prodigy",
+                "album": "Album",
+                "duration_ms": 280000,
+                "kind": "Apple Music AAC audio file",
+                "bit_rate_kbps": 256,
+                "sample_rate_hz": 44100,
+                "cloud_status": "",
+                "is_file_track": false
+              }
+            ],
+            "reason_by_omitted_index": [
+              [
+                0,
+                "lossless kind"
+              ]
+            ]
+          }
+        ],
+        "non_eligible_source_indexes": [],
+        "combined_track_count": 4,
+        "copy_boundaries": [
+          2,
+          2,
+          4
+        ],
+        "combined_tracks": [
+          {
+            "source_index": 0,
+            "database_id": 1,
+            "persistent_id": "LOSSY",
+            "title": "Firestarter",
+            "artist": "The Prodigy",
+            "album": "Album",
+            "duration_ms": 280000,
+            "kind": "Apple Music AAC audio file",
+            "bit_rate_kbps": 256,
+            "sample_rate_hz": 44100,
+            "cloud_status": "",
+            "is_file_track": false
+          },
+          {
+            "source_index": 1,
+            "database_id": 2,
+            "persistent_id": "ONLY-A",
+            "title": "Around the World",
+            "artist": "Daft Punk",
+            "album": "Album",
+            "duration_ms": 430000,
+            "kind": "Apple Music AAC audio file",
+            "bit_rate_kbps": 256,
+            "sample_rate_hz": 44100,
+            "cloud_status": "",
+            "is_file_track": false
+          },
+          {
+            "source_index": 2,
+            "database_id": 3,
+            "persistent_id": "LOSSLESS",
+            "title": "Firestarter",
+            "artist": "The Prodigy",
+            "album": "Album",
+            "duration_ms": 280000,
+            "kind": "AIFF audio file",
+            "bit_rate_kbps": 256,
+            "sample_rate_hz": 96000,
+            "cloud_status": "",
+            "is_file_track": false
+          },
+          {
+            "source_index": 3,
+            "database_id": 4,
+            "persistent_id": "ONLY-B",
+            "title": "Enjoy the Silence",
+            "artist": "Depeche Mode",
+            "album": "Album",
+            "duration_ms": 370000,
+            "kind": "Apple Music AAC audio file",
+            "bit_rate_kbps": 256,
+            "sample_rate_hz": 44100,
+            "cloud_status": "",
+            "is_file_track": false
+          }
+        ],
+        "output_tracks": [
+          {
+            "source_index": 2,
+            "database_id": 3,
+            "persistent_id": "LOSSLESS",
+            "title": "Firestarter",
+            "artist": "The Prodigy",
+            "album": "Album",
+            "duration_ms": 280000,
+            "kind": "AIFF audio file",
+            "bit_rate_kbps": 256,
+            "sample_rate_hz": 96000,
+            "cloud_status": "",
+            "is_file_track": false
+          },
+          {
+            "source_index": 1,
+            "database_id": 2,
+            "persistent_id": "ONLY-A",
+            "title": "Around the World",
+            "artist": "Daft Punk",
+            "album": "Album",
+            "duration_ms": 430000,
+            "kind": "Apple Music AAC audio file",
+            "bit_rate_kbps": 256,
+            "sample_rate_hz": 44100,
+            "cloud_status": "",
+            "is_file_track": false
+          },
+          {
+            "source_index": 3,
+            "database_id": 4,
+            "persistent_id": "ONLY-B",
+            "title": "Enjoy the Silence",
+            "artist": "Depeche Mode",
+            "album": "Album",
+            "duration_ms": 370000,
+            "kind": "Apple Music AAC audio file",
+            "bit_rate_kbps": 256,
+            "sample_rate_hz": 44100,
+            "cloud_status": "",
+            "is_file_track": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "single_empty_copy",
+      "merged_name": "Empty",
+      "copies": [
+        {
+          "name": "Empty",
+          "persistent_id": "PID-EMPTY",
+          "tracks": []
+        }
+      ],
+      "expected": {
+        "merged_playlist_source_name": "Empty",
+        "winner_source_indexes": [],
+        "decisions": [],
+        "non_eligible_source_indexes": [],
+        "combined_track_count": 0,
+        "copy_boundaries": [
+          0
+        ],
+        "combined_tracks": [],
+        "output_tracks": []
+      }
+    }
+  ]
+}
