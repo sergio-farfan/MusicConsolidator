@@ -226,6 +226,39 @@ struct CleanupCandidacyTests {
         #expect(reason.contains("CPYBBBB000000002"))
     }
 
+    @Test("rule 2 at gate-arm: armVerification catches a copy that is still live but renamed away from the group name (present in the full listing, absent from the name-scoped snapshot)")
+    func armVerificationCatchesRenamedLiveCopy() async throws {
+        let fixture = try CleanupFixture()
+        defer { fixture.cleanUp() }
+        let copies = cleanupFixtureCopies()
+        let plan = try buildMergePlan(name: "Trance 2022", copies: copies)
+        try fixture.writePlan(plan, at: planDate)
+        let target = verifiedCleanupTarget(for: plan, name: "Trance 2022 \u{2014} Merged")
+        let scanner = fixture.scanner()
+        let group = try #require(scanner.discoverGroups().first)
+        // Copy B (CPYBBBB000000002) is still live in the library, but has
+        // been renamed away from the group's exact name since the plan was
+        // written -- still present in the FULL listing by persistent ID, but
+        // no longer returned by the name-scoped snapshot() (groupLiveCopies).
+        let renamedListingEntry = PlaylistListing(
+            playlistId: 42,
+            name: "Trance 2022 (renamed)",
+            persistentId: copies[1].persistentId,
+            trackCount: copies[1].tracks.count,
+            isSmart: false,
+            specialKind: "none"
+        )
+
+        let reason = try #require(try scanner.armVerification(
+            group: group,
+            listing: [renamedListingEntry],
+            groupLiveCopies: [copies[0]],
+            targetLiveCopies: [target]
+        ))
+        #expect(reason.contains("CPYBBBB000000002"))
+        #expect(reason.contains("no longer bears the group name"))
+    }
+
     @Test("rule 2: an absent copy WITHOUT a recorded delete disqualifies")
     func rule2AbsentUnaccountedDisqualifies() async throws {
         let fixture = try CleanupFixture()

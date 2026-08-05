@@ -1,10 +1,12 @@
 // CleanupScanner.swift
 // B3 post-merge cleanup discovery: candidate groups come from EVIDENCE
 // (reports/ merge-plan artifacts loaded through the same fail-closed
-// loadMergePlan gate as apply), never guesswork. This task ships discovery
-// only (grouping, newest plan, target-name resolution); the candidacy rules
-// 1-4 land in scan() (Task 11). All live Music access is injected as
-// closures so tests run on fixtures and this file never talks to OSA.
+// loadMergePlan gate as apply), never guesswork. scan() applies candidacy
+// rules 1-4 against ONE listing read (listing-only, no per-track live data);
+// the full ordered-track re-verification lives in armVerification, run only
+// at gate-arm for one group at a time. All live Music access is injected as
+// closures (one listPlaylists closure here) so tests run on fixtures and
+// this file never talks to OSA.
 
 import Foundation
 import ConsolidatorCore
@@ -26,8 +28,8 @@ struct CleanupCandidate: Equatable, Identifiable {
     let targetName: String
     /// True when the target name exists exactly once in the live listing
     /// (scalar-exact name match); this is NOT the ordered-database-ID/
-    /// persistent-ID verification — that now happens only at gate-arm (a
-    /// later task wires it in).
+    /// persistent-ID verification — that happens only at gate-arm, via
+    /// `armVerification` (called from `AuditFlowModel.armCleanupGroup`).
     let targetPresent: Bool
     let copies: [CleanupCopyStatus]
     let disqualification: String?  // nil == candidate; else shown reason
@@ -462,7 +464,20 @@ final class CleanupScanner {
         for planCopy in group.plan.copies {
             guard let live = groupLiveCopies.first(
                 where: { scalarExact($0.persistentId, planCopy.persistentId) }
-            ) else { continue }
+            ) else {
+                // Present in the listing (by PID) but absent from the
+                // name-scoped snapshot means it's still live, just no longer
+                // named the group's exact name -- a rename, not a vanish.
+                // Absent-from-the-listing entirely is a DIFFERENT case
+                // already caught by the listing-level scan()'s Rule 2, so
+                // this copy reaching armVerification at all already implies
+                // listing presence.
+                if listing.contains(where: { scalarExact($0.persistentId, planCopy.persistentId) }) {
+                    return "copy \(planCopy.persistentId) no longer bears the group "
+                        + "name \"\(group.groupName)\""
+                }
+                continue
+            }
             if let drift = copyDriftReason(planCopy: planCopy, live: live) {
                 return "copy \(planCopy.persistentId) drifted: \(drift)"
             }
