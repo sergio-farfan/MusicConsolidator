@@ -200,7 +200,11 @@ armed — scoped to just that group's two names, never at discovery — and
 the scan itself holds the OSA slot like every other mutation activity. It
 deletes a group's source copies one compiled execution at a time behind a
 single per-group typed approval — the one named exception to
-one-approval-per-playlist. Browser rows carry
+one-approval-per-playlist. The tab also lists every live playlist:
+any playlist can be deleted there behind the same individually typed
+gate (contract-excluded names and IDs stay refused up front). The
+Library and Cleanup lists order by clickable Name/Tracks headers —
+display-only; ordering never feeds a guard, plan, or queue. Browser rows carry
 Delete…/Rename… actions with refusals surfaced up front as disabled actions
 plus the reason. NEAR MATCHES clusters carry "Align names…": the canonical
 name is the variant equal to its own NFC form with no leading/trailing
