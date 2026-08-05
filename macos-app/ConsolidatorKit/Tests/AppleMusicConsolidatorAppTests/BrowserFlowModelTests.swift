@@ -769,8 +769,8 @@ struct StepNavigationTests {
         #expect(model.canNavigate(to: .source))
         #expect(!model.canNavigate(to: .review))
         #expect(!model.canNavigate(to: .confirm))
-        #expect(model.stepBlockedReason(for: .review) == "Run a read-only audit first.")
-        #expect(model.stepBlockedReason(for: .confirm) == "Run a read-only audit first.")
+        #expect(model.stepBlockedReason(for: .review) == "Run a read-only check first.")
+        #expect(model.stepBlockedReason(for: .confirm) == "Run a read-only check first.")
 
         model.navigate(to: .confirm)
         #expect(model.step == .source)

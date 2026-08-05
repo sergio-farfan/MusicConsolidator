@@ -79,7 +79,7 @@ nonisolated struct QueueStatusStyle: Equatable {
                 symbolName: "circle.dotted", tint: .gray, label: "pending"
             )
         case .auditing:
-            return QueueStatusStyle(symbolName: nil, tint: .blue, label: "auditing\u{2026}")
+            return QueueStatusStyle(symbolName: nil, tint: .blue, label: "reading\u{2026}")
         case .awaitingReview:
             return QueueStatusStyle(
                 symbolName: "doc.text.magnifyingglass",

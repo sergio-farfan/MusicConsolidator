@@ -108,7 +108,7 @@ struct CleanupDiscoveryTests {
 
         ## Daechir ESP ORIG \u{2014} failed
         - Failure (verbatim): source track count mismatch after write: planned 143, actual 141
-        - Failure class: Source drifted after a verified write \u{2014} the created target matches the plan, but the source changed after the audit.
+        - Failure class: Source drifted after a verified write \u{2014} the created target matches the plan, but the source changed after the check.
         - Leftover target: Daechir ESP ORIG \u{2014} Consolidated
         - Plan artifact: Daechir-ESP-ORIG-20260804-090000+0000.plan.json
         """

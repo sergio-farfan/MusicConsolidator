@@ -214,7 +214,7 @@ struct ActivityIdleView: View {
             // The attended audit in flight — the exact presentation
             // screen 1's footer renders for the same RunState case.
             VStack(alignment: .leading, spacing: 8) {
-                Text("Auditing \u{2014} the gate arms in Activity when the audit finishes.")
+                Text("Reading playlists \u{2014} the gate arms in Activity when the check finishes.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
@@ -238,7 +238,7 @@ struct ActivityIdleView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         case .cancelled:
             VStack(alignment: .leading, spacing: 12) {
-                Text("Audit cancelled.")
+                Text("Cancelled.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
                 backToLibraryButton

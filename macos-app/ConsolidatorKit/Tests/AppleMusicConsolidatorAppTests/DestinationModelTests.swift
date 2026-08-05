@@ -107,7 +107,7 @@ struct DestinationModelTests {
         )
         #expect(
             harness.model.destinationBlockedReason(for: .library)
-                == "Wait for the running audit to finish."
+                == "Wait for the running check to finish."
         )
         #expect(harness.model.destinationBlockedReason(for: .activity) == nil)
 

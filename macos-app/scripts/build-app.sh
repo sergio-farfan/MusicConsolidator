@@ -57,8 +57,13 @@ echo "OK: no package dylibs, no @rpath dependencies (static linkage confirmed)"
 step "assemble ${APP}"
 rm -rf "${APP}"
 mkdir -p "${APP}/Contents/MacOS"
+mkdir -p "${APP}/Contents/Resources"
 cp "${BIN_PATH}" "${APP}/Contents/MacOS/${EXEC_NAME}"
 printf 'APPL????' > "${APP}/Contents/PkgInfo"
+
+ICON_SRC="${MACOS_APP_DIR}/assets/appicon/AppIcon.icns"
+[ -f "${ICON_SRC}" ] || fail "app icon not found: ${ICON_SRC}"
+cp "${ICON_SRC}" "${APP}/Contents/Resources/AppIcon.icns"
 
 cat > "${APP}/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
@@ -75,6 +80,8 @@ cat > "${APP}/Contents/Info.plist" <<'PLIST'
 	<string>Apple Music Consolidator</string>
 	<key>CFBundleExecutable</key>
 	<string>AppleMusicConsolidator</string>
+	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>

@@ -313,17 +313,16 @@ struct ApplyStructuralViewTests {
         #expect(await pollUntil { runner.runCount == 2 })
 
         let fixture = HostedFixture(SourceSelectionView(model: harness.model))
-        let segmented = views(under: fixture.hosting, classNameContains: "SegmentedControl")
-            .compactMap { $0 as? NSControl }
-            .first
-        let isEnabled = segmented?.isEnabled
+        let pill = view(under: fixture.hosting, axIdentifier: WaveBControlID.tabPill(.merge))
+            as? NSControl
+        let isEnabled = pill?.isEnabled
         fixture.tearDown()
 
         runner.proceed.signal()
         await harness.awaitApply()
 
-        #expect(segmented != nil, "mode picker segmented control missing")
-        #expect(isEnabled == false, "the mode picker must be disabled during an apply")
+        #expect(pill != nil, "mode pill control missing")
+        #expect(isEnabled == false, "the mode pill selector must be disabled during an apply")
     }
 
     // Fix round 1, folded minor f: the tall-mismatch failure cell in QUEUE

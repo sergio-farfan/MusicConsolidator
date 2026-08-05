@@ -281,7 +281,7 @@ nonisolated struct HistoryEntry: Equatable, Sendable, Identifiable {
 
     var kindLabel: String {
         switch kind {
-        case .auditPlan: return "audit plan"
+        case .auditPlan: return "plan"
         case .runReport: return "run report"
         case .other: return "artifact"
         }

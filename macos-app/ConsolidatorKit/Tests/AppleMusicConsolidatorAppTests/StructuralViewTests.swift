@@ -182,8 +182,10 @@ struct StructuralViewTests {
         let fixture = HostedFixture(SourceSelectionView(model: harness.model))
         defer { fixture.tearDown() }
 
-        // Mode control (segmented) is present.
-        #expect(!views(under: fixture.hosting, classNameContains: "SegmentedControl").isEmpty)
+        // Mode control (tab pill selector) is present: one pill per tab.
+        for tab in BrowserTab.allCases {
+            #expect(view(under: fixture.hosting, axIdentifier: WaveBControlID.tabPill(tab)) != nil)
+        }
 
         // Filter field and scan control are present, by identifier.
         #expect(view(under: fixture.hosting, axIdentifier: "m8.filterField") != nil)
@@ -406,11 +408,13 @@ struct StructuralViewTests {
             "hosting grew to \(fixture.hosting.frame.size)"
         )
 
-        let segmented = try #require(
-            views(under: fixture.hosting, classNameContains: "SegmentedControl").first
-        )
-        let segmentedFrame = segmented.convert(segmented.bounds, to: fixture.hosting)
-        #expect(windowBox.contains(segmentedFrame), "mode control at \(segmentedFrame)")
+        for tab in BrowserTab.allCases {
+            let pill = try #require(
+                view(under: fixture.hosting, axIdentifier: WaveBControlID.tabPill(tab))
+            )
+            let pillFrame = pill.convert(pill.bounds, to: fixture.hosting)
+            #expect(windowBox.contains(pillFrame), "mode pill \(tab) at \(pillFrame)")
+        }
 
         let runButton = try #require(
             view(under: fixture.hosting, axIdentifier: "m8.startQueue")

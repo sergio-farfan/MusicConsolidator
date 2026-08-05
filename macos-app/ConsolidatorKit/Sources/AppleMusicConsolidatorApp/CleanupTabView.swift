@@ -149,7 +149,7 @@ struct CleanupTabView: View {
             if candidate.disqualification == nil {
                 Chip(
                     text: candidate.targetPresent
-                        ? "target present \u{2014} verified at gate" : "target unchecked",
+                        ? "target present \u{2014} verified at gate" : "target unverified",
                     tint: candidate.targetPresent ? .green : .orange
                 )
             } else {
@@ -158,7 +158,7 @@ struct CleanupTabView: View {
             Spacer()
             AppKitActionButton(
                 identifier: WaveBControlID.cleanupOpenGate(candidate.planFileName),
-                title: "Open group gate\u{2026}"
+                title: "Clean up\u{2026}"
             ) {
                 model.startCleanupAudit(planFileName: candidate.planFileName)
             }

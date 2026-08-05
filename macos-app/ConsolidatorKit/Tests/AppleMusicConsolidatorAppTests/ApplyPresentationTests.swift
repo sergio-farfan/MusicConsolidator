@@ -140,10 +140,10 @@ struct ApplyFailureClassificationTests {
             MusicBridgeError("live copy count changed after audit: planned 2, actual 1; create a fresh audit")
         )
         #expect(display.failureClass == .libraryDrift)
-        #expect(display.headline == "Library changed since the audit")
+        #expect(display.headline == "Library changed since the check")
         #expect(display.message
             == "live copy count changed after audit: planned 2, actual 1; create a fresh audit")
-        #expect(display.guidance.contains("fresh audit"))
+        #expect(display.guidance.contains("fresh check"))
     }
 
     @Test("an unknown error class falls into unexpected, message verbatim")
@@ -172,7 +172,7 @@ struct ApplyFailureClassificationTests {
         #expect(display.mismatches == result.mismatches)
         #expect(display.plannedCount == 10)
         #expect(display.actualCount == 7)
-        #expect(display.guidance.contains("fresh audit"))
+        #expect(display.guidance.contains("fresh check"))
     }
 }
 

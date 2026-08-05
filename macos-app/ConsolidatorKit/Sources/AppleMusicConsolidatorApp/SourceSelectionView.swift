@@ -52,6 +52,55 @@ struct SourceSelectionView: View {
         model.loadedSections == nil ? "Scan Library (read-only)" : "Rescan"
     }
 
+    private var mergeStartQueueTitle: String {
+        let count = model.checkedGroupNames.count
+        return count == 0 ? "Merge" : "Merge \(count) groups"
+    }
+
+    private var consolidateStartQueueTitle: String {
+        let count = model.checkedPersistentIds.count
+        return count == 0 ? "Consolidate" : "Consolidate \(count) playlists"
+    }
+
+    // MARK: mode/tab pill selector
+
+    private var tabPillSelector: some View {
+        HStack(spacing: 4) {
+            ForEach(BrowserTab.allCases) { tab in
+                ZStack {
+                    if model.browserTab == tab {
+                        Capsule().fill(Color.accentColor.opacity(0.22))
+                    }
+                    AppKitActionButton(
+                        identifier: WaveBControlID.tabPill(tab),
+                        title: tab.displayName,
+                        compressible: true,
+                        systemImage: tabSymbolName(tab)
+                    ) {
+                        model.setBrowserTab(tab)
+                    }
+                    .padding(2)
+                }
+            }
+        }
+        // Wave C hotfix (2026-08-04): was a FIXED `.frame(width: 320)` on
+        // the segmented control it replaced — compresses down to 240
+        // instead of forcing the header past a narrow window's width.
+        .frame(minWidth: 240, idealWidth: 280, maxWidth: 320)
+        .disabled(
+            model.isRunning || model.isQueueActive || model.isApplying
+                || model.isMutationBusy
+        )
+    }
+
+    private func tabSymbolName(_ tab: BrowserTab) -> String {
+        switch tab {
+        case .merge: return "arrow.triangle.merge"
+        case .consolidate: return "rectangle.stack"
+        case .cleanup: return "sparkles"
+        }
+    }
+
     // MARK: header (mode tabs + filter + scan)
 
     private var header: some View {
@@ -60,28 +109,8 @@ struct SourceSelectionView: View {
                 // Mode changes route through the model's guarded setter
                 // (fix round 1, finding 1): a mid-apply flip would orphan
                 // the guarded write's outcome, so the model refuses it AND
-                // the picker disables during an apply.
-                Picker(
-                    "Tab",
-                    selection: Binding(
-                        get: { model.browserTab },
-                        set: { model.setBrowserTab($0) }
-                    )
-                ) {
-                    ForEach(BrowserTab.allCases) { tab in
-                        Text(tab.displayName).tag(tab)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                // Wave C hotfix (2026-08-04): was a FIXED `.frame(width:
-                // 320)` — compresses down to 240 instead of forcing the
-                // header past a narrow window's width.
-                .frame(minWidth: 240, idealWidth: 280, maxWidth: 320)
-                .disabled(
-                    model.isRunning || model.isQueueActive || model.isApplying
-                        || model.isMutationBusy
-                )
+                // the pill selector disables during an apply.
+                tabPillSelector
 
                 AppKitFilterField(
                     identifier: M8ControlID.filterField,
@@ -116,7 +145,7 @@ struct SourceSelectionView: View {
                             Chip(text: "cached", tint: .orange)
                                 .help(
                                     "Restored from the local cache for instant "
-                                        + "startup. Audits and applies ALWAYS re-read "
+                                        + "startup. Reads and applies ALWAYS re-read "
                                         + "Music live; Rescan refreshes this list."
                                 )
                         }
@@ -137,7 +166,7 @@ struct SourceSelectionView: View {
         }
         switch model.mode {
         case .consolidate:
-            return "Consolidate audits ONE single-copy playlist for strict duplicates. "
+            return "Consolidate checks ONE single-copy playlist for strict duplicates. "
                 + "Check playlists to build a batch queue \u{2014} every item still gets "
                 + "its own plan review, confirm gate, and apply."
         case .merge:
@@ -280,7 +309,7 @@ struct SourceSelectionView: View {
                 Spacer()
                 AppKitActionButton(
                     identifier: M8ControlID.startQueue,
-                    title: "Start Merge Queue (read-only audits)",
+                    title: mergeStartQueueTitle,
                     prominent: true
                 ) {
                     model.startQueue()
@@ -315,7 +344,7 @@ struct SourceSelectionView: View {
                 Spacer()
                 AppKitActionButton(
                     identifier: M8ControlID.startQueue,
-                    title: "Start Queue (read-only audits)",
+                    title: consolidateStartQueueTitle,
                     prominent: true
                 ) {
                     model.startQueue()
@@ -349,7 +378,7 @@ struct SourceSelectionView: View {
         case .cancelled:
             Label {
                 Text(
-                    "Audit cancelled. Nothing was applied; any artifacts already "
+                    "Cancelled. Nothing was applied; any artifacts already "
                         + "written remain on disk (they are never overwritten)."
                 )
             } icon: {

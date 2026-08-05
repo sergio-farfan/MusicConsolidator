@@ -258,7 +258,7 @@ nonisolated enum AuditQueueStatus: Equatable, Sendable {
     var displayName: String {
         switch self {
         case .pending: return "pending"
-        case .audited: return "audited"
+        case .audited: return "ready"
         case .applied: return "applied"
         case .skipped: return "skipped"
         case .failed: return "failed"

@@ -745,15 +745,15 @@ final class AuditFlowModel {
     func stepBlockedReason(for step: FlowStep) -> String? {
         guard !canNavigate(to: step) else { return nil }
         if isApplying { return "Wait for the running apply to finish." }
-        if isRunning { return "Wait for the running audit to finish." }
+        if isRunning { return "Wait for the running check to finish." }
         switch step {
         case .source:
             return nil
         case .review:
-            return "Run a read-only audit first."
+            return "Run a read-only check first."
         case .confirm:
             return result == nil
-                ? "Run a read-only audit first."
+                ? "Run a read-only check first."
                 : "Review the plan (step 2) first."
         case .apply:
             return "Apply from the confirm gate (step 3) first."
@@ -798,7 +798,7 @@ final class AuditFlowModel {
     func destinationBlockedReason(for destination: AppDestination) -> String? {
         guard !canSelect(destination) else { return nil }
         if isApplying { return "Wait for the running apply to finish." }
-        return "Wait for the running audit to finish."
+        return "Wait for the running check to finish."
     }
 
     /// The Activity sidebar chip (spec C2.3), derived per render.
@@ -1743,8 +1743,8 @@ final class AuditFlowModel {
             guard auditArtifactsExist(paths) else {
                 throw AuditPipelineError(
                     mode == .consolidate
-                        ? "audit did not produce all three required artifacts"
-                        : "merge audit did not produce all three required artifacts"
+                        ? "the check did not produce all three required artifacts"
+                        : "the merge check did not produce all three required artifacts"
                 )
             }
             return paths
@@ -1822,7 +1822,7 @@ final class AuditFlowModel {
         if let current = currentQueueItem, current.status == .pending,
            scalarExact(current.name, activeAuditName) {
             queue[queueIndex].status = .failed
-            recordRunItem(named: current.name, outcome: .failed(reason: "audit cancelled"))
+            recordRunItem(named: current.name, outcome: .failed(reason: "cancelled"))
             if isRunUnattended { advanceQueue() }
         }
     }
@@ -2018,7 +2018,7 @@ final class AuditFlowModel {
         let age = instant.timeIntervalSince(created)
         if age < 0 || age > 600 {
             return "refused: mutation artifact is stale (age \(Int(age)) s exceeds the "
-                + "600 s freshness contract); run a fresh mutation audit"
+                + "600 s freshness contract); run a fresh safety check"
         }
         if isMutationPlanConsumed(planURL: planURL) {
             return "refused: mutation artifact \(planURL.lastPathComponent) is already "
@@ -2213,8 +2213,8 @@ final class AuditFlowModel {
             }
             guard pinned.tracks.count == entry.trackCount else {
                 throw MutationGateRefusal(
-                    "refused: \u{201C}\(entry.name)\u{201D} drifted during the mutation "
-                        + "audit: the listing reports \(entry.trackCount) tracks, the "
+                    "refused: \u{201C}\(entry.name)\u{201D} drifted during the safety "
+                        + "check: the listing reports \(entry.trackCount) tracks, the "
                         + "snapshot has \(pinned.tracks.count)"
                 )
             }
@@ -2440,7 +2440,7 @@ final class AuditFlowModel {
 
     private nonisolated static func mutationSummaryText(plan: MutationPlan) -> String {
         var lines = [
-            "# Mutation audit \u{2014} \(plan.kind.rawValue)",
+            "# Mutation check \u{2014} \(plan.kind.rawValue)",
             "",
             "- Playlist: \(plan.playlistName)",
             "- Persistent ID: \(plan.playlistPersistentID)",
