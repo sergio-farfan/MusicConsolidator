@@ -2767,8 +2767,8 @@ final class AuditFlowModel {
                 where: { scalarExact($0.persistentId, status.persistentID) }
             ) else {
                 throw failArming(MutationGateRefusal(
-                    "refused: live copy \(status.persistentID) vanished between the "
-                        + "re-check and arming"
+                    "refused: live copy \(status.persistentID) vanished or was renamed "
+                        + "between the re-check and arming"
                 ))
             }
             let plan = MutationPlan(

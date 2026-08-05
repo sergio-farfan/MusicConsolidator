@@ -55,7 +55,7 @@ struct CleanupTabView: View {
                     model.isMutationBusy || model.isRunning || model.isScanning
                         || model.isApplying || model.isUnattendedRunActive
                 )
-                .help("Re-scan reports/ evidence and re-check every group live.")
+                .help("Re-scan reports/ evidence against one fresh live listing; full verification runs when you open a group's gate.")
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
@@ -73,7 +73,7 @@ struct CleanupTabView: View {
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .lineLimit(3)
-                Text("Refresh scans the artifacts and re-checks every group against live Music (read-only).")
+                Text("Refresh reads the artifacts and one fresh live listing (read-only); opening a group's gate re-verifies it fully.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(3)
