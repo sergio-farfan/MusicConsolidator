@@ -1,5 +1,5 @@
 // DestinationPresentation.swift
-// Wave C2 (spec C2.1/C2.3) — the destination shell's value layer: the four
+// Wave C2 (spec C2.1/C2.3) — the destination shell's value layer: the three
 // app destinations the sidebar navigates between. Pure value types only —
 // headlessly testable, no Music, no I/O. The selection STATE lives on
 // AuditFlowModel (it must veto changes while the write path is hot); this
@@ -7,13 +7,12 @@
 
 import SwiftUI
 
-/// The app's four places (spec C2.1). The sidebar holds destinations, not
+/// The app's three places (spec C2.1). The sidebar holds destinations, not
 /// wizard steps; `FlowStep` survives as the Activity staged panel's
 /// internal sequencer only.
 nonisolated enum AppDestination: String, CaseIterable, Identifiable, Sendable {
     case library
     case activity
-    case reports
     case settings
 
     var id: String { rawValue }
@@ -22,19 +21,16 @@ nonisolated enum AppDestination: String, CaseIterable, Identifiable, Sendable {
         switch self {
         case .library: return "Library"
         case .activity: return "Activity"
-        case .reports: return "Reports"
         case .settings: return "Settings"
         }
     }
 
     /// Sidebar row icons, reusing the app's established SF Symbol
-    /// vocabulary (the browser, the run surface, the report glass,
-    /// settings).
+    /// vocabulary (the browser, the run surface, settings).
     var systemImage: String {
         switch self {
         case .library: return "music.note.list"
         case .activity: return "play.circle"
-        case .reports: return "doc.text.magnifyingglass"
         case .settings: return "gearshape"
         }
     }
@@ -43,7 +39,7 @@ nonisolated enum AppDestination: String, CaseIterable, Identifiable, Sendable {
 // MARK: - the Activity status chip (spec C2.3) and the last-run summary
 
 /// The session's last finished batch run, retained AFTER the report is
-/// acknowledged so the Activity idle screen can point at Reports (spec
+/// acknowledged so the Activity idle screen can summarize it (spec
 /// C2.2 state 4, "when one exists this session"). Set by `finishRun` only;
 /// never cleared within a session.
 nonisolated struct LastRunSummary: Equatable, Sendable {
@@ -52,7 +48,7 @@ nonisolated struct LastRunSummary: Equatable, Sendable {
 
     /// The idle caption — exact spec wording.
     var caption: String {
-        "Last run: \(appliedCount) applied, \(failedCount) failed \u{2014} see Reports."
+        "Last run: \(appliedCount) applied, \(failedCount) failed."
     }
 }
 

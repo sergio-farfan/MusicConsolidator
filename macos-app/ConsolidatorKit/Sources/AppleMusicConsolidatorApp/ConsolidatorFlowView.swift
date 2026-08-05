@@ -1,16 +1,22 @@
 // ConsolidatorFlowView.swift
 // The Wave C2 root: NavigationSplitView with DESTINATIONS in the
-// sidebar (Library / Activity / Reports / Settings — places, not
+// sidebar (Library / Activity / Settings — places, not
 // wizard steps; spec C2.1) and the selected destination in the detail
 // column. The five-step rail is gone; the attended step machinery
 // survives verbatim inside the Activity staged panel. The Status
 // section is retained beneath the destination rows.
 
+import AppKit
 import SwiftUI
 
 @MainActor
 struct ConsolidatorFlowView: View {
     @State private var model: AuditFlowModel
+    /// UI rework Part 2 — the one-shot launch-effects guard: SwiftUI can
+    /// fire `.onAppear` more than once (e.g. relayout), so the flag itself
+    /// is what keeps appearance/tab/rescan application to exactly once per
+    /// view lifetime.
+    @State private var hasAppliedLaunchPreferences = false
 
     /// Injectable model (M11 fix round 1, minor b): the structural tests
     /// pass a fixture-driven model so hosting this view never reads the
@@ -35,6 +41,20 @@ struct ConsolidatorFlowView: View {
             detail
         }
         .navigationTitle("Apple Music Consolidator")
+        .onAppear { applyLaunchPreferencesOnce() }
+    }
+
+    /// UI rework Part 2 — applied once per view lifetime, in order:
+    /// appearance, then the default-tab-on-launch preference, then (if on)
+    /// the reload-library-on-start rescan.
+    private func applyLaunchPreferencesOnce() {
+        guard !hasAppliedLaunchPreferences else { return }
+        hasAppliedLaunchPreferences = true
+        NSApp.appearance = nsAppearance(for: model.appearanceMode)
+        model.setBrowserTab(model.defaultBrowserTabOnLaunch)
+        if model.reloadLibraryOnStart {
+            model.rescanLibrary()
+        }
     }
 
     // MARK: sidebar
@@ -135,12 +155,6 @@ struct ConsolidatorFlowView: View {
             SourceSelectionView(model: model)
         case .activity:
             ActivityView(model: model)
-        case .reports:
-            // The model's live output directory (its defaults key's single
-            // owner, observed per render) — never the static-default
-            // fallback, so hosting the root stays hermetic and a Choose…
-            // change re-renders the destination.
-            HistoryBrowserView(directoryPath: model.outputDirectoryPath)
         case .settings:
             SettingsDestinationView(model: model)
         }

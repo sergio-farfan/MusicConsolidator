@@ -109,6 +109,14 @@ struct NarrowWindowStructuralTests {
         let harness = try ModelHarness(runner: ScriptedRunner(outputs: []))
         defer { harness.cleanUp() }
         harness.model.setBrowserTab(.cleanup)
+        // UI rework Part 2: ConsolidatorFlowView's one-shot launch effect
+        // applies `defaultBrowserTabOnLaunch` (default .merge) once the
+        // view appears; without this, it would silently override the
+        // Cleanup selection this test just made. Declaring the launch
+        // preference to match keeps the one-shot application a no-op here,
+        // mirroring how `confirmEachApply` is declared to match the queue
+        // mode under test elsewhere in this suite.
+        harness.model.setDefaultBrowserTabOnLaunch(.cleanup)
         let fixture = HostedFixture(
             ConsolidatorFlowView(model: harness.model), width: 900, height: 620
         )

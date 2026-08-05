@@ -1,12 +1,12 @@
 // SettingsDestinationView.swift
-// Wave C2 (spec C2.4) — the Settings destination: the M11 settings panel
-// promoted from the browser-footer "Artifacts & Automation" disclosure to
-// a destination detail. CONTENT RELOCATED VERBATIM from
-// SourceSelectionView.settingsDisclosure — strings, controls, identifiers,
-// and the fix-round-4 lineLimit discipline are byte-preserved; only the
-// container changed (a ScrollView + GroupBox detail instead of a footer
-// DisclosureGroup, so the DisclosureGroup-measurement caveats no longer
-// apply). Persistence and the preflight flow are untouched.
+// UI rework Part 2 — the Settings destination reworked from the M11
+// "Artifacts & Automation" plumbing panel (output-directory chooser, batch
+// toggles, Automation preflight) into a genuine USER PREFERENCES screen:
+// Appearance, Startup, and Notifications. The removed plumbing's model
+// state (confirmEachApply, pauseOnJudgmentItems, outputDirectoryPath) and
+// the Automation preflight are untouched — only this view's surface
+// changed. The preflight stays reachable through the Diagnostics window's
+// existing "Preflight Automation" button (Window menu / Cmd-Shift-D).
 
 import SwiftUI
 import AppKit
@@ -20,80 +20,68 @@ struct SettingsDestinationView: View {
             VStack(alignment: .leading, spacing: 16) {
                 GroupBox {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Artifacts & Automation")
+                        Text("Appearance")
                             .font(.headline)
-                        LabeledContent("Output directory") {
-                            HStack(spacing: 8) {
-                                IdentifierText(text: model.outputDirectoryPath)
-                                Button("Choose\u{2026}") { chooseOutputDirectory() }
-                                    .disabled(model.isRunning)
-                            }
-                        }
-                        // Fix round 4, item 4 discipline retained: every
-                        // potentially-multiline Text here carries an
-                        // explicit lineLimit.
+                        appearancePicker
                         Text(
-                            "Each check writes a new .plan.json / .detail.csv / .summary.md "
-                                + "triple. Existing artifacts are never overwritten."
+                            "Controls the app's light/dark appearance. System follows the "
+                                + "current macOS appearance."
                         )
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .lineLimit(2)
-                        // M11 batch settings (both default OFF per Sergio).
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(6)
+                }
+                GroupBox {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Startup")
+                            .font(.headline)
                         HStack(spacing: 8) {
                             AppKitCheckbox(
-                                identifier: M11ControlID.confirmEachApply,
-                                isOn: model.confirmEachApply,
-                                help: "When on, batch items pause at the M9 per-item "
-                                    + "review + typed-name gate before each apply."
+                                identifier: SettingsControlID.reloadLibraryOnStart,
+                                isOn: model.reloadLibraryOnStart,
+                                help: "When on, the library rescans automatically once, "
+                                    + "each time the app launches."
                             ) {
-                                model.setConfirmEachApply(!model.confirmEachApply)
+                                model.setReloadLibraryOnStart(!model.reloadLibraryOnStart)
                             }
-                            Text("Confirm each apply (batch runs pause at the per-item gate)")
+                            Text("Reload library on app start")
                                 .font(.caption)
                                 .lineLimit(2)
                         }
-                        HStack(spacing: 8) {
-                            AppKitCheckbox(
-                                identifier: M11ControlID.pauseOnJudgment,
-                                isOn: model.pauseOnJudgmentItems,
-                                help: "When on, unattended items with near-identical pairs, "
-                                    + "distinct-entry omissions, or count anomalies pause "
-                                    + "for review."
-                            ) {
-                                model.setPauseOnJudgmentItems(!model.pauseOnJudgmentItems)
-                            }
-                            Text("Pause on judgment items (unattended runs hold them for review)")
-                                .font(.caption)
-                                .lineLimit(2)
-                        }
+                        Text("Default tab on launch")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                        defaultTabPicker
                         Text(
-                            "Unattended batch runs keep every engine guard and end in a "
-                                + "mandatory run report; the listing cache serves the browser "
-                                + "only \u{2014} reads and applies always re-read Music live."
+                            "Chooses which browser tab is selected the next time the app "
+                                + "opens; it does not change the tab right now."
                         )
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                        .lineLimit(3)
+                        .lineLimit(2)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(6)
+                }
+                GroupBox {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Notifications")
+                            .font(.headline)
                         HStack(spacing: 8) {
-                            Button("Check Automation access") { model.runPreflight() }
-                                .disabled(model.isPreflightRunning || model.isRunning)
-                            if model.isPreflightRunning {
-                                ProgressView()
-                                    .controlSize(.small)
+                            AppKitCheckbox(
+                                identifier: SettingsControlID.playSoundOnRunFinish,
+                                isOn: model.playSoundOnRunFinish,
+                                help: "When on, a sound plays once a batch run finishes."
+                            ) {
+                                model.setPlaySoundOnRunFinish(!model.playSoundOnRunFinish)
                             }
-                        }
-                        if let preflight = model.preflight {
-                            Label {
-                                Text(preflight.displayText)
-                                    .textSelection(.enabled)
-                                    .lineLimit(4)
-                            } icon: {
-                                Image(systemName: preflightSymbol(preflight))
-                                    .foregroundStyle(
-                                        preflight == .granted ? Color.green : Color.orange
-                                    )
-                            }
+                            Text("Play sound when a run finishes")
+                                .font(.caption)
+                                .lineLimit(2)
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -105,25 +93,57 @@ struct SettingsDestinationView: View {
         }
     }
 
-    private func preflightSymbol(_ result: AutomationPreflightResult) -> String {
-        switch result {
-        case .granted: return "checkmark.circle.fill"
-        case .denied: return "xmark.octagon.fill"
-        case .musicNotRunning: return "play.slash"
-        default: return "questionmark.circle"
+    // MARK: Appearance picker
+
+    /// The same tab-pill pattern as `SourceSelectionView.tabPillSelector`:
+    /// one `AppKitActionButton` per case with a `Capsule` selection
+    /// highlight. Changing the pick applies immediately (unlike "Default
+    /// tab on launch" below, which only takes effect at the next launch).
+    private var appearancePicker: some View {
+        HStack(spacing: 4) {
+            ForEach(AppearanceMode.allCases) { candidate in
+                ZStack {
+                    if model.appearanceMode == candidate {
+                        Capsule().fill(Color.accentColor.opacity(0.22))
+                    }
+                    AppKitActionButton(
+                        identifier: SettingsControlID.appearance(candidate),
+                        title: candidate.displayName,
+                        compressible: true
+                    ) {
+                        model.setAppearanceMode(candidate)
+                        NSApp.appearance = nsAppearance(for: candidate)
+                    }
+                    .padding(2)
+                }
+            }
         }
+        .frame(minWidth: 200, idealWidth: 240, maxWidth: 280)
     }
 
-    private func chooseOutputDirectory() {
-        let panel = NSOpenPanel()
-        panel.title = "Choose the output directory"
-        panel.canChooseFiles = false
-        panel.canChooseDirectories = true
-        panel.canCreateDirectories = true
-        panel.allowsMultipleSelection = false
-        panel.prompt = "Choose"
-        panel.directoryURL = URL(fileURLWithPath: model.outputDirectoryPath, isDirectory: true)
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        model.setOutputDirectory(path: url.path)
+    // MARK: default-tab-on-launch picker
+
+    /// Same pill pattern, over `BrowserTab.allCases`. Deliberately does NOT
+    /// call `model.setBrowserTab(_:)` — this preference only edits
+    /// `defaultBrowserTabOnLaunch`, applied to the live tab once, at launch.
+    private var defaultTabPicker: some View {
+        HStack(spacing: 4) {
+            ForEach(BrowserTab.allCases) { tab in
+                ZStack {
+                    if model.defaultBrowserTabOnLaunch == tab {
+                        Capsule().fill(Color.accentColor.opacity(0.22))
+                    }
+                    AppKitActionButton(
+                        identifier: SettingsControlID.defaultTabOnLaunch(tab),
+                        title: tab.displayName,
+                        compressible: true
+                    ) {
+                        model.setDefaultBrowserTabOnLaunch(tab)
+                    }
+                    .padding(2)
+                }
+            }
+        }
+        .frame(minWidth: 240, idealWidth: 280, maxWidth: 320)
     }
 }

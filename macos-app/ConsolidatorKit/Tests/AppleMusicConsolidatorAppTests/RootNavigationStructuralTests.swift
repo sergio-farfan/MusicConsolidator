@@ -1,5 +1,5 @@
 // RootNavigationStructuralTests.swift
-// Wave C2 Task 6 — the destination root (spec C2.5): four sidebar
+// Wave C2 Task 6 — the destination root (spec C2.5): three sidebar
 // destination rows (present, contained, lock-aware), the live Activity
 // chip, and per-destination detail spot-checks. Offscreen at 1200x800;
 // fixture-driven injectable models (the root must never read the real
@@ -23,7 +23,7 @@ private func rootListingWire() -> String {
 @Suite("Wave C2 root navigation", .serialized)
 struct RootNavigationStructuralTests {
 
-    @Test("the sidebar renders exactly the four destination rows, contained; the split fits")
+    @Test("the sidebar renders exactly the three destination rows, contained; the split fits")
     func destinationRowsRender() throws {
         let harness = try ModelHarness(runner: ScriptedRunner(outputs: []))
         defer { harness.cleanUp() }
@@ -45,12 +45,12 @@ struct RootNavigationStructuralTests {
             #expect(row.isEnabled, "\(destination.rawValue) row enabled while idle")
         }
         // No grayed step rows exist anywhere: the only wc2.dest.* buttons
-        // are the four destinations (the old rail had five unidentified
+        // are the three destinations (the old rail had five unidentified
         // rows; its test is deleted with it).
         let destinationButtons = allViews(under: fixture.hosting)
             .compactMap { $0 as? NSButton }
             .filter { $0.accessibilityIdentifier().hasPrefix("wc2.dest.") }
-        #expect(destinationButtons.count == 4)
+        #expect(destinationButtons.count == 3)
 
         // Geometry sanity: window height + the calibrated 32 pt
         // unified-toolbar band the never-shown NavigationSplitView reserves
@@ -69,6 +69,13 @@ struct RootNavigationStructuralTests {
         // Attended queue (harness default confirmEachApply true).
         let harness = try ModelHarness(runner: runner, mode: .consolidate, playlistName: "")
         defer { harness.cleanUp() }
+        // UI rework Part 2: ConsolidatorFlowView's one-shot launch effect
+        // applies `defaultBrowserTabOnLaunch` (default .merge) once the
+        // view appears below; without this, it would flip `mode` away from
+        // .consolidate and discard the completed audit this test drives up
+        // to before hosting the view. Declaring the launch preference to
+        // match the harness's mode keeps the one-shot application a no-op.
+        harness.model.setDefaultBrowserTabOnLaunch(.consolidate)
         harness.model.rescanLibrary()
         await harness.model.scanTask?.value
         harness.model.toggleChecked(persistentId: "P-A")
@@ -99,18 +106,6 @@ struct RootNavigationStructuralTests {
         fixture.pump()
         #expect(view(under: fixture.hosting, axIdentifier: M8ControlID.scanLibrary) != nil)
 
-        // Reports hosts the history browser (over the harness temp dir —
-        // hermetic by construction).
-        let reportsRow = try #require(
-            view(
-                under: fixture.hosting,
-                axIdentifier: WaveC2ControlID.destinationRow(.reports)
-            ) as? NSButton
-        )
-        reportsRow.performClick(nil)
-        fixture.pump()
-        #expect(view(under: fixture.hosting, axIdentifier: M11ControlID.historyFilter) != nil)
-
         // Settings hosts the relocated panel.
         let settingsRow = try #require(
             view(
@@ -120,7 +115,13 @@ struct RootNavigationStructuralTests {
         )
         settingsRow.performClick(nil)
         fixture.pump()
-        #expect(view(under: fixture.hosting, axIdentifier: M11ControlID.confirmEachApply) != nil)
+        // UI rework Part 2: the relocated panel's batch toggles are gone;
+        // this smoke check now looks for one of the new preference controls
+        // (the reload-library-on-start checkbox) instead.
+        #expect(
+            view(under: fixture.hosting, axIdentifier: SettingsControlID.reloadLibraryOnStart)
+                != nil
+        )
     }
 
     @Test("hot lock: rows disable, Activity stays enabled, the sidebar chip goes live")
@@ -168,7 +169,6 @@ struct RootNavigationStructuralTests {
 
         #expect(enabledByDestination[.activity] == true)
         #expect(enabledByDestination[.library] == false)
-        #expect(enabledByDestination[.reports] == false)
         #expect(enabledByDestination[.settings] == false)
         #expect(sidebarSpinners >= 1, "the Activity chip must spin during the run")
     }

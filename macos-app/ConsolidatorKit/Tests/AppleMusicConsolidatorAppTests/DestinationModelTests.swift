@@ -54,8 +54,6 @@ struct DestinationModelTests {
         harness.model.rescanLibrary()
         await harness.model.scanTask?.value
         harness.model.toggleChecked(persistentId: "P-A")
-        harness.model.selectDestination(.reports)
-        #expect(harness.model.selectedDestination == .reports)
         harness.model.startQueue()
         #expect(harness.model.selectedDestination == .activity)
         await harness.awaitAudit()
@@ -98,7 +96,6 @@ struct DestinationModelTests {
         #expect(harness.model.isDestinationLocked)
         #expect(harness.model.canSelect(.activity))
         #expect(!harness.model.canSelect(.library))
-        #expect(!harness.model.canSelect(.reports))
         #expect(!harness.model.canSelect(.settings))
         harness.model.selectDestination(.library)
         #expect(
@@ -176,7 +173,7 @@ struct DestinationModelTests {
         #expect(await pollUntil { harness.model.finishedRunReport != nil })
         #expect(harness.model.selectedDestination == .activity)
 
-        harness.model.selectDestination(.reports)
+        harness.model.selectDestination(.settings)
         #expect(harness.model.finishedRunReport != nil, "report invariant")
         harness.model.selectDestination(.library)
         #expect(harness.model.finishedRunReport != nil, "report invariant")
@@ -239,7 +236,7 @@ struct ActivityChipTests {
     @Test("the last-run caption renders the spec's exact wording")
     func lastRunCaption() {
         let summary = LastRunSummary(appliedCount: 1, failedCount: 2)
-        #expect(summary.caption == "Last run: 1 applied, 2 failed \u{2014} see Reports.")
+        #expect(summary.caption == "Last run: 1 applied, 2 failed.")
     }
 }
 

@@ -141,9 +141,14 @@ struct M11StructuralTests {
         expectContained(M11ControlID.stopRun, in: fixture.hosting)
     }
 
-    @Test("the settings destination exposes the batch toggles inside the window")
-    func settingsPanelToggles() async throws {
-        // confirmEachApply false here = the raw app default's rendering.
+    // UI rework Part 2: the batch toggles and the output-directory/
+    // Automation-preflight plumbing were REMOVED from this view (the model
+    // state and the preflight flow stay reachable elsewhere — the model
+    // directly, and the preflight through the Diagnostics window's
+    // "Preflight Automation" button); this view is now a genuine
+    // preferences screen. Renamed from `settingsPanelToggles`.
+    @Test("settings no longer hosts the batch toggles or the output-dir/preflight plumbing")
+    func settingsNoLongerHostsBatchTogglesOrPlumbing() async throws {
         let harness = try ModelHarness(
             runner: ScriptedRunner(outputs: []), confirmEachApply: false
         )
@@ -152,22 +157,109 @@ struct M11StructuralTests {
         defer { fixture.tearDown() }
 
         #expect(fixture.hosting.frame.height <= 866)
-        let confirm = try #require(
-            view(under: fixture.hosting, axIdentifier: M11ControlID.confirmEachApply) as? NSButton
-        )
-        let pause = try #require(
-            view(under: fixture.hosting, axIdentifier: M11ControlID.pauseOnJudgment) as? NSButton
-        )
-        #expect(confirm.state == .off) // Sergio's defaults
-        #expect(pause.state == .off)
-        expectContained(M11ControlID.confirmEachApply, in: fixture.hosting)
-        expectContained(M11ControlID.pauseOnJudgment, in: fixture.hosting)
+        #expect(view(under: fixture.hosting, axIdentifier: M11ControlID.confirmEachApply) == nil)
+        #expect(view(under: fixture.hosting, axIdentifier: M11ControlID.pauseOnJudgment) == nil)
 
-        // Click plumbing drives the persisted settings.
-        confirm.performClick(nil)
+        // The model-level state and mutators are untouched by the UI
+        // removal — proven directly, without going through the view.
+        harness.model.setConfirmEachApply(true)
         #expect(harness.model.confirmEachApply == true)
-        pause.performClick(nil)
+        harness.model.setPauseOnJudgmentItems(true)
         #expect(harness.model.pauseOnJudgmentItems == true)
+    }
+
+    @Test("the settings destination exposes the four new preference controls inside the window")
+    func settingsExposesPreferenceControls() async throws {
+        let harness = try ModelHarness(
+            runner: ScriptedRunner(outputs: []), confirmEachApply: false
+        )
+        defer { harness.cleanUp() }
+        let fixture = HostedFixture(SettingsDestinationView(model: harness.model))
+        defer { fixture.tearDown() }
+        // This test clicks the Dark appearance pill below, which sets the
+        // process-wide NSApp.appearance — .serialized keeps this suite's own
+        // tests from interleaving, but swift-testing can still run other
+        // suites concurrently, so the mutation must not escape this test.
+        defer { NSApp.appearance = nil }
+
+        #expect(fixture.hosting.frame.height <= 866)
+        for mode in AppearanceMode.allCases {
+            expectContained(SettingsControlID.appearance(mode), in: fixture.hosting)
+        }
+        expectContained(SettingsControlID.reloadLibraryOnStart, in: fixture.hosting)
+        for tab in BrowserTab.allCases {
+            expectContained(SettingsControlID.defaultTabOnLaunch(tab), in: fixture.hosting)
+        }
+        expectContained(SettingsControlID.playSoundOnRunFinish, in: fixture.hosting)
+
+        let reload = try #require(
+            view(under: fixture.hosting, axIdentifier: SettingsControlID.reloadLibraryOnStart)
+                as? NSButton
+        )
+        #expect(reload.state == .off) // default off
+        reload.performClick(nil)
+        #expect(harness.model.reloadLibraryOnStart == true)
+
+        let sound = try #require(
+            view(under: fixture.hosting, axIdentifier: SettingsControlID.playSoundOnRunFinish)
+                as? NSButton
+        )
+        #expect(sound.state == .off) // default off
+        sound.performClick(nil)
+        #expect(harness.model.playSoundOnRunFinish == true)
+
+        let dark = try #require(
+            view(under: fixture.hosting, axIdentifier: SettingsControlID.appearance(.dark))
+                as? NSButton
+        )
+        dark.performClick(nil)
+        #expect(harness.model.appearanceMode == .dark)
+
+        let cleanupTab = try #require(
+            view(under: fixture.hosting, axIdentifier: SettingsControlID.defaultTabOnLaunch(.cleanup))
+                as? NSButton
+        )
+        cleanupTab.performClick(nil)
+        #expect(harness.model.defaultBrowserTabOnLaunch == .cleanup)
+        // This preference control never touches the LIVE tab.
+        #expect(harness.model.browserTab != .cleanup)
+    }
+
+    // The narrow-gate requirement: `SettingsDestinationView` does not
+    // currently participate in NarrowWindowStructuralTests.swift's root-shell
+    // suite (that suite covers the root shell + the Cleanup tab only), so
+    // this is a standalone narrow check rather than an addition there.
+    @Test("the settings destination's preference controls fit a narrow 900x620 window")
+    func settingsPreferenceControlsFitNarrowWindow() async throws {
+        let harness = try ModelHarness(
+            runner: ScriptedRunner(outputs: []), confirmEachApply: false
+        )
+        defer { harness.cleanUp() }
+        let fixture = HostedFixture(
+            SettingsDestinationView(model: harness.model), width: 900, height: 620
+        )
+        defer { fixture.tearDown() }
+
+        let narrowBox = NSRect(x: 0, y: 0, width: 900, height: 620)
+        #expect(fixture.hosting.frame.height <= 620)
+        for mode in AppearanceMode.allCases {
+            let id = SettingsControlID.appearance(mode)
+            let control = try #require(view(under: fixture.hosting, axIdentifier: id))
+            let frame = control.convert(control.bounds, to: fixture.hosting)
+            #expect(narrowBox.contains(frame), "\(id) at \(frame)")
+        }
+        let reloadID = SettingsControlID.reloadLibraryOnStart
+        let reload = try #require(view(under: fixture.hosting, axIdentifier: reloadID))
+        #expect(narrowBox.contains(reload.convert(reload.bounds, to: fixture.hosting)))
+        for tab in BrowserTab.allCases {
+            let id = SettingsControlID.defaultTabOnLaunch(tab)
+            let control = try #require(view(under: fixture.hosting, axIdentifier: id))
+            let frame = control.convert(control.bounds, to: fixture.hosting)
+            #expect(narrowBox.contains(frame), "\(id) at \(frame)")
+        }
+        let soundID = SettingsControlID.playSoundOnRunFinish
+        let sound = try #require(view(under: fixture.hosting, axIdentifier: soundID))
+        #expect(narrowBox.contains(sound.convert(sound.bounds, to: fixture.hosting)))
     }
 
     // Wave C2 (spec C2.4): the disclosure LEFT the browser footer — screen 1
@@ -184,29 +276,6 @@ struct M11StructuralTests {
         #expect(view(under: fixture.hosting, axIdentifier: M11ControlID.pauseOnJudgment) == nil)
     }
 
-    @Test("the history browser lists artifacts, filters, and stays bounded")
-    func historyBrowserFits() async throws {
-        let directory = FileManager.default.temporaryDirectory
-            .appendingPathComponent("m11-hist-\(UUID().uuidString)", isDirectory: true)
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: directory) }
-        for index in 0..<8 {
-            FileManager.default.createFile(
-                atPath: directory
-                    .appendingPathComponent("List-\(index)-20260803-\(index).plan.json").path,
-                contents: Data("{}".utf8)
-            )
-        }
-        FileManager.default.createFile(
-            atPath: directory.appendingPathComponent("Run-20260803-1.runreport.md").path,
-            contents: Data("run".utf8)
-        )
-
-        let fixture = HostedFixture(HistoryBrowserView(directoryPath: directory.path))
-        defer { fixture.tearDown() }
-        #expect(fixture.hosting.frame.height <= 866)
-        #expect(view(under: fixture.hosting, axIdentifier: M11ControlID.historyFilter) != nil)
-        // The rows materialize inside a List (9 artifacts).
-        #expect(listContentCellCount(under: fixture.hosting) == 9)
-    }
+    // historyBrowserFits removed 2026-08-05: it hosted HistoryBrowserView,
+    // which was deleted along with the Reports destination that hosted it.
 }
