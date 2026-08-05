@@ -214,7 +214,7 @@ struct ActivityStructuralTests {
         #expect(activityWindowBox.contains(frame), "idle caption at \(frame)")
         #expect(
             (caption as? NSTextField)?.stringValue
-                == "Last run: 1 applied, 0 failed \u{2014} see Reports."
+                == "Last run: 1 applied, 0 failed."
         )
     }
 

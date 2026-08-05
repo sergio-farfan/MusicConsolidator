@@ -51,6 +51,7 @@
 // run-generation counter guards every asynchronous state application, so a
 // stale plan can never survive into (or complete over) a new audit.
 
+import AppKit
 import Foundation
 import Observation
 import ConsolidatorCore
@@ -339,6 +340,15 @@ final class AuditFlowModel {
     private nonisolated static let outputDirectoryDefaultsKey = "AuditOutputDirectoryPath"
     private nonisolated static let confirmEachApplyDefaultsKey = "ConfirmEachApply"
     private nonisolated static let pauseOnJudgmentDefaultsKey = "PauseOnJudgmentItems"
+    // UI rework Part 2 — user preferences (Settings destination).
+    private nonisolated static let appearanceModeDefaultsKey = "AppearanceMode"
+    private nonisolated static let reloadLibraryOnStartDefaultsKey = "ReloadLibraryOnStart"
+    private nonisolated static let defaultBrowserTabOnLaunchDefaultsKey = "DefaultBrowserTabOnLaunch"
+    private nonisolated static let playSoundOnRunFinishDefaultsKey = "PlaySoundOnRunFinish"
+    /// Injectable finish-run sound hook (UI rework Part 2): fires from
+    /// `finishRun()` when `playSoundOnRunFinish` is on. Defaults to the real
+    /// `NSSound` playback; tests inject a counting closure instead.
+    private let playFinishSound: @Sendable () -> Void
 
     /// The app-launch session identity stamped into every mutation artifact
     /// (B2: a gate can only ever arm against an artifact from THIS launch).
@@ -385,6 +395,13 @@ final class AuditFlowModel {
     // M11 settings (persisted; both default OFF per Sergio).
     private(set) var confirmEachApply = false
     private(set) var pauseOnJudgmentItems = false
+
+    // UI rework Part 2 — user preferences (persisted; see the matching
+    // setters and the "MARK: preferences" section below).
+    private(set) var appearanceMode: AppearanceMode = .system
+    private(set) var reloadLibraryOnStart = false
+    private(set) var defaultBrowserTabOnLaunch: BrowserTab = .merge
+    private(set) var playSoundOnRunFinish = false
 
     // M11 run state (the unattended batch + its mandatory report).
     private(set) var isRunUnattended = false
@@ -519,17 +536,27 @@ final class AuditFlowModel {
         defaultOutputDirectoryPath: String = "/Users/sergio.farfan/projects/git/MusicConsolidator/reports",
         cacheDirectoryPath: String = defaultListingCacheDirectoryPath(),
         appSessionID: String = UUID().uuidString,
-        now: @escaping @Sendable () -> Date = { Date() }
+        now: @escaping @Sendable () -> Date = { Date() },
+        playFinishSound: @escaping @Sendable () -> Void = { NSSound(named: "Glass")?.play() }
     ) {
         self.makeRunner = makeRunner
         self.defaults = defaults
         self.cacheDirectoryPath = cacheDirectoryPath
         self.appSessionID = appSessionID
         self.now = now
+        self.playFinishSound = playFinishSound
         self.outputDirectoryPath = defaults.string(forKey: Self.outputDirectoryDefaultsKey)
             ?? defaultOutputDirectoryPath
         self.confirmEachApply = defaults.bool(forKey: Self.confirmEachApplyDefaultsKey)
         self.pauseOnJudgmentItems = defaults.bool(forKey: Self.pauseOnJudgmentDefaultsKey)
+        self.appearanceMode = AppearanceMode(
+            rawValue: defaults.string(forKey: Self.appearanceModeDefaultsKey) ?? ""
+        ) ?? .system
+        self.reloadLibraryOnStart = defaults.bool(forKey: Self.reloadLibraryOnStartDefaultsKey)
+        self.defaultBrowserTabOnLaunch = BrowserTab(
+            rawValue: defaults.string(forKey: Self.defaultBrowserTabOnLaunchDefaultsKey) ?? ""
+        ) ?? .merge
+        self.playSoundOnRunFinish = defaults.bool(forKey: Self.playSoundOnRunFinishDefaultsKey)
         // M11: instant startup from the persisted listing cache (browser
         // only; audits/applies always re-read live). No Apple event fires
         // here — the cache is a local file.
@@ -556,6 +583,31 @@ final class AuditFlowModel {
     func setPauseOnJudgmentItems(_ value: Bool) {
         pauseOnJudgmentItems = value
         defaults.set(value, forKey: Self.pauseOnJudgmentDefaultsKey)
+    }
+
+    // MARK: preferences (UI rework Part 2)
+
+    func setAppearanceMode(_ value: AppearanceMode) {
+        appearanceMode = value
+        defaults.set(value.rawValue, forKey: Self.appearanceModeDefaultsKey)
+    }
+
+    func setReloadLibraryOnStart(_ value: Bool) {
+        reloadLibraryOnStart = value
+        defaults.set(value, forKey: Self.reloadLibraryOnStartDefaultsKey)
+    }
+
+    /// Only the persisted preference — never the live `browserTab`. Applied
+    /// to `browserTab` exactly once, at launch (see `ConsolidatorFlowView`'s
+    /// one-shot launch-effects block).
+    func setDefaultBrowserTabOnLaunch(_ value: BrowserTab) {
+        defaultBrowserTabOnLaunch = value
+        defaults.set(value.rawValue, forKey: Self.defaultBrowserTabOnLaunchDefaultsKey)
+    }
+
+    func setPlaySoundOnRunFinish(_ value: Bool) {
+        playSoundOnRunFinish = value
+        defaults.set(value, forKey: Self.playSoundOnRunFinishDefaultsKey)
     }
 
     // MARK: derived state
@@ -1195,6 +1247,7 @@ final class AuditFlowModel {
         runReportPath = path
         runReportWriteFailure = writeFailure
         step = .report
+        if playSoundOnRunFinish { playFinishSound() }
     }
 
     /// Append (or supersede) one item's run record. Judgment summaries come

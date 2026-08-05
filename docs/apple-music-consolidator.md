@@ -268,9 +268,9 @@ Execute — dispatches while it is in flight.
 ## Destination navigation (Wave C2, 2026-08-04)
 
 The native app's sidebar holds PLACES, not wizard steps: Library, Activity,
-Reports, and Settings, with the existing Status section retained beneath
-them. The five-step rail is gone; nothing changed inside the screens —
-containers moved, content did not.
+and Settings, with the existing Status section retained beneath them. The
+five-step rail is gone; nothing changed inside the screens — containers
+moved, content did not.
 
 - Library is the unchanged source browser: Merge / Consolidate / Cleanup
   tabs, selection, the queue rail, and the mutation-gate sheet.
@@ -283,12 +283,25 @@ containers moved, content did not.
   mandatory report; an attended audit in flight shows its live ticking
   progress; otherwise an idle placeholder with the session's last run
   outcome.
-- Reports embeds the history browser; the standalone History window (and
-  its Cmd-Shift-H shortcut) is removed. The Diagnostics window
-  (Cmd-Shift-D) is unchanged.
-- Settings promotes the browser-footer "Artifacts & Automation" disclosure
-  to a destination: the output directory, the two batch toggles, and the
-  Automation preflight, all unchanged.
+- The Reports destination and its in-app history browser have been removed
+  (Part 1, 2026-08-05); report artifacts remain on disk as the durable
+  record, and each finished run's own report screen still offers
+  "Save report…" to export it. The standalone History window (and its
+  Cmd-Shift-H shortcut) was already removed in an earlier wave; the
+  Diagnostics window (Cmd-Shift-D) is unchanged.
+- Settings is a user-preferences screen (Part 2, 2026-08-05): Appearance
+  (System / Light / Dark, applied immediately via `NSApp.appearance`),
+  Startup ("Reload library on app start", plus the default browser tab —
+  Merge / Consolidate / Cleanup — applied to the live tab once, at
+  launch), and Notifications ("Play sound when a run finishes"). All four
+  persist via `UserDefaults` (defaults: System appearance, reload off,
+  Merge tab, sound off). This replaced the "Artifacts & Automation" panel
+  Wave C2 promoted here: the output directory, the two batch toggles
+  ("Confirm each apply", "Pause on judgment items"), and the Automation
+  preflight button are no longer surfaced in Settings. Their model state
+  and behavior are unchanged (both toggles still default off), and the
+  Automation preflight stays reachable from the Diagnostics window
+  (Cmd-Shift-D).
 
 Starting an audit, a queue, or an apply auto-selects Activity. While the
 write path is hot — an apply in flight, or an unattended run actively

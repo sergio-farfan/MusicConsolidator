@@ -1,8 +1,9 @@
 // AppleMusicConsolidatorApp.swift
 // The app shell: the @main SwiftUI entry point. ONE main window hosts the
-// destination shell (Library / Activity / Reports / Settings — Wave C2);
-// history lives in the Reports destination, so the standalone History
-// window (and its Cmd-Shift-H shortcut) is gone. The M6 read harness is
+// destination shell (Library / Activity / Settings — Wave C2; the Reports
+// destination and its in-app history browser were removed 2026-08-05, and
+// the standalone History window with its Cmd-Shift-H shortcut had already
+// gone in an earlier wave). The M6 read harness is
 // retained as a separate Diagnostics window (Window menu, or Cmd-Shift-D)
 // — the fidelity-probe surface (preflight, raw all-copies read, raw
 // wire-JSON export).

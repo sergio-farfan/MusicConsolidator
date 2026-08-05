@@ -356,6 +356,24 @@ enum WaveC2ControlID {
     static let pendingReportBack = "wc2.pendingReportBack"
 }
 
+/// Stable accessibility identifiers for the UI-rework-Part-2 Settings
+/// preferences (Appearance / Startup / Notifications) — the genuine
+/// user-preferences screen that replaced the "Artifacts & Automation"
+/// plumbing panel.
+enum SettingsControlID {
+    /// The Appearance pill selector (one id per `AppearanceMode` case).
+    static func appearance(_ mode: AppearanceMode) -> String {
+        "settings.appearance.\(mode.rawValue)"
+    }
+    static let reloadLibraryOnStart = "settings.reloadLibraryOnStart"
+    /// The "Default tab on launch" pill selector (one id per `BrowserTab`
+    /// case).
+    static func defaultTabOnLaunch(_ tab: BrowserTab) -> String {
+        "settings.defaultTabOnLaunch.\(tab.rawValue)"
+    }
+    static let playSoundOnRunFinish = "settings.playSoundOnRunFinish"
+}
+
 // MARK: - typed-token field (Wave B)
 
 /// A native NSTextField bound to a typed-confirm token, with a stable

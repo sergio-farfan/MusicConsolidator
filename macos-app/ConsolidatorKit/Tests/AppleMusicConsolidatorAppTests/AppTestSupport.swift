@@ -6,6 +6,7 @@
 // UserDefaults harness. Nothing here executes any script or contacts Music:
 // the fakes return canned wire JSON strings only.
 
+import AppKit
 import Foundation
 import ConsolidatorCore
 import MusicBridge
@@ -409,7 +410,8 @@ struct ModelHarness {
         runner: any ScriptRunner & Sendable,
         mode: ConsolidatorMode = .consolidate,
         playlistName: String = "Fixture List",
-        confirmEachApply: Bool = true
+        confirmEachApply: Bool = true,
+        playFinishSound: @escaping @Sendable () -> Void = { NSSound(named: "Glass")?.play() }
     ) throws {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("m7-tests-\(UUID().uuidString)", isDirectory: true)
@@ -432,7 +434,8 @@ struct ModelHarness {
             makeRunner: { runner },
             defaults: suite,
             defaultOutputDirectoryPath: directory.path,
-            cacheDirectoryPath: cacheDirectory.path
+            cacheDirectoryPath: cacheDirectory.path,
+            playFinishSound: playFinishSound
         )
         model.setMode(mode)
         model.playlistName = playlistName

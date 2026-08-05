@@ -114,32 +114,6 @@ struct HistoryCountTests {
     }
 }
 
-@MainActor
-@Suite("Wave A — history browser counts (structural)", .serialized)
-struct HistoryCountStructuralTests {
-
-    @Test("history browser renders count-bearing rows within bounds")
-    func historyBrowserFitsWithCounts() throws {
-        let directory = try makeHistoryFixtureDirectory()
-        defer { try? FileManager.default.removeItem(at: directory) }
-        _ = try writeAudit(outputDir: directory, plan: try twoTrackConsolidatePlan())
-        FileManager.default.createFile(
-            atPath: directory.appendingPathComponent("Broken-20260803-1.plan.json").path,
-            contents: Data("{not json".utf8)
-        )
-
-        let fixture = HostedFixture(
-            HistoryBrowserView(directoryPath: directory.path), width: 1200, height: 800
-        )
-        defer { fixture.tearDown() }
-        #expect(
-            fixture.hosting.frame.height <= 806,
-            "history height \(fixture.hosting.frame.height)"
-        )
-        #expect(
-            view(under: fixture.hosting, axIdentifier: M11ControlID.historyFilter) != nil
-        )
-        // Four rows: plan.json + detail.csv + summary.md + the malformed plan.
-        #expect(listContentCellCount(under: fixture.hosting) == 4)
-    }
-}
+// HistoryCountStructuralTests removed 2026-08-05: it hosted HistoryBrowserView,
+// which was deleted along with the Reports destination that hosted it.
+// historyEntries()/HistoryPlanCounts remain covered by HistoryCountTests above.
