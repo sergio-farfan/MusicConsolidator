@@ -490,6 +490,20 @@ final class AuditFlowModel {
     // M8 source-browser state.
     private(set) var listingState: ListingState = .idle
     var searchText: String = ""
+
+    // Browser list ordering (session-only, DISPLAY-ONLY — never feeds a
+    // guard, plan, or queue; Sergio, 2026-08-05).
+    private(set) var browserSortKey: BrowserSortKey = .name
+    private(set) var browserSortAscending = true
+
+    func toggleBrowserSort(_ key: BrowserSortKey) {
+        if browserSortKey == key {
+            browserSortAscending.toggle()
+        } else {
+            browserSortKey = key
+            browserSortAscending = true
+        }
+    }
     var browserSelection: BrowserSelection?
     /// Consolidate-tab checkbox picks, by persistent ID (unique by the
     /// listing parse's own gate; names can repeat and canonically-equivalent

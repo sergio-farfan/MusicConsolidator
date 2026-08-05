@@ -284,6 +284,11 @@ enum WaveBControlID {
     static let collisionWarning = "wb.collisionWarning"
     static let unattendedNotice = "wb.unattendedNotice"
     static let cleanupRefresh = "wb.cleanupRefresh"
+    static let sortByName = "wb.sortByName"
+    static let sortByCount = "wb.sortByCount"
+    static func cleanupDelete(_ persistentId: String) -> String {
+        "wb.cleanupDelete.\(persistentId)"
+    }
     static func cleanupOpenGate(_ planFileName: String) -> String {
         "wb.cleanupGate.\(planFileName)"
     }

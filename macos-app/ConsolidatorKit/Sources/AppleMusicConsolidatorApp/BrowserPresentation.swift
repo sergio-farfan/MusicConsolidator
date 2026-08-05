@@ -372,3 +372,33 @@ nonisolated func alignRenames(
             }
         }
 }
+
+// MARK: - browser sort (display-only; never feeds a guard or plan)
+
+nonisolated enum BrowserSortKey: String, Equatable, Sendable {
+    case name
+    case count
+}
+
+/// Stable re-ordering of an already-name-ordered array (the Core builder
+/// emits name order): name ascending is the identity, name descending is the
+/// reversal; count sorts stably (index tiebreak) so equal counts keep the
+/// name order.
+nonisolated func applyBrowserSort<T>(
+    _ items: [T],
+    key: BrowserSortKey,
+    ascending: Bool,
+    count: (T) -> Int
+) -> [T] {
+    switch key {
+    case .name:
+        return ascending ? items : items.reversed()
+    case .count:
+        return items.enumerated().sorted { a, b in
+            let ca = count(a.element)
+            let cb = count(b.element)
+            if ca != cb { return ascending ? ca < cb : ca > cb }
+            return a.offset < b.offset
+        }.map(\.element)
+    }
+}

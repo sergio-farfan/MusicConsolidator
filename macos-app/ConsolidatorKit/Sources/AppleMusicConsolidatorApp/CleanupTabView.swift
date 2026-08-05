@@ -61,6 +61,71 @@ struct CleanupTabView: View {
             .padding(.vertical, 8)
             Divider()
             scanContent
+            Divider()
+            allPlaylistsSection
+        }
+    }
+
+    // MARK: all playlists (general guarded deletion; Sergio, 2026-08-05)
+
+    /// Every live playlist, deletable behind the SAME Wave B gate the
+    /// Library inspector uses — nothing new mutates; refusals surface as
+    /// disabled buttons with the verbatim reason as the tooltip.
+    @ViewBuilder
+    private var allPlaylistsSection: some View {
+        HStack(spacing: 8) {
+            Text("All playlists")
+                .font(.headline)
+            BrowserSortHeader(model: model)
+            Spacer()
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        if let loaded = model.loadedListing {
+            let needle = model.searchText.lowercased()
+            let rows = applyBrowserSort(
+                loaded.listings.filter {
+                    needle.isEmpty || $0.name.lowercased().contains(needle)
+                },
+                key: model.browserSortKey,
+                ascending: model.browserSortAscending,
+                count: { $0.trackCount }
+            )
+            List {
+                ForEach(rows, id: \.persistentId) { listing in
+                    let refusal = AuditFlowModel.mutationEntryRefusalReason(listing)
+                    HStack(spacing: 8) {
+                        BrowserNameText(name: listing.name)
+                        Text(trackCountText(copyCounts: [listing.trackCount]))
+                            .foregroundStyle(.secondary)
+                            .monospacedDigit()
+                        IdentifierText(text: listing.persistentId)
+                        Spacer()
+                        AppKitActionButton(
+                            identifier: WaveBControlID.cleanupDelete(listing.persistentId),
+                            title: "Delete\u{2026}",
+                            help: refusal ?? "One guarded, typed-confirmation deletion."
+                        ) {
+                            model.startMutationAudit(
+                                kind: .delete, persistentID: listing.persistentId
+                            )
+                        }
+                        .controlSize(.mini)
+                        .disabled(
+                            refusal != nil || model.isMutationBusy || model.isRunning
+                                || model.isScanning || model.isApplying
+                                || model.isUnattendedRunActive
+                        )
+                    }
+                }
+            }
+            .listStyle(.inset)
+        } else {
+            Text("Rescan the library to list playlists here.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(2)
+                .padding(12)
         }
     }
 
@@ -79,7 +144,7 @@ struct CleanupTabView: View {
                     .lineLimit(3)
             }
             .padding(12)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
         case .scanning(let started):
             TimelineView(.periodic(from: .now, by: 1)) { context in
                 HStack(spacing: 8) {
@@ -93,7 +158,7 @@ struct CleanupTabView: View {
                 }
             }
             .padding(12)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
         case .failed(let message):
             VStack(alignment: .leading, spacing: 8) {
                 Label("Cleanup scan failed", systemImage: "exclamationmark.triangle.fill")
@@ -105,7 +170,7 @@ struct CleanupTabView: View {
                     .lineLimit(6)
             }
             .padding(12)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
         case .loaded(let candidates, _):
             candidateList(candidates)
         }

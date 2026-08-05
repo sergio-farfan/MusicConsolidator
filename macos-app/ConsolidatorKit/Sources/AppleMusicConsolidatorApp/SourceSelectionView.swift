@@ -155,12 +155,14 @@ struct SourceSelectionView: View {
             Text(modeCaption)
                 .font(.callout)
                 .foregroundStyle(.secondary)
+                .lineLimit(2)
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
     private var modeCaption: String {
         if model.browserTab == .cleanup {
-            return "Cleanup lists merge groups whose evidence artifacts and live state "
+            return "Cleanup deletes playlists behind individually typed gates: post-merge groups "
                 + "still agree. One typed approval covers only that group's source "
                 + "copies; deleting a playlist never removes songs from the library."
         }
