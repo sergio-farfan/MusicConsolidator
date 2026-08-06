@@ -376,22 +376,25 @@ struct BrowserInspector: View {
     @Bindable var model: AuditFlowModel
     let sections: PlaylistBrowseSections
 
-    /// The Align-names sheet (B5). The mutation GATE has its own single
+    /// The Align-names sheet (B5). `DirectMutationSheets` has its own single
     /// sheet anchor below; picking a rename closes this sheet first so the
     /// two never stack.
     @State private var alignSheetShown = false
 
-    /// The one mutation-gate sheet anchor for both browser tabs. Swiping
-    /// the sheet away is the abort path (dismissMutationGate consumes an
-    /// armed artifact); dismissal is refused while the gate is busy.
-    private var mutationGateShown: Binding<Bool> {
+    /// The one `.sheet(isPresented:)` anchor for `DirectMutationSheets`,
+    /// shared by both browser tabs: presented while either a pending direct
+    /// action or a dispatch error is set; a dismiss (Escape, sheet-swipe)
+    /// cancels the pending action or clears the error, whichever is active.
+    private var directSheetShown: Binding<Bool> {
         Binding(
-            get: {
-                if case .idle = model.mutationGatePhase { return false }
-                return true
-            },
+            get: { model.pendingDirectAction != nil || model.directMutationError != nil },
             set: { shown in
-                if !shown { model.dismissMutationGate() }
+                guard !shown else { return }
+                if model.directMutationError != nil {
+                    model.dismissDirectMutationError()
+                } else {
+                    model.cancelPendingDirectAction()
+                }
             }
         )
     }
@@ -424,8 +427,8 @@ struct BrowserInspector: View {
             .padding(12)
         }
         .background(Color(nsColor: .underPageBackgroundColor))
-        .sheet(isPresented: mutationGateShown) {
-            MutationGateView(model: model)
+        .sheet(isPresented: directSheetShown) {
+            DirectMutationSheets(model: model)
                 .interactiveDismissDisabled(model.isMutationBusy)
         }
     }
@@ -479,10 +482,6 @@ struct BrowserInspector: View {
                     }
                     .font(.callout)
                 }
-            }
-            if let pid = model.browserRenamePID,
-               let copy = group.copies.first(where: { scalarExact($0.persistentId, pid) }) {
-                renameEditor(for: copy)
             }
             LabeledContent("Combined input") {
                 Text(trackCountText(copyCounts: [group.combinedTrackCount]))
@@ -566,11 +565,8 @@ struct BrowserInspector: View {
                 )
                 .sheet(isPresented: $alignSheetShown) {
                     AlignNamesSheet(cluster: cluster) { persistentId, canonicalName in
-                        model.startMutationAudit(
-                            kind: .rename,
-                            persistentID: persistentId,
-                            newName: canonicalName,
-                            confirmWithDestinationName: true
+                        model.requestDirectRename(
+                            persistentID: persistentId, prefilledName: canonicalName
                         )
                     }
                 }
@@ -615,82 +611,39 @@ struct BrowserInspector: View {
         }
     }
 
-    // MARK: Wave B mutation actions (B4/B5)
+    // MARK: direct mutation actions (Task 5, Sergio 2026-08-06)
 
-    /// Delete.../Rename... for ONE pinned row. Refusals surface BEFORE any
-    /// gate: a refused row renders DISABLED actions plus the verbatim
-    /// reason (AppKit-backed so the structural tests can see it), and
-    /// startMutationAudit is unreachable for it.
+    /// Delete/Rename... for ONE pinned row, dispatched directly: NO refusal
+    /// filtering (smart playlists, folders, even the contract-excluded pilot
+    /// are all actionable here) — the confirm/rename sheet
+    /// (`DirectMutationSheets`) is the only thing between a click and the
+    /// guarded AppleScript writer.
     @ViewBuilder
     private func mutationActions(for listing: PlaylistListing) -> some View {
-        let refusal = AuditFlowModel.mutationEntryRefusalReason(listing)
         Divider()
         HStack(spacing: 8) {
             AppKitActionButton(
                 identifier: WaveBControlID.rowDelete(listing.persistentId),
-                title: "Delete\u{2026}"
+                title: "Delete"
             ) {
-                model.startMutationAudit(kind: .delete, persistentID: listing.persistentId)
+                model.requestDirectDelete(persistentIDs: [listing.persistentId])
             }
             AppKitActionButton(
                 identifier: WaveBControlID.rowRename(listing.persistentId),
                 title: "Rename\u{2026}"
             ) {
-                model.browserRenameDraft = ""
-                model.browserRenamePID = listing.persistentId
+                model.requestDirectRename(persistentID: listing.persistentId, prefilledName: nil)
             }
         }
         .controlSize(.small)
         .disabled(
-            refusal != nil || model.isScanning || model.isRunning || model.isApplying
+            model.isScanning || model.isRunning || model.isApplying
                 || model.isMutationBusy || model.isQueueActive
         )
-        if let refusal {
-            AppKitStaticText(
-                identifier: WaveBControlID.browserRefusal,
-                text: refusal,
-                maximumLines: 3
-            )
-        } else {
-            Text("Deleting a playlist never removes songs from the library.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .lineLimit(2)
-            if model.browserRenamePID == listing.persistentId {
-                renameEditor(for: listing)
-            }
-        }
-    }
-
-    /// The rename destination editor. The draft is an INPUT (pre-gate);
-    /// the gate's own typed-confirm tokens stay unnormalized and separate.
-    private func renameEditor(for listing: PlaylistListing) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("New name \u{2014} collisions warn in the gate, never block (B5).")
-                .font(.caption)
-                .lineLimit(2)
-            AppKitTokenField(
-                identifier: WaveBControlID.browserRenameField,
-                text: $model.browserRenameDraft
-            )
-            HStack(spacing: 8) {
-                AppKitActionButton(
-                    identifier: WaveBControlID.browserRenameAudit,
-                    title: "Check rename\u{2026}"
-                ) {
-                    let draft = model.browserRenameDraft
-                    model.browserRenamePID = nil
-                    model.startMutationAudit(
-                        kind: .rename,
-                        persistentID: listing.persistentId,
-                        newName: draft
-                    )
-                }
-                .disabled(model.browserRenameDraft.isEmpty)
-                Button("Cancel") { model.browserRenamePID = nil }
-            }
-            .controlSize(.small)
-        }
+        Text("Deleting a playlist never removes songs from the library.")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .lineLimit(2)
     }
 
     /// Mini per-copy actions for the group inspector's copy rows: same-name
@@ -699,22 +652,20 @@ struct BrowserInspector: View {
         HStack(spacing: 6) {
             AppKitActionButton(
                 identifier: WaveBControlID.rowDelete(copy.persistentId),
-                title: "Delete\u{2026}"
+                title: "Delete"
             ) {
-                model.startMutationAudit(kind: .delete, persistentID: copy.persistentId)
+                model.requestDirectDelete(persistentIDs: [copy.persistentId])
             }
             AppKitActionButton(
                 identifier: WaveBControlID.rowRename(copy.persistentId),
                 title: "Rename\u{2026}"
             ) {
-                model.browserRenameDraft = ""
-                model.browserRenamePID = copy.persistentId
+                model.requestDirectRename(persistentID: copy.persistentId, prefilledName: nil)
             }
         }
         .controlSize(.mini)
         .disabled(
-            AuditFlowModel.mutationEntryRefusalReason(copy) != nil
-                || model.isScanning || model.isRunning || model.isApplying
+            model.isScanning || model.isRunning || model.isApplying
                 || model.isMutationBusy || model.isQueueActive
         )
     }
@@ -780,11 +731,11 @@ struct QueueRailView: View {
 
 // MARK: - the Align-names sheet (B5)
 
-/// Pick the canonical name, then dispatch N-1 separately gated renames.
+/// Pick the canonical name, then dispatch N-1 separately confirmed renames.
 /// The sheet is model-free: `onRename` (wired by the inspector) dismisses
-/// this sheet and starts one mutation audit; the shared MutationGateView
-/// then gates that single rename with the CANONICAL DESTINATION name as
-/// its typed token, the deviant copy pinned by persistent ID.
+/// this sheet and stages one pending direct rename, pre-filled with the
+/// CANONICAL DESTINATION name; the shared `DirectMutationSheets` confirms
+/// that single rename, the deviant copy pinned by persistent ID.
 struct AlignNamesSheet: View {
     let cluster: PlaylistNearMatchCluster
     let onRename: (_ persistentId: String, _ canonicalName: String) -> Void
@@ -812,7 +763,7 @@ struct AlignNamesSheet: View {
             Text(
                 "The canonical name is the variant that equals its own NFC form "
                     + "with no leading/trailing whitespace and no invisible scalars. "
-                    + "Each rename below is separately gated."
+                    + "Each rename below is separately confirmed."
             )
             .font(.caption)
             .foregroundStyle(.secondary)
@@ -860,13 +811,6 @@ struct AlignNamesSheet: View {
                         .lineLimit(2)
                     }
                 }
-                Text(
-                    "The gate's typed confirmation is the canonical destination "
-                        + "name; the deviant copy stays pinned by persistent ID."
-                )
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .lineLimit(2)
             } else {
                 Text(
                     canonicalAlignCandidates(in: cluster).isEmpty

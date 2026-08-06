@@ -1,11 +1,10 @@
 // CleanupTabView.swift
-// Wave B (B3) — the third browser tab: evidence-discovered cleanup
-// candidates on the left (per-copy rows with counts and dispositions;
-// disqualified groups grayed with their verbatim reason), the shared
-// MutationGateView on the right. Selecting a candidate runs the gate-arm
-// re-check (startCleanupAudit) and the gate pane takes over: evidence
-// panel, ONE typed group-name token, per-copy execution progress, and the
-// fail-closed result — all Task 13 surfaces, rendered unchanged.
+// Wave B (B3) — the third browser tab: every live playlist, deletable and
+// renamable directly (Sergio, 2026-08-06). The evidence-discovered gate pane
+// is retired from this composition: Delete and Rename... on a row (or
+// Delete selected... on a batch) stage a `pendingDirectAction` and the
+// shared `DirectMutationSheets` confirm/rename/error sheet is the only
+// thing standing between a click and the guarded AppleScript writer.
 //
 // Composition rules carried from SourceBrowserView/SourceSelectionView:
 // AppKit-backed load-bearing buttons (offscreen-introspectable), explicit
@@ -20,21 +19,29 @@ import MusicBridge
 struct CleanupTabView: View {
     @Bindable var model: AuditFlowModel
 
+    /// The one `.sheet(isPresented:)` binding for `DirectMutationSheets`:
+    /// presented while either a pending direct action or a dispatch error is
+    /// set; a dismiss (Escape, sheet-swipe) cancels the pending action or
+    /// clears the error, whichever is active.
+    private var directSheetShown: Binding<Bool> {
+        Binding(
+            get: { model.pendingDirectAction != nil || model.directMutationError != nil },
+            set: { shown in
+                guard !shown else { return }
+                if model.directMutationError != nil {
+                    model.dismissDirectMutationError()
+                } else {
+                    model.cancelPendingDirectAction()
+                }
+            }
+        )
+    }
+
     var body: some View {
-        HStack(spacing: 0) {
-            candidateColumn
-                .frame(minWidth: 320, maxWidth: .infinity)
-                .layoutPriority(1)
-            Divider()
-            // Wave C hotfix (2026-08-04): was a FIXED `.frame(width: 480)` —
-            // a pane that could never compress, the M8 defect class. The
-            // gate's own content is a ScrollView with an internal
-            // maxWidth: 880 (MutationGateView.swift), so it compresses fine
-            // down to this floor; NarrowWindowStructuralTests pins the
-            // whole composition fits at 900x620.
-            MutationGateView(model: model)
-                .frame(minWidth: 340, idealWidth: 480, maxWidth: 520)
-        }
+        candidateColumn
+            .sheet(isPresented: directSheetShown) {
+                DirectMutationSheets(model: model)
+            }
     }
 
     // MARK: candidate column
@@ -45,11 +52,11 @@ struct CleanupTabView: View {
         }
     }
 
-    // MARK: all playlists (general guarded deletion; Sergio, 2026-08-05)
+    // MARK: all playlists (direct deletion/rename; Sergio, 2026-08-06)
 
-    /// Every live playlist, deletable behind the SAME Wave B gate the
-    /// Library inspector uses — nothing new mutates; refusals surface as
-    /// disabled buttons with the verbatim reason as the tooltip.
+    /// Every live playlist, deletable and renamable directly — ZERO refusal
+    /// filtering (smart playlists, folders, even the contract-excluded pilot
+    /// are all actionable here); the confirm/rename sheet is the only gate.
     @ViewBuilder
     private var allPlaylistsSection: some View {
         HStack(spacing: 8) {
@@ -60,12 +67,10 @@ struct CleanupTabView: View {
             if !model.checkedCleanupPIDs.isEmpty {
                 AppKitActionButton(
                     identifier: WaveBControlID.cleanupDeleteSelected,
-                    title: "Delete selected (\(model.checkedCleanupPIDs.count))\u{2026}",
-                    help: "One typed approval \u{2014} the selection count \u{2014} "
-                        + "covers the batch; every playlist is still its own guarded, "
-                        + "verified deletion."
+                    title: "Delete selected (\(model.checkedCleanupPIDs.count))",
+                    help: "One confirmation covers the whole selection."
                 ) {
-                    model.startBatchDeleteAudit(
+                    model.requestDirectDelete(
                         persistentIDs: Array(model.checkedCleanupPIDs)
                     )
                 }
@@ -95,17 +100,14 @@ struct CleanupTabView: View {
             )
             List {
                 ForEach(rows, id: \.persistentId) { listing in
-                    let refusal = AuditFlowModel.mutationEntryRefusalReason(listing)
                     HStack(spacing: 8) {
                         AppKitCheckbox(
                             identifier: WaveBControlID.cleanupCheckbox(listing.persistentId),
                             isOn: model.checkedCleanupPIDs.contains(listing.persistentId),
-                            help: refusal
-                                ?? "Select for batch deletion (one typed approval per batch)."
+                            help: "Select for batch deletion."
                         ) {
                             model.toggleCleanupChecked(listing.persistentId)
                         }
-                        .disabled(refusal != nil)
                         BrowserNameText(name: listing.name)
                         Text(trackCountText(copyCounts: [listing.trackCount]))
                             .foregroundStyle(.secondary)
@@ -114,16 +116,28 @@ struct CleanupTabView: View {
                         Spacer()
                         AppKitActionButton(
                             identifier: WaveBControlID.cleanupDelete(listing.persistentId),
-                            title: "Delete\u{2026}",
-                            help: refusal ?? "One guarded, typed-confirmation deletion."
+                            title: "Delete",
+                            help: "One confirmation deletes this playlist."
                         ) {
-                            model.startMutationAudit(
-                                kind: .delete, persistentID: listing.persistentId
+                            model.requestDirectDelete(persistentIDs: [listing.persistentId])
+                        }
+                        .controlSize(.mini)
+                        .disabled(
+                            model.isMutationBusy || model.isRunning
+                                || model.isScanning || model.isApplying
+                                || model.isUnattendedRunActive
+                        )
+                        AppKitActionButton(
+                            identifier: DirectControlID.rowRename(listing.persistentId),
+                            title: "Rename\u{2026}"
+                        ) {
+                            model.requestDirectRename(
+                                persistentID: listing.persistentId, prefilledName: nil
                             )
                         }
                         .controlSize(.mini)
                         .disabled(
-                            refusal != nil || model.isMutationBusy || model.isRunning
+                            model.isMutationBusy || model.isRunning
                                 || model.isScanning || model.isApplying
                                 || model.isUnattendedRunActive
                         )
@@ -139,9 +153,4 @@ struct CleanupTabView: View {
                 .padding(12)
         }
     }
-
-
-
-
-
 }

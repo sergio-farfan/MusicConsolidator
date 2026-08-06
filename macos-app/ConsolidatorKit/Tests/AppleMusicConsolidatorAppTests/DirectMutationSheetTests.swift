@@ -128,4 +128,42 @@ struct DirectMutationSheetTests {
         #expect(view(under: fixture.hosting, axIdentifier: DirectControlID.renameField) == nil)
         #expect(view(under: fixture.hosting, axIdentifier: DirectControlID.errorDismiss) == nil)
     }
+
+    // Task 5 — the Cleanup tab hosts the row actions directly (no gate pane
+    // beside it anymore): its own Delete button keeps the WaveBControlID it
+    // always had, the new Rename... button carries the DirectControlID this
+    // suite already knows, and the retired gate's disarmed-state text must
+    // never render inside this composition.
+    @Test("the Cleanup tab shows row rename/delete controls, never the retired gate's disarmed text")
+    func cleanupTabShowsDirectRowControlsNotTheGate() async throws {
+        let runner = ScriptedRunner(outputs: [gateListingWire()])
+        let harness = try MutationGateHarness(runner: runner)
+        defer { harness.cleanUp() }
+        let model = harness.model
+        model.rescanLibrary()
+        await model.scanTask?.value
+
+        let fixture = HostedFixture(
+            CleanupTabView(model: model), width: 900, height: 620
+        )
+        defer { fixture.tearDown() }
+        let box = NSRect(x: 0, y: 0, width: 900, height: 620)
+        let rename = try #require(
+            view(under: fixture.hosting, axIdentifier: DirectControlID.rowRename("SOLO000000000001"))
+        )
+        #expect(box.contains(rename.convert(rename.bounds, to: fixture.hosting)))
+        let delete = try #require(
+            view(under: fixture.hosting, axIdentifier: WaveBControlID.cleanupDelete("SOLO000000000001"))
+        )
+        #expect(box.contains(delete.convert(delete.bounds, to: fixture.hosting)))
+        // The retired gate pane's disarmed-state text ("No mutation armed",
+        // MutationGateView.swift) is plain SwiftUI content with no AX
+        // identifier of its own, so this suite's established idiom (locate
+        // by identifier) proves its absence indirectly but conclusively:
+        // MutationGateView's OWN dismiss control is AppKit-backed and (per
+        // NarrowWindowStructuralTests) renders in every gate phase including
+        // idle/disarmed — its absence here means the entire gate view,
+        // "No mutation armed" included, was never mounted beside this tab.
+        #expect(view(under: fixture.hosting, axIdentifier: WaveBControlID.mutationDismiss) == nil)
+    }
 }
