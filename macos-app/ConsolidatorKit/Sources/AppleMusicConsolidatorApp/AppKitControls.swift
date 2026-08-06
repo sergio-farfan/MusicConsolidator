@@ -308,6 +308,21 @@ enum WaveBControlID {
     static func alignRename(_ persistentId: String) -> String { "wb.alignRename.\(persistentId)" }
 }
 
+/// Stable accessibility identifiers for the direct-mutation confirm/rename/
+/// error sheets (Task 4, Sergio 2026-08-06). `folderCascadeNotice` and
+/// `errorMessage` are Task 4 additions beyond the interface's required set
+/// — the same one-off-notice-id pattern as `WaveBControlID.collisionWarning`
+/// — so the offscreen structural tests can locate and verify their text.
+enum DirectControlID {
+    static let confirmExecute = "direct.confirmExecute"   // Delete N / Rename commit
+    static let confirmCancel = "direct.confirmCancel"
+    static let renameField = "direct.renameField"
+    static let errorDismiss = "direct.errorDismiss"
+    static func rowRename(_ persistentId: String) -> String { "direct.rowRename.\(persistentId)" }
+    static let folderCascadeNotice = "direct.folderCascadeNotice"
+    static let errorMessage = "direct.errorMessage"
+}
+
 /// Stable accessibility identifiers for the Wave C1 failure-taxonomy
 /// surfaces (spec C1.4/C1.5). These three are the ATTENDED failure screen's
 /// ids — it renders exactly one outcome, so static ids carry no duplication
@@ -394,9 +409,14 @@ enum SettingsControlID {
 struct AppKitTokenField: NSViewRepresentable {
     let identifier: String
     @Binding var text: String
+    /// Fires when Return is pressed in the field (Task 4, direct-mutation
+    /// rename sheet: Enter commits the pending action). Defaults to a
+    /// no-op so every existing call site is unaffected.
+    var onSubmit: () -> Void = {}
 
     final class Coordinator: NSObject, NSTextFieldDelegate {
         var text: Binding<String>
+        var onSubmit: () -> Void = {}
 
         init(text: Binding<String>) {
             self.text = text
@@ -405,6 +425,15 @@ struct AppKitTokenField: NSViewRepresentable {
         func controlTextDidChange(_ notification: Notification) {
             guard let field = notification.object as? NSTextField else { return }
             text.wrappedValue = field.stringValue
+        }
+
+        func control(
+            _ control: NSControl, textView: NSTextView,
+            doCommandBy commandSelector: Selector
+        ) -> Bool {
+            guard commandSelector == #selector(NSResponder.insertNewline(_:)) else { return false }
+            onSubmit()
+            return true
         }
     }
 
@@ -424,6 +453,7 @@ struct AppKitTokenField: NSViewRepresentable {
 
     func updateNSView(_ field: NSTextField, context: Context) {
         context.coordinator.text = $text
+        context.coordinator.onSubmit = onSubmit
         if field.stringValue != text {
             field.stringValue = text
         }
