@@ -165,7 +165,9 @@ struct NarrowWindowStructuralTests {
         defer { fixture.tearDown() }
 
         expectContained(WaveBControlID.sortByName, in: fixture.hosting)
-        expectContained(WaveBControlID.cleanupDeleteSelected, in: fixture.hosting)
+        // Sergio, 2026-08-06: the batch controls moved to SourceSelectionView's
+        // shared footer bar — pinned there by the root-window test above and
+        // by cleanupFooterMirrorsOtherModes. Standalone, the tab is the list.
         expectContained(DirectControlID.rowRename("SOLO000000000001"), in: fixture.hosting)
         expectAllControlsWithinHorizontalBounds(in: fixture.hosting, maxX: 900)
     }

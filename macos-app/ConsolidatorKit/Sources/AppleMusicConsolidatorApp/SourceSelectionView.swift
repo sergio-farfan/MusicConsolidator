@@ -290,7 +290,9 @@ struct SourceSelectionView: View {
 
     private var footer: some View {
         VStack(alignment: .leading, spacing: 10) {
-            if model.browserTab != .cleanup {
+            if model.browserTab == .cleanup {
+                cleanupFooter
+            } else {
                 switch model.mode {
                 case .merge:
                     mergeFooter
@@ -299,6 +301,41 @@ struct SourceSelectionView: View {
                 }
             }
             runStatus
+        }
+    }
+
+    /// Sergio, 2026-08-06: Cleanup gets the same bottom-bar anatomy as the
+    /// other modes — count on the left, primary action on the right, always
+    /// visible (disabled at zero, like Start Queue). The batch controls
+    /// moved here from the tab header.
+    @ViewBuilder
+    private var cleanupFooter: some View {
+        HStack(spacing: 12) {
+            Text("Selected: \(model.checkedCleanupPIDs.count) playlists")
+                .bold()
+            Spacer()
+            AppKitActionButton(
+                identifier: WaveBControlID.cleanupClearSelection,
+                title: "Clear"
+            ) {
+                model.clearCleanupSelection()
+            }
+            .disabled(model.checkedCleanupPIDs.isEmpty)
+            AppKitActionButton(
+                identifier: WaveBControlID.cleanupDeleteSelected,
+                title: "Delete selected (\(model.checkedCleanupPIDs.count))",
+                prominent: true,
+                help: "One confirmation covers the whole selection."
+            ) {
+                model.requestDirectDelete(
+                    persistentIDs: Array(model.checkedCleanupPIDs)
+                )
+            }
+            .disabled(
+                model.checkedCleanupPIDs.isEmpty || model.isMutationBusy
+                    || model.isRunning || model.isScanning || model.isApplying
+                    || model.isUnattendedRunActive
+            )
         }
     }
 
@@ -312,7 +349,9 @@ struct SourceSelectionView: View {
             QueueRailView(model: model)
         } else {
             HStack(spacing: 12) {
-                Text("Queued: \(model.checkedGroupNames.count) groups")
+                // Sergio, 2026-08-06: same noun as the consolidate footer —
+                // each queued group produces exactly one merged playlist.
+                Text("Queued: \(model.checkedGroupNames.count) playlists")
                     .bold()
                 Spacer()
                 AppKitActionButton(

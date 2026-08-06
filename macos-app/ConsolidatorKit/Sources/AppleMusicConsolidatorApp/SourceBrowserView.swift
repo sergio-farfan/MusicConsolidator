@@ -451,17 +451,27 @@ struct BrowserInspector: View {
             BrowserNameText(name: group.name)
             VStack(alignment: .leading, spacing: 4) {
                 ForEach(Array(group.copies.enumerated()), id: \.element.persistentId) { ordinal, copy in
-                    HStack(spacing: 8) {
-                        Text("Copy \(ordinal)")
-                            .foregroundStyle(.secondary)
-                            .frame(width: 52, alignment: .leading)
+                    // Two lines per copy: the single-line HStack squeezed the
+                    // count to one character per line at the pane's 220pt
+                    // minimum once Rename… joined Delete (M8 defect class;
+                    // pinned by groupCopyRowsCompactAtPaneWidth).
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack(spacing: 8) {
+                            Text("Copy \(ordinal)")
+                                .foregroundStyle(.secondary)
+                                .frame(width: 52, alignment: .leading)
+                            Text(trackCountText(copyCounts: [copy.trackCount]))
+                                .foregroundStyle(.secondary)
+                                .monospacedDigit()
+                                .lineLimit(1)
+                            Spacer(minLength: 4)
+                            copyActions(copy)
+                        }
                         IdentifierText(text: copy.persistentId)
-                        Text(trackCountText(copyCounts: [copy.trackCount]))
-                            .foregroundStyle(.secondary)
-                            .monospacedDigit()
-                        copyActions(copy)
+                            .padding(.leading, 60)
                     }
                     .font(.callout)
+                    .padding(.bottom, 2)
                 }
             }
             LabeledContent("Combined input") {

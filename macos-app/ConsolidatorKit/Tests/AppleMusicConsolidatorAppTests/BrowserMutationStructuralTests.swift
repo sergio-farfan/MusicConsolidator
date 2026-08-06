@@ -81,6 +81,40 @@ private func inspectorFixture(
 @Suite("Offscreen structural view tests (Wave B browser mutations)", .serialized)
 struct BrowserMutationStructuralTests {
 
+    @Test("a group's copy rows stay compact and contained at the inspector's real pane width")
+    func groupCopyRowsCompactAtPaneWidth() async throws {
+        // Sergio, 2026-08-06: with Delete + Rename… beside the PID and the
+        // count, the ~300pt inspector squeezed the count text to one
+        // character per line — an M8-class vertical explosion.
+        let harness = try MutationGateHarness(
+            runner: ScriptedRunner(outputs: [browserFixtureListingWire()])
+        )
+        defer { harness.cleanUp() }
+        harness.model.rescanLibrary()
+        await harness.model.scanTask?.value
+        harness.model.browserSelection = .group("Trance 2022")
+        let fixture = HostedFixture(
+            BrowserInspector(model: harness.model, sections: browserFixtureSections()),
+            width: 220, height: 800
+        )
+        defer { fixture.tearDown() }
+        let paneBox = NSRect(x: 0, y: 0, width: 220, height: 800)
+        let d0 = try #require(
+            view(under: fixture.hosting, axIdentifier: WaveBControlID.rowDelete("G-A")) as? NSButton
+        )
+        let d1 = try #require(
+            view(under: fixture.hosting, axIdentifier: WaveBControlID.rowDelete("G-B")) as? NSButton
+        )
+        let f0 = d0.convert(d0.bounds, to: fixture.hosting)
+        let f1 = d1.convert(d1.bounds, to: fixture.hosting)
+        #expect(paneBox.contains(f0), "copy 0 Delete at \(f0)")
+        #expect(paneBox.contains(f1), "copy 1 Delete at \(f1)")
+        #expect(
+            abs(f0.midY - f1.midY) <= 64,
+            "copy rows exploded vertically: \(f0.midY) vs \(f1.midY)"
+        )
+    }
+
     @Test("a plain singleton exposes enabled Delete/Rename actions and no refusal note")
     func singletonActionsEnabled() async throws {
         let (harness, fixture) = try await inspectorFixture(selecting: .singleton("S-E"))
