@@ -1180,4 +1180,39 @@ extension MusicBridgeSession {
             informational: informational
         )
     }
+
+    /// Direct user-responsible delete (Sergio, 2026-08-06): one compiled
+    /// execution, no baseline, no revalidation, no readback. The caller
+    /// (the app's confirm dialog) is the only gate.
+    public func deletePlaylistDirect(persistentID: String) throws {
+        let script = DirectMutationScriptBuilder.buildDirectDeleteScript(
+            persistentID: persistentID
+        )
+        try compileAndExecuteDirect(script: script, artifactName: "direct-delete.scpt")
+    }
+
+    /// Direct user-responsible rename (Sergio, 2026-08-06). Duplicate
+    /// resulting names are allowed, as in Music.app.
+    public func renamePlaylistDirect(persistentID: String, newName: String) throws {
+        let script = DirectMutationScriptBuilder.buildDirectRenameScript(
+            persistentID: persistentID, newName: newName
+        )
+        try compileAndExecuteDirect(script: script, artifactName: "direct-rename.scpt")
+    }
+
+    private func compileAndExecuteDirect(script: String, artifactName: String) throws {
+        // Same compile-into-fresh-temp-dir shape as performMutation, minus
+        // progress events, expectations, and readback.
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "apple-music-consolidator-\(UUID().uuidString)",
+            isDirectory: true
+        )
+        try FileManager.default.createDirectory(
+            at: directory, withIntermediateDirectories: true
+        )
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let compiledScript = directory.appendingPathComponent(artifactName)
+        try runner.run(.compileAppleScript(script: script, outputPath: compiledScript.path))
+        try runner.run(.executeCompiledScript(path: compiledScript.path))
+    }
 }
