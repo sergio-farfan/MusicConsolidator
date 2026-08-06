@@ -515,6 +515,117 @@ final class AuditFlowModel {
 
     func clearCleanupSelection() { checkedCleanupPIDs = [] }
 
+    /// Direct-mutation pending confirmation (Sergio, 2026-08-06): a
+    /// delete/rename dispatched straight from the browser/cleanup UI with
+    /// ZERO refusal filtering — the confirm dialog is the only gate. This is
+    /// deliberately separate from the audited Wave B mutation gate above,
+    /// which still applies `mutationEntryRefusalReason` for its own flows.
+    enum PendingDirectAction: Equatable {
+        case delete(targets: [PlaylistListing])
+        case rename(target: PlaylistListing)
+    }
+    private(set) var pendingDirectAction: PendingDirectAction?
+    /// Rename sheet binding, pre-filled by `requestDirectRename`.
+    var typedRenameName: String = ""
+    /// Verbatim failure from the last direct dispatch; nil means none.
+    private(set) var directMutationError: String?
+    private(set) var isDirectMutationRunning = false
+    @ObservationIgnored private(set) var directMutationTask: Task<Void, Never>?
+
+    /// Resolve PIDs against the live listing cache and stage a pending
+    /// delete confirmation. NO refusal filtering: smart playlists, folders,
+    /// and even the contract-excluded pilot are all requestable here — the
+    /// confirm dialog the caller shows is the only gate. Unknown PIDs are
+    /// silently dropped; a no-op if nothing resolves or another OSA
+    /// activity currently holds the slot.
+    func requestDirectDelete(persistentIDs: [String]) {
+        guard !isMutationBusy, !isRunning, !isScanning, !isApplying,
+              !isUnattendedRunActive else { return }
+        guard let loaded = loadedListing else { return }
+        let targets = persistentIDs.compactMap { pid in
+            loaded.listings.first { scalarExact($0.persistentId, pid) }
+        }
+        guard !targets.isEmpty else { return }
+        pendingDirectAction = .delete(targets: targets)
+    }
+
+    /// Resolve one PID and stage a pending rename confirmation, pre-filling
+    /// the rename sheet binding. NO refusal filtering (see
+    /// `requestDirectDelete`).
+    func requestDirectRename(persistentID: String, prefilledName: String?) {
+        guard !isMutationBusy, !isRunning, !isScanning, !isApplying,
+              !isUnattendedRunActive else { return }
+        guard let loaded = loadedListing,
+              let target = loaded.listings.first(
+                  where: { scalarExact($0.persistentId, persistentID) }
+              )
+        else { return }
+        typedRenameName = prefilledName ?? target.name
+        pendingDirectAction = .rename(target: target)
+    }
+
+    /// Clear a pending direct action without dispatching anything.
+    func cancelPendingDirectAction() {
+        pendingDirectAction = nil
+        typedRenameName = ""
+    }
+
+    func dismissDirectMutationError() {
+        directMutationError = nil
+    }
+
+    /// Dispatch the pending direct action. Deletes run sequentially, in
+    /// selection order, each on a fresh `MusicBridgeSession` off the main
+    /// actor; the first failure stops the batch and surfaces the verbatim
+    /// error, leaving remaining rows untouched. A rename that types back the
+    /// unchanged name is a no-op (no runner call at all).
+    func confirmPendingDirectAction() {
+        guard let action = pendingDirectAction else { return }
+        pendingDirectAction = nil
+        isDirectMutationRunning = true
+        let make = makeRunner
+        switch action {
+        case .delete(let targets):
+            let pids = targets.map(\.persistentId)
+            directMutationTask = Task { [weak self] in
+                for pid in pids {
+                    do {
+                        try await Task.detached(priority: .userInitiated) {
+                            let session = MusicBridgeSession(runner: make())
+                            try session.deletePlaylistDirect(persistentID: pid)
+                        }.value
+                    } catch {
+                        self?.directMutationError = String(describing: error)
+                        break
+                    }
+                    self?.removeFromLoadedListing(persistentIDs: [pid])
+                    self?.checkedCleanupPIDs.subtract([pid])
+                }
+                self?.isDirectMutationRunning = false
+            }
+        case .rename(let target):
+            let newName = typedRenameName
+            let persistentID = target.persistentId
+            directMutationTask = Task { [weak self] in
+                defer { self?.isDirectMutationRunning = false }
+                guard let self else { return }
+                guard !scalarExact(newName, target.name) else { return }
+                do {
+                    try await Task.detached(priority: .userInitiated) {
+                        let session = MusicBridgeSession(runner: make())
+                        try session.renamePlaylistDirect(
+                            persistentID: persistentID, newName: newName
+                        )
+                    }.value
+                } catch {
+                    self.directMutationError = String(describing: error)
+                    return
+                }
+                self.renameInLoadedListing(persistentID: persistentID, to: newName)
+            }
+        }
+    }
+
     /// Arm ONE gate for a user-selected batch of deletes (AGENTS.md
     /// exception 2): fresh listing, per-entry refusal checks (ANY refusal
     /// refuses the whole batch), one plan + artifact pair per playlist, and
@@ -691,6 +802,33 @@ final class AuditFlowModel {
         ))
     }
 
+    /// Patch one entry's name in the DISPLAY cache after a verified direct
+    /// rename (mirrors `removeFromLoadedListing`; browser-only — audits,
+    /// gates, and readbacks always re-read live).
+    private func renameInLoadedListing(persistentID: String, to newName: String) {
+        guard case .loaded(let loaded) = listingState,
+              let index = loaded.listings.firstIndex(
+                  where: { scalarExact($0.persistentId, persistentID) }
+              )
+        else { return }
+        var listings = loaded.listings
+        let old = listings[index]
+        listings[index] = PlaylistListing(
+            playlistId: old.playlistId,
+            name: newName,
+            persistentId: old.persistentId,
+            trackCount: old.trackCount,
+            isSmart: old.isSmart,
+            specialKind: old.specialKind
+        )
+        listingState = .loaded(LoadedListing(
+            listings: listings,
+            sections: buildPlaylistBrowseSections(from: listings),
+            scannedAt: loaded.scannedAt,
+            fromCache: loaded.fromCache
+        ))
+    }
+
     func toggleBrowserSort(_ key: BrowserSortKey) {
         if browserSortKey == key {
             browserSortAscending.toggle()
@@ -860,6 +998,9 @@ final class AuditFlowModel {
         // Cleanup-scan hotfix (2026-08-05): the scan's listing read holds
         // the OSA slot as well; every other entry point refuses meanwhile.
         if case .scanning = cleanupScanState { return true }
+        // Direct mutations (2026-08-06): the confirm-then-dispatch path
+        // holds the OSA slot too — same fail-closed direction.
+        if isDirectMutationRunning { return true }
         switch mutationGatePhase {
         case .auditing, .executing: return true
         case .idle, .armed, .finished, .refused: return false
