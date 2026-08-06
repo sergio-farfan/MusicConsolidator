@@ -54,6 +54,13 @@ struct MutationGateView: View {
         }
     }
 
+    /// The armed BATCH-delete context (user-selected set): the cleanup
+    /// context with no target guard. The evidence-group flow always carries
+    /// a target guard; single mutations never set the context at all.
+    private var batchDeleteContext: AuditFlowModel.CleanupGroupContext? {
+        model.cleanupContext.flatMap { $0.targetGuard == nil ? $0 : nil }
+    }
+
     private var dismissTitle: String {
         if case .armed = model.mutationGatePhase {
             return "Cancel \u{2014} consume this artifact"
@@ -79,7 +86,11 @@ struct MutationGateView: View {
             case .auditing(let started):
                 auditingPanel(started: started)
             case .armed(let state):
-                snapshotPanel(state: state)
+                if let batch = batchDeleteContext {
+                    batchPanel(batch)
+                } else {
+                    snapshotPanel(state: state)
+                }
                 if let evidence = state.plan.evidence {
                     evidencePanel(evidence)
                 }
@@ -150,6 +161,34 @@ struct MutationGateView: View {
     }
 
     // MARK: snapshot facts
+
+    /// Batch delete (AGENTS.md exception 2): every selected playlist,
+    /// pinned by persistent ID; the typed token is the selection count.
+    private func batchPanel(_ batch: AuditFlowModel.CleanupGroupContext) -> some View {
+        GroupBox {
+            VStack(alignment: .leading, spacing: 6) {
+                Label("Delete \(batch.plans.count) Playlists", systemImage: "trash")
+                    .font(.headline)
+                ForEach(batch.plans, id: \.playlistPersistentID) { plan in
+                    HStack(spacing: 8) {
+                        BrowserNameText(name: plan.playlistName)
+                        Text("\(plan.trackCount) tracks")
+                            .foregroundStyle(.secondary)
+                            .monospacedDigit()
+                        IdentifierText(text: plan.playlistPersistentID)
+                        Spacer()
+                    }
+                    .font(.callout)
+                }
+                Text("Deleting a playlist never removes songs from the library.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(6)
+        }
+    }
 
     private func snapshotPanel(state: AuditFlowModel.MutationGateState) -> some View {
         GroupBox {
@@ -238,10 +277,12 @@ struct MutationGateView: View {
                 Text("Typed confirmation \u{2014} identifies this exact persistent ID")
                     .font(.headline)
                 tokenField(
-                    caption: scalarExact(state.confirmationName, state.plan.playlistName)
-                        ? "Type the exact playlist name"
-                        : "Type the canonical DESTINATION name \u{2014} the deviant "
-                            + "current name stays pinned by persistent ID",
+                    caption: batchDeleteContext != nil
+                        ? "Type the number of playlists selected for deletion"
+                        : scalarExact(state.confirmationName, state.plan.playlistName)
+                            ? "Type the exact playlist name"
+                            : "Type the canonical DESTINATION name \u{2014} the deviant "
+                                + "current name stays pinned by persistent ID",
                     required: state.confirmationName,
                     identifier: WaveBControlID.mutationNameField,
                     text: $model.typedMutationName
@@ -257,7 +298,8 @@ struct MutationGateView: View {
                     }
                     .foregroundStyle(.orange)
                 }
-                if !scalarExact(state.confirmationName, state.plan.playlistName) {
+                if batchDeleteContext == nil,
+                   !scalarExact(state.confirmationName, state.plan.playlistName) {
                     Text(describeNameDifference(
                         reference: state.confirmationName, other: state.plan.playlistName
                     ))
@@ -340,9 +382,11 @@ struct MutationGateView: View {
         GroupBox {
             VStack(alignment: .leading, spacing: 10) {
                 Label(
-                    state.plan.kind == .delete
-                        ? "Execute \u{2014} Delete Playlist"
-                        : "Execute \u{2014} Rename Playlist",
+                    batchDeleteContext != nil
+                        ? "Execute \u{2014} Delete \(batchDeleteContext?.plans.count ?? 0) Playlists"
+                        : state.plan.kind == .delete
+                            ? "Execute \u{2014} Delete Playlist"
+                            : "Execute \u{2014} Rename Playlist",
                     systemImage: "play.circle"
                 )
                     .font(.headline)
@@ -385,6 +429,9 @@ struct MutationGateView: View {
     }
 
     private func executeTitle(state: AuditFlowModel.MutationGateState) -> String {
+        if let batch = batchDeleteContext {
+            return "Delete \(batch.plans.count) playlists now"
+        }
         switch state.plan.kind {
         case .delete:
             return "Delete \u{201C}\(state.plan.playlistName)\u{201D} now"
