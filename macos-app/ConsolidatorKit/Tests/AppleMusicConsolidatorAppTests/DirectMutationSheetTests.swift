@@ -147,6 +147,20 @@ struct DirectMutationSheetTests {
                 as? NSTextField
         )
         #expect(status.stringValue == "Working\u{2026}")
+        // Sergio, 2026-08-06: the caption clipped mid-sentence — the wrapping
+        // label's intrinsic height was computed for one line. The field must
+        // be tall enough for its own required height at the laid-out width.
+        let caption = try #require(
+            view(under: fixture.hosting, axIdentifier: DirectControlID.inProgressCaption)
+                as? NSTextField
+        )
+        let required = caption.sizeThatFits(
+            NSSize(width: caption.frame.width, height: .greatestFiniteMagnitude)
+        ).height
+        #expect(
+            caption.frame.height + 0.5 >= required,
+            "caption clipped: frame \(caption.frame.height) < required \(required)"
+        )
         #expect(view(under: fixture.hosting, axIdentifier: DirectControlID.confirmExecute) == nil)
         #expect(view(under: fixture.hosting, axIdentifier: DirectControlID.confirmCancel) == nil)
         #expect(view(under: fixture.hosting, axIdentifier: DirectControlID.errorDismiss) == nil)
