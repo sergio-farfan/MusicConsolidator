@@ -42,6 +42,14 @@ final class ScriptedRunner: ScriptRunner, @unchecked Sendable {
         return recordedCommands
     }
 
+    /// Count of unconsumed scripted outputs — a batch's exact command shape
+    /// pin (e.g. "cancel dispatched nothing").
+    var remainingOutputs: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return results.count
+    }
+
     @discardableResult
     func run(_ command: ScriptCommand) throws -> String {
         lock.lock()
