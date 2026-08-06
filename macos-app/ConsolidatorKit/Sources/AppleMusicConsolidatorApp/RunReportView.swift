@@ -15,6 +15,10 @@ import ConsolidatorCore
 struct RunReportView: View {
     @Bindable var model: AuditFlowModel
 
+    /// Resizable height for the judgment log box (drag grabber below it).
+    @State private var judgmentBoxHeight: CGFloat = 180
+    @State private var judgmentDragBase: CGFloat?
+
     var body: some View {
         if let report = model.finishedRunReport {
             ScrollView {
@@ -41,7 +45,7 @@ struct RunReportView: View {
                 HStack(spacing: 12) {
                     AppKitActionButton(
                         identifier: M11ControlID.reportDone,
-                        title: "Done \u{2014} back to the browser",
+                        title: "OK",
                         prominent: true
                     ) {
                         model.acknowledgeRunReport()
@@ -84,7 +88,7 @@ struct RunReportView: View {
     private func summaryPanel(_ report: BatchRunReport) -> some View {
         GroupBox {
             VStack(alignment: .leading, spacing: 8) {
-                Label("Batch run report", systemImage: "checklist.checked")
+                Label("Processing Report", systemImage: "checklist.checked")
                     .font(.headline)
                 HStack(spacing: 8) {
                     Chip(text: report.unattended ? "unattended" : "confirmed per item", tint: .blue)
@@ -128,10 +132,7 @@ struct RunReportView: View {
         GroupBox {
             VStack(alignment: .leading, spacing: 10) {
                 Label(
-                    "Auto-decided judgment calls ("
-                        + "\(report.judgmentItemCount) "
-                        + (report.judgmentItemCount == 1 ? "item" : "items")
-                        + ") \u{2014} recorded for reference",
+                    "Playlists Processing Output Log",
                     systemImage: "checklist"
                 )
                 .foregroundStyle(.secondary)
@@ -152,26 +153,55 @@ struct RunReportView: View {
         let lines = item.nearIdenticalPairLines
             + item.distinctOmissionLines
             + item.countAnomalyLines
-        return ScrollView([.vertical, .horizontal]) {
-            Text(lines.joined(separator: "\n"))
-                .font(.system(.caption, design: .monospaced))
-                .textSelection(.enabled)
-                .fixedSize(horizontal: true, vertical: true)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(6)
+        let contentEstimate = CGFloat(lines.count) * 22 + 18
+        return VStack(spacing: 3) {
+            ScrollView([.vertical, .horizontal]) {
+                Text(lines.joined(separator: "\n"))
+                    .font(.system(.caption, design: .monospaced))
+                    .textSelection(.enabled)
+                    .fixedSize(horizontal: true, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(6)
+            }
+            .frame(height: min(judgmentBoxHeight, contentEstimate))
+            .background(
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(Color(nsColor: .textBackgroundColor))
+            )
+            .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(.quaternary))
+            if contentEstimate > 120 {
+                judgmentResizeGrabber
+            }
         }
-        .frame(height: min(140, CGFloat(lines.count) * 22 + 18))
-        .background(
-            RoundedRectangle(cornerRadius: 6)
-                .fill(Color(nsColor: .textBackgroundColor))
-        )
-        .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(.quaternary))
+    }
+
+    /// Drag handle below the log box (Sergio, 2026-08-06): dragging adjusts
+    /// the box height, clamped so it can neither vanish nor swallow the
+    /// screen. Display-only state.
+    private var judgmentResizeGrabber: some View {
+        RoundedRectangle(cornerRadius: 2)
+            .fill(.quaternary)
+            .frame(width: 64, height: 5)
+            .frame(maxWidth: .infinity)
+            .contentShape(Rectangle().inset(by: -8))
+            .gesture(
+                DragGesture(minimumDistance: 1)
+                    .onChanged { value in
+                        if judgmentDragBase == nil { judgmentDragBase = judgmentBoxHeight }
+                        judgmentBoxHeight = min(
+                            700, max(100, (judgmentDragBase ?? judgmentBoxHeight)
+                                + value.translation.height)
+                        )
+                    }
+                    .onEnded { _ in judgmentDragBase = nil }
+            )
+            .help("Drag to resize the log")
     }
 
     private func itemsPanel(_ report: BatchRunReport) -> some View {
         GroupBox {
             VStack(alignment: .leading, spacing: 8) {
-                Text("Items (\(report.items.count))")
+                Text("Action Summary")
                     .font(.headline)
                 ForEach(report.items) { item in
                     VStack(alignment: .leading, spacing: 2) {
