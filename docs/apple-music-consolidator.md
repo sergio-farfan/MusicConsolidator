@@ -189,18 +189,9 @@ other rename collision is a warning, not a block — creating a same-name
 group is often the intent, because that is what makes a near-match twin
 mergeable on the next scan.
 
-Three entry points exist. The Cleanup tab lists post-merge groups derived
-from merge-plan evidence plus a single fresh live listing read — target
-name present and unique in that listing, copy accounting from the
-listing's persistent IDs plus existing on-disk delete evidence, and
-unknown same-name persistent IDs disqualifying the group. The stronger
-ordered-database-ID-and-persistent-ID target verification, and the
-per-copy track-identity recheck, run only when a group's gate is actually
-armed — scoped to just that group's two names, never at discovery — and
-the scan itself holds the OSA slot like every other mutation activity. It
-deletes a group's source copies one compiled execution at a time behind a
-single per-group typed approval — the one named exception to
-one-approval-per-playlist. The tab also lists every live playlist:
+Three entry points exist. The Cleanup tab lists every live playlist
+for individually gated deletion (2026-08-06: the post-merge group flow
+was removed from the UI; the evidence scanner remains in the engine). The tab also lists every live playlist:
 any playlist can be deleted there behind the same individually typed
 gate (contract-excluded names and IDs stay refused up front). The
 Library and Cleanup lists order by clickable Name/Tracks headers —

@@ -95,6 +95,8 @@ nonisolated struct RunItemRecord: Equatable, Sendable, Identifiable {
     let targetName: String?
     let planFileName: String?
     let elapsedSeconds: Double?
+    /// Optional advisory (e.g. "already done" pre-skip guidance).
+    var note: String? = nil
 
     var id: String { name }
 
@@ -178,6 +180,9 @@ nonisolated func renderRunReportText(_ report: BatchRunReport) -> String {
         }
         if let elapsed = item.elapsedSeconds {
             lines.append("- Item time: \(elapsedText(elapsed))")
+        }
+        if let note = item.note {
+            lines.append("- Note: \(note)")
         }
         for line in item.nearIdenticalPairLines { lines.append("- JUDGMENT: \(line)") }
         for line in item.distinctOmissionLines { lines.append("- JUDGMENT: \(line)") }

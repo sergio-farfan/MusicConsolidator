@@ -229,6 +229,13 @@ struct RunReportView: View {
                             failureClassLines(failureClass: failureClass, item: item)
                                 .padding(.leading, 12)
                         }
+                        if let note = item.note {
+                            Text(note)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(3)
+                                .padding(.leading, 12)
+                        }
                         if let target = item.targetName, case .applied = item.outcome {
                             HStack(spacing: 6) {
                                 Text("Created:")

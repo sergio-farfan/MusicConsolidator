@@ -60,8 +60,8 @@ private struct UnattendedRunScreen: View {
                 GroupBox {
                     VStack(alignment: .leading, spacing: 8) {
                         Label(
-                            "Unattended batch run \u{2014} item "
-                                + "\(min(model.queueIndex + 1, model.queue.count)) "
+                            "\(model.mode == .merge ? "Merge" : "Consolidate") Run "
+                                + "\u{2014} \(min(model.queueIndex + 1, model.queue.count)) "
                                 + "of \(model.queue.count)",
                             systemImage: "play.circle.fill"
                         )
