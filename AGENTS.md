@@ -73,6 +73,18 @@ and never rewrite published history.
   mutation, including as rename destinations. The CLI has no delete or
   rename. Everything else in this section is unchanged. Design:
   `docs/superpowers/specs/2026-08-03-queue-tables-and-playlist-management-design.md`.
+- AMENDMENT (Sergio, 2026-08-06) — direct user-responsible mutations,
+  superseding the guarded in-app mutation flow above: in-app playlist
+  delete and rename are DIRECT — a simple confirm dialog, then one
+  compiled AppleScript execution pinned by persistent ID. No plan
+  artifacts, typed approvals, freshness windows, fingerprint rechecks,
+  or readback verification. NO playlist is refused: smart playlists,
+  folders, and the pilot identities are all valid targets for delete
+  and rename (the pilot CONSOLIDATION PLAN is still never applied
+  again). Both prior exceptions to one-approval-per-playlist are moot.
+  Unchanged: mutations never run inside any apply or unattended run;
+  applies keep every guard; source playlists are never modified by any
+  create path; Library*.xml evidence stays read-only.
 
 ## Duplicate and quality contract
 

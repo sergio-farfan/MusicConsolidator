@@ -152,68 +152,66 @@ counts strictly decoded from their `.plan.json` artifacts through the same
 fail-closed loaders the apply uses — a file those loaders reject simply
 shows no counts. Counts are display-only everywhere and never feed a guard.
 
-## Guarded delete and rename (AGENTS.md amendment, 2026-08-03)
+## Direct delete and rename (AGENTS.md amendment, 2026-08-06)
 
-The native app adds playlist delete and rename as a second guarded mutation
-class under the AGENTS.md "guarded in-app mutations" amendment (Sergio,
-2026-08-03). Creates remain the only batch-capable operation; delete and
-rename are ATTENDED ONLY — they never run inside an unattended queue, never
-inside any apply, and both gates are disabled while an unattended run is
-active.
+The native app's playlist delete and rename are direct, user-responsible
+actions — Music.app parity — superseding the guarded in-app mutation flow
+(AGENTS.md amendment, 2026-08-03) and both of its named exceptions to
+one-approval-per-playlist. Delete and rename remain ATTENDED ONLY: they
+never run inside an unattended queue, never inside any apply, and both
+are disabled while a scan, audit, apply, or unattended run is active. One
+direct mutation runs at a time.
 
-Every mutation is artifact-first and persistent-ID-pinned. Arming a gate
-performs a fresh live audit and writes a reviewable
-`.delete.plan.json` / `.rename.plan.json` plus `.summary.md` pair into
-`reports/` (never overwritten). The artifact is session-bound and single-use:
-it can only dispatch from the app launch that wrote it, within 10 minutes,
-after a SHA-256 recheck from disk, and executing OR aborting consumes it —
-nothing can ever re-arm a consumed artifact. The writer re-verifies the
-pinned copy's exact name, track count, and ordered track persistent IDs
-inside the same compiled execution, immediately before its single mutation
-verb, and every execution ends in a bijective full-listing readback; any
-drift fails closed with verbatim mismatches persisted in a
-`.mutationresult.md` report. Failures are never repaired and never retried.
+Each action is one compiled AppleScript execution addressed by persistent
+ID — delete the matching playlist, or set its name — behind a single
+confirm dialog. There are no plan artifacts, no typed approvals, no
+freshness windows, no fingerprint rechecks, and no readback verification;
+a failure returns the verbatim script error, never repaired and never
+retried. No `.plan.json` or `.mutationresult.md` files are written for a
+direct action — History and Reports cover applies only. The former
+guarded machinery (script builders, plan artifact writers,
+`CleanupGroupContext`) stays in the codebase, dormant, for a possible
+later cleanup wave, but no user-visible path arms it anymore.
 
-Typed confirmation must uniquely identify the pinned persistent ID, never a
-name alone: when the typed name matches more than one live playlist the gate
-also requires the copy's track count, and if that is ambiguous too, the last
-four characters of the persistent ID. Typed input is never trimmed, folded,
-or normalized anywhere in the app.
+No playlist is refused: smart playlists, special-kind playlists
+(including folders), and the pilot identities — the scalar-exact names
+`#Musica xTotal` and `#Musica xTotal — Consolidated`, and persistent IDs
+`E02030832FD20B07` and `61EC0FC6E0F1C250` — are all valid delete and
+rename targets. (The rule that the pilot CONSOLIDATION PLAN is never
+applied again is unaffected; only the playlists' deletability and
+renamability changed.) Duplicate names are permitted on rename, exactly
+as in Music.app — creating a same-name group is often the intent, because
+that is what makes a near-match twin mergeable on the next scan.
 
-Refused outright, before any gate: smart playlists; special-kind playlists
-(including folders); the scalar-exact names `#Musica xTotal` and
-`#Musica xTotal — Consolidated`; and persistent IDs `E02030832FD20B07` and
-`61EC0FC6E0F1C250` (the pilot source and its verified target, retained as
-contract evidence). The same names are refused as rename destinations. Any
-other rename collision is a warning, not a block — creating a same-name
-group is often the intent, because that is what makes a near-match twin
-mergeable on the next scan.
-
-Three entry points exist. The Cleanup tab lists every live playlist
-for gated deletion (2026-08-06: the post-merge group flow was removed
-from the UI; the evidence scanner remains in the engine); contract-excluded
-names and IDs stay refused up front. Eligible rows carry a checkbox
-(refused rows cannot be checked): selecting N playlists and choosing
-"Delete selected (N)…" arms one gate for the whole batch, whose typed
-token is the exact selection count — the second named exception to
-one-approval-per-playlist (Sergio, 2026-08-06). Every playlist in the
-batch is still its own fresh-audited plan artifact and its own guarded
-compiled execution with full-listing readback between deletes, and any
-refusal at arm time refuses the whole batch fail-closed. The
-Library and Cleanup lists order by clickable Name/Tracks headers —
-display-only; ordering never feeds a guard, plan, or queue. Browser rows carry
-Delete…/Rename… actions with refusals surfaced up front as disabled actions
-plus the reason. NEAR MATCHES clusters carry "Align names…": the canonical
-name is the variant equal to its own NFC form with no leading/trailing
+Three entry points share the same confirm/rename sheet. The Cleanup tab
+lists every live playlist as a full-width list — the former gate detail
+pane is gone. Each row carries a checkbox, a Delete button, and a
+Rename… button; the header caption reads "Delete or rename any playlist
+directly. Deleting a playlist never removes songs from your library."
+Deleting shows one alert — `Delete "Name"?` / `Songs stay in your
+library.` — with an added line, `Deleting a folder also deletes the
+playlists inside it.`, when the target is a folder; confirming executes
+immediately. Renaming opens a sheet pre-filled with the current name;
+Enter or the Rename button commits, Escape cancels, and committing the
+unchanged name is a no-op (no script runs at all). Checking N rows and
+choosing "Delete selected (N)…" raises one alert — `Delete N playlists?`,
+with the same folder-cascade line if any selection is a folder — then
+runs the batch: deletes execute sequentially in selection order, each
+success removes the row from the list immediately, and the first failure
+stops the batch, surfaces the verbatim error, and leaves the remaining
+rows untouched. The Library and Cleanup lists still order by clickable
+Name/Tracks headers — display-only; ordering never feeds a mutation.
+Browser rows (Merge/Consolidate tabs) carry the same Delete…/Rename…
+actions. NEAR MATCHES clusters carry "Align names…": the canonical name
+is the variant equal to its own NFC form with no leading/trailing
 whitespace and no invisible scalars (Sergio picks when none or several
-qualify), and an N-variant cluster yields N−1 separately gated renames whose
-typed confirmation is the canonical destination name, the deviant copy
-pinned by persistent ID with its invisible-character diff displayed.
+qualify), and each deviant copy in the cluster opens the same pre-filled
+rename sheet — one confirm per rename, no typed gate.
 
 As the pilot section above records, deleting a playlist removes the
 playlist, not its songs from the library. Source playlists of merges and
 consolidations remain untouched by every create path; removal is only ever
-this separate, individually gated operation.
+this separate, per-playlist confirmed action.
 
 ## Apply failure taxonomy (Wave C1, 2026-08-04)
 
