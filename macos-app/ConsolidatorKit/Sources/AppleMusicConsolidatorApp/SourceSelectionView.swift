@@ -215,26 +215,33 @@ struct SourceSelectionView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         case .scanning(let started):
-            VStack(spacing: 8) {
+            // Same centered anatomy as the idle state: spinner, status line,
+            // caption. The status label is AppKit-backed so the structural
+            // tests can pin this state on every tab (SwiftUI Text publishes
+            // no NSView); fixedSize keeps the short single-line label hugging
+            // its content instead of stretching the row edge-to-edge.
+            VStack(spacing: 10) {
+                ProgressView()
                 TimelineView(.periodic(from: .now, by: 1)) { context in
                     HStack(spacing: 8) {
-                        ProgressView()
-                            .controlSize(.small)
-                        // AppKit-backed so the structural tests can pin this
-                        // state on every tab (SwiftUI Text publishes no NSView).
                         AppKitStaticText(
                             identifier: WaveC2ControlID.browserScanningStatus,
                             text: "Scanning library\u{2026}",
                             maximumLines: 1
                         )
+                        .fixedSize()
                         Text("elapsed \(ProgressPhaseView.elapsedText(from: started, to: context.date))")
                             .monospacedDigit()
                             .foregroundStyle(.secondary)
                     }
+                    .fixedSize()
                 }
                 Text("One enumeration pass over every user playlist; no tracks are read.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: 460)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         case .failed(let failure):

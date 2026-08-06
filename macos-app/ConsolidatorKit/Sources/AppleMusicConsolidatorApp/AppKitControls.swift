@@ -482,10 +482,26 @@ struct AppKitStaticText: NSViewRepresentable {
     let text: String
     var maximumLines: Int = 3
 
+    /// Sergio, 2026-08-06: a plain wrapping NSTextField reports a ONE-LINE
+    /// intrinsic height until `preferredMaxLayoutWidth` matches its laid-out
+    /// width — multi-line text silently clipped mid-sentence (the direct
+    /// sheets' captions) while single-line labels stretched greedily. Track
+    /// the width at layout time and re-measure.
+    final class WrappingLabel: NSTextField {
+        override func layout() {
+            super.layout()
+            if preferredMaxLayoutWidth != bounds.width {
+                preferredMaxLayoutWidth = bounds.width
+                invalidateIntrinsicContentSize()
+            }
+        }
+    }
+
     func makeNSView(context: Context) -> NSTextField {
-        let field = NSTextField(wrappingLabelWithString: text)
+        let field = WrappingLabel(wrappingLabelWithString: text)
         field.isSelectable = true
         field.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        field.setContentCompressionResistancePriority(.required, for: .vertical)
         return field
     }
 
