@@ -162,9 +162,9 @@ struct SourceSelectionView: View {
 
     private var modeCaption: String {
         if model.browserTab == .cleanup {
-            return "Cleanup deletes playlists behind individually typed gates: post-merge groups "
-                + "still agree. One typed approval covers only that group's source "
-                + "copies; deleting a playlist never removes songs from the library."
+            return "Delete any playlist behind an individually typed, verified "
+                + "gate. Contract-excluded playlists are refused up front; "
+                + "deleting a playlist never removes songs from the library."
         }
         switch model.mode {
         case .consolidate:

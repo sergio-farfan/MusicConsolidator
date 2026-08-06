@@ -496,6 +496,26 @@ final class AuditFlowModel {
     private(set) var browserSortKey: BrowserSortKey = .name
     private(set) var browserSortAscending = true
 
+    /// PIDs of the delete dispatch in flight — consumed by finishMutation
+    /// to patch the display listing after a VERIFIED delete.
+    @ObservationIgnored private var dispatchedDeletePIDs: [String] = []
+
+    /// Remove deleted playlists from the DISPLAY cache (browser lists only;
+    /// audits, gates, and readbacks always re-read live).
+    private func removeFromLoadedListing(persistentIDs: [String]) {
+        guard !persistentIDs.isEmpty, case .loaded(let loaded) = listingState else { return }
+        let remaining = loaded.listings.filter { listing in
+            !persistentIDs.contains { scalarExact($0, listing.persistentId) }
+        }
+        guard remaining.count != loaded.listings.count else { return }
+        listingState = .loaded(LoadedListing(
+            listings: remaining,
+            sections: buildPlaylistBrowseSections(from: remaining),
+            scannedAt: loaded.scannedAt,
+            fromCache: loaded.fromCache
+        ))
+    }
+
     func toggleBrowserSort(_ key: BrowserSortKey) {
         if browserSortKey == key {
             browserSortAscending.toggle()
@@ -1119,6 +1139,29 @@ final class AuditFlowModel {
         runReportWriteFailure = nil
         stopRequested = false
         selectedDestination = .activity
+        // Pre-flight (Sergio, 2026-08-06): a target that already exists in
+        // the loaded listing means the item is ALREADY DONE — mark it
+        // skipped up front instead of burning a full audit into the
+        // existing-target refusal. Courtesy check only: the engine guard
+        // still protects everything that actually runs.
+        for index in queue.indices {
+            let target = defaultTargetName(mode: mode, sourceName: queue[index].name)
+            if sections.allPlaylists.contains(where: { scalarExact($0.name, target) }) {
+                queue[index].status = .skipped
+                recordRunItem(
+                    named: queue[index].name,
+                    outcome: .skipped,
+                    note: "already done: \u{201C}\(target)\u{201D} exists \u{2014} "
+                        + "review it, then clean up the sources; delete the target "
+                        + "first if you want to reprocess"
+                )
+            }
+        }
+        while currentQueueItem?.status == .skipped { queueIndex += 1 }
+        guard currentQueueItem != nil else {
+            finishRun()
+            return
+        }
         startCurrentQueueItemAudit()
         // AFTER the audit start (whose discard resets the step): the
         // unattended run owns the apply surface for its whole duration.
@@ -1203,6 +1246,9 @@ final class AuditFlowModel {
 
     private func advanceQueue() {
         queueIndex += 1
+        // Hop pre-skipped (already-done) items; their records were written
+        // at queue start.
+        while currentQueueItem?.status == .skipped { queueIndex += 1 }
         if currentQueueItem != nil, !stopRequested {
             startCurrentQueueItemAudit()
             // The unattended run keeps the apply surface between items
@@ -1271,7 +1317,8 @@ final class AuditFlowModel {
         named name: String,
         outcome: RunItemOutcome,
         elapsed: Double? = nil,
-        failureClass: ApplyFailureClass? = nil
+        failureClass: ApplyFailureClass? = nil,
+        note: String? = nil
     ) {
         guard isQueueActive else { return }
         var judgment = JudgmentSummaries(
@@ -1306,7 +1353,8 @@ final class AuditFlowModel {
                 countAnomalyLines: judgment.countAnomalyLines,
                 targetName: itemTargetName,
                 planFileName: planFileName,
-                elapsedSeconds: elapsed
+                elapsedSeconds: elapsed,
+                note: note
             )
         )
     }
@@ -2179,9 +2227,12 @@ final class AuditFlowModel {
         // Wave B Task 14: an armed GROUP routes to the sequential per-copy
         // orchestration; the single delete/rename path below is unchanged.
         if let context = cleanupContext {
+            dispatchedDeletePIDs = context.plans.map(\.playlistPersistentID)
             executeCleanupGroup(context: context, baseline: state.baseline)
             return
         }
+        dispatchedDeletePIDs = state.plan.kind == .delete
+            ? [state.plan.playlistPersistentID] : []
         let generation = mutationGeneration
         let sessionID = appSessionID
         let clock = now
@@ -2485,7 +2536,14 @@ final class AuditFlowModel {
             mutationGatePhase = .refused(reason)
         case .finished(let display):
             mutationGatePhase = .finished(display)
+            // Sergio, 2026-08-06: a VERIFIED delete disappears from the
+            // browser lists immediately. Display-cache patch only — every
+            // engine read stays live.
+            if display.verified, display.kind == .delete {
+                removeFromLoadedListing(persistentIDs: dispatchedDeletePIDs)
+            }
         }
+        dispatchedDeletePIDs = []
         typedMutationName = ""
         typedMutationCount = ""
         typedMutationPIDSuffix = ""

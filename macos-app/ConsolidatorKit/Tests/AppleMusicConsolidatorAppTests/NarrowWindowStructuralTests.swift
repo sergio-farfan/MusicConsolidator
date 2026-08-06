@@ -129,7 +129,7 @@ struct NarrowWindowStructuralTests {
             )
         }
         expectContained(
-            WaveBControlID.cleanupRefresh, in: fixture.hosting, box: narrowRootWindowBox
+            WaveBControlID.sortByName, in: fixture.hosting, box: narrowRootWindowBox
         )
         expectContained(
             WaveBControlID.mutationDismiss, in: fixture.hosting, box: narrowRootWindowBox
@@ -146,9 +146,9 @@ struct NarrowWindowStructuralTests {
         )
         defer { fixture.tearDown() }
 
-        // Candidate column proof: the header's Refresh control always
-        // renders regardless of scan state.
-        expectContained(WaveBControlID.cleanupRefresh, in: fixture.hosting)
+        // Column proof: the All-playlists sort header always renders
+        // regardless of listing state (post-merge section removed 2026-08-06).
+        expectContained(WaveBControlID.sortByName, in: fixture.hosting)
         // Gate pane proof: MutationGateView's dismiss control always renders
         // in its safeAreaInset footer regardless of gate phase.
         expectContained(WaveBControlID.mutationDismiss, in: fixture.hosting)

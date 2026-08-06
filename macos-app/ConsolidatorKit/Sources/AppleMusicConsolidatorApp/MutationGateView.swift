@@ -155,9 +155,7 @@ struct MutationGateView: View {
         GroupBox {
             VStack(alignment: .leading, spacing: 6) {
                 Label(
-                    state.plan.kind == .delete
-                        ? "Delete playlist \u{2014} one guarded mutation"
-                        : "Rename playlist \u{2014} one guarded mutation",
+                    state.plan.kind == .delete ? "Delete Playlist" : "Rename Playlist",
                     systemImage: state.plan.kind == .delete ? "trash" : "pencil"
                 )
                 .font(.headline)
@@ -175,15 +173,6 @@ struct MutationGateView: View {
                     LabeledContent("Rename to") {
                         BrowserNameText(name: destination)
                     }
-                }
-                LabeledContent("Plan artifact") {
-                    IdentifierText(text: state.paths.planURL.lastPathComponent)
-                }
-                LabeledContent("Fresh until") {
-                    Text(
-                        state.freshnessDeadline.formatted(date: .omitted, time: .standard)
-                    )
-                    .monospacedDigit()
                 }
                 if state.plan.kind == .delete {
                     Text("Deleting a playlist never removes songs from the library.")
@@ -350,7 +339,12 @@ struct MutationGateView: View {
     private func executePanel(state: AuditFlowModel.MutationGateState) -> some View {
         GroupBox {
             VStack(alignment: .leading, spacing: 10) {
-                Label("Execute \u{2014} one guarded mutation", systemImage: "play.circle")
+                Label(
+                    state.plan.kind == .delete
+                        ? "Execute \u{2014} Delete Playlist"
+                        : "Execute \u{2014} Rename Playlist",
+                    systemImage: "play.circle"
+                )
                     .font(.headline)
                 VStack(alignment: .leading, spacing: 3) {
                     reminderRow(
