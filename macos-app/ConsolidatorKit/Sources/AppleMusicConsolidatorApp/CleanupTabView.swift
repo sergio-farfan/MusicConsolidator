@@ -57,6 +57,29 @@ struct CleanupTabView: View {
                 .font(.headline)
             BrowserSortHeader(model: model)
             Spacer()
+            if !model.checkedCleanupPIDs.isEmpty {
+                AppKitActionButton(
+                    identifier: WaveBControlID.cleanupDeleteSelected,
+                    title: "Delete selected (\(model.checkedCleanupPIDs.count))\u{2026}",
+                    help: "One typed approval \u{2014} the selection count \u{2014} "
+                        + "covers the batch; every playlist is still its own guarded, "
+                        + "verified deletion."
+                ) {
+                    model.startBatchDeleteAudit(
+                        persistentIDs: Array(model.checkedCleanupPIDs)
+                    )
+                }
+                .disabled(
+                    model.isMutationBusy || model.isRunning || model.isScanning
+                        || model.isApplying || model.isUnattendedRunActive
+                )
+                AppKitActionButton(
+                    identifier: WaveBControlID.cleanupClearSelection,
+                    title: "Clear"
+                ) {
+                    model.clearCleanupSelection()
+                }
+            }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
@@ -74,6 +97,15 @@ struct CleanupTabView: View {
                 ForEach(rows, id: \.persistentId) { listing in
                     let refusal = AuditFlowModel.mutationEntryRefusalReason(listing)
                     HStack(spacing: 8) {
+                        AppKitCheckbox(
+                            identifier: WaveBControlID.cleanupCheckbox(listing.persistentId),
+                            isOn: model.checkedCleanupPIDs.contains(listing.persistentId),
+                            help: refusal
+                                ?? "Select for batch deletion (one typed approval per batch)."
+                        ) {
+                            model.toggleCleanupChecked(listing.persistentId)
+                        }
+                        .disabled(refusal != nil)
                         BrowserNameText(name: listing.name)
                         Text(trackCountText(copyCounts: [listing.trackCount]))
                             .foregroundStyle(.secondary)

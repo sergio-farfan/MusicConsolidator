@@ -190,10 +190,16 @@ group is often the intent, because that is what makes a near-match twin
 mergeable on the next scan.
 
 Three entry points exist. The Cleanup tab lists every live playlist
-for individually gated deletion (2026-08-06: the post-merge group flow
-was removed from the UI; the evidence scanner remains in the engine). The tab also lists every live playlist:
-any playlist can be deleted there behind the same individually typed
-gate (contract-excluded names and IDs stay refused up front). The
+for gated deletion (2026-08-06: the post-merge group flow was removed
+from the UI; the evidence scanner remains in the engine); contract-excluded
+names and IDs stay refused up front. Eligible rows carry a checkbox
+(refused rows cannot be checked): selecting N playlists and choosing
+"Delete selected (N)…" arms one gate for the whole batch, whose typed
+token is the exact selection count — the second named exception to
+one-approval-per-playlist (Sergio, 2026-08-06). Every playlist in the
+batch is still its own fresh-audited plan artifact and its own guarded
+compiled execution with full-listing readback between deletes, and any
+refusal at arm time refuses the whole batch fail-closed. The
 Library and Cleanup lists order by clickable Name/Tracks headers —
 display-only; ordering never feeds a guard, plan, or queue. Browser rows carry
 Delete…/Rename… actions with refusals surfaced up front as disabled actions

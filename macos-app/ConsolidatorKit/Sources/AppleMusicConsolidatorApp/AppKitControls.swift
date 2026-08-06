@@ -285,6 +285,11 @@ enum WaveBControlID {
     static let unattendedNotice = "wb.unattendedNotice"
     static let cleanupRefresh = "wb.cleanupRefresh"
     static let sortByName = "wb.sortByName"
+    static let cleanupDeleteSelected = "wb.cleanupDeleteSelected"
+    static let cleanupClearSelection = "wb.cleanupClearSelection"
+    static func cleanupCheckbox(_ persistentId: String) -> String {
+        "wb.cleanupCheck.\(persistentId)"
+    }
     static let sortByCount = "wb.sortByCount"
     static func cleanupDelete(_ persistentId: String) -> String {
         "wb.cleanupDelete.\(persistentId)"

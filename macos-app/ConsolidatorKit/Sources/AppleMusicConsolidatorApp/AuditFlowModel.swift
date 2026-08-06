@@ -319,6 +319,11 @@ final class AuditFlowModel {
         /// Non-nil when persisting the result report failed (loud, like
         /// `runReportWriteFailure`).
         let resultWriteFailure: String?
+        /// Deletes whose own readback verified, even when a LATER copy of a
+        /// multi-playlist dispatch failed closed (Sergio, 2026-08-06). The
+        /// display cache retires exactly these; empty on the single path,
+        /// where `verified` already says it.
+        var verifiedDeletedPersistentIDs: [String] = []
     }
 
     /// The gate lifecycle (contract B2/B4/B5). `auditing` carries its start
@@ -495,6 +500,176 @@ final class AuditFlowModel {
     // guard, plan, or queue; Sergio, 2026-08-05).
     private(set) var browserSortKey: BrowserSortKey = .name
     private(set) var browserSortAscending = true
+
+    /// Cleanup batch selection (Sergio, 2026-08-06): checked rows in the
+    /// All-playlists list. Selection is UI state only; the gate re-audits.
+    private(set) var checkedCleanupPIDs: Set<String> = []
+
+    func toggleCleanupChecked(_ persistentId: String) {
+        if checkedCleanupPIDs.contains(persistentId) {
+            checkedCleanupPIDs.remove(persistentId)
+        } else {
+            checkedCleanupPIDs.insert(persistentId)
+        }
+    }
+
+    func clearCleanupSelection() { checkedCleanupPIDs = [] }
+
+    /// Arm ONE gate for a user-selected batch of deletes (AGENTS.md
+    /// exception 2): fresh listing, per-entry refusal checks (ANY refusal
+    /// refuses the whole batch), one plan + artifact pair per playlist, and
+    /// a count-typed confirmation. Execution reuses the sequential per-copy
+    /// group dispatch (per-playlist guarded writes, readback between).
+    func startBatchDeleteAudit(persistentIDs: [String]) {
+        guard !persistentIDs.isEmpty else { return }
+        guard !isRunning, !isScanning, !isApplying, !isMutationBusy,
+              !isUnattendedRunActive else { return }
+        if case .armed(let previous) = mutationGatePhase {
+            consumeArmedMutationArtifacts(previous)
+        }
+        typedMutationName = ""
+        typedMutationCount = ""
+        typedMutationPIDSuffix = ""
+        mutationGeneration += 1
+        let generation = mutationGeneration
+        let make = makeRunner
+        let pids = persistentIDs
+        mutationGatePhase = .auditing(started: now())
+        mutationTask = Task { [weak self] in
+            guard let self else { return }
+            do {
+                let session = MusicBridgeSession(runner: make())
+                let sample: ([PlaylistListing], [String: [PlaylistSnapshot]]) =
+                    try await Task.detached(priority: .userInitiated) {
+                        let listing = try session.listPlaylists()
+                        var byName: [String: [PlaylistSnapshot]] = [:]
+                        for pid in pids {
+                            guard let entry = listing.first(
+                                where: { scalarExact($0.persistentId, pid) }
+                            ) else { continue }
+                            // Refusals surface BEFORE any snapshot read: a
+                            // poisoned selection refuses the whole batch
+                            // without touching Music further.
+                            if let reason = AuditFlowModel.mutationEntryRefusalReason(entry) {
+                                throw MutationGateRefusal(
+                                    "refused (whole batch): \(reason)"
+                                )
+                            }
+                            if byName[entry.name] == nil {
+                                byName[entry.name] = try session.snapshotAllCopies(
+                                    name: entry.name
+                                )
+                            }
+                        }
+                        return (listing, byName)
+                    }.value
+                try self.armBatchDelete(
+                    persistentIDs: pids, listing: sample.0,
+                    snapshotsByName: sample.1, generation: generation
+                )
+            } catch {
+                self.refuseMutation(error, generation: generation)
+            }
+        }
+    }
+
+    private func armBatchDelete(
+        persistentIDs: [String],
+        listing: [PlaylistListing],
+        snapshotsByName: [String: [PlaylistSnapshot]],
+        generation: Int
+    ) throws {
+        let fingerprint = listingFingerprint(of: listing)
+        let createdAt = ISO8601DateFormatter().string(from: now())
+        let outputDir = URL(fileURLWithPath: outputDirectoryPath, isDirectory: true)
+        var plans: [MutationPlan] = []
+        var paths: [MutationAuditPaths] = []
+        func failArming(_ error: Error) -> Error {
+            for auditPaths in paths {
+                try? markMutationPlanConsumed(planURL: auditPaths.planURL)
+            }
+            return error
+        }
+        for pid in persistentIDs {
+            guard let entry = listing.first(
+                where: { scalarExact($0.persistentId, pid) }
+            ) else {
+                throw failArming(MutationGateRefusal(
+                    "refused: no live playlist carries persistent ID \(pid); "
+                        + "rescan and retry"
+                ))
+            }
+            if let reason = Self.mutationEntryRefusalReason(entry) {
+                throw failArming(MutationGateRefusal(
+                    "refused (whole batch): \(reason)"
+                ))
+            }
+            let copies = (snapshotsByName[entry.name] ?? [])
+                .filter { scalarExact($0.persistentId, pid) }
+            guard copies.count == 1, let pinned = copies.first,
+                  pinned.tracks.count == entry.trackCount else {
+                throw failArming(MutationGateRefusal(
+                    "refused (whole batch): \u{201C}\(entry.name)\u{201D} drifted "
+                        + "during the batch audit"
+                ))
+            }
+            let plan = MutationPlan(
+                kind: .delete,
+                playlistName: entry.name,
+                playlistPersistentID: entry.persistentId,
+                trackCount: pinned.tracks.count,
+                orderedTrackPersistentIDs: pinned.tracks.map(\.persistentId),
+                newName: nil,
+                listingFingerprint: fingerprint,
+                evidence: nil,
+                createdAtISO8601: createdAt,
+                sessionID: appSessionID
+            )
+            let auditPaths: MutationAuditPaths
+            do {
+                auditPaths = try writeMutationAudit(
+                    outputDir: outputDir, plan: plan,
+                    summaryText: Self.mutationSummaryText(plan: plan)
+                )
+            } catch { throw failArming(error) }
+            paths.append(auditPaths)
+            if let reason = Self.mutationPreconditionFailure(
+                armedPlan: plan, planURL: auditPaths.planURL,
+                sessionID: appSessionID, at: now()
+            ) {
+                throw failArming(MutationGateRefusal(reason))
+            }
+            plans.append(plan)
+        }
+        guard let firstPlan = plans.first, let firstPaths = paths.first else {
+            throw MutationGateRefusal("refused: nothing selected survives arming")
+        }
+        guard generation == mutationGeneration, case .auditing = mutationGatePhase else {
+            for auditPaths in paths {
+                try? markMutationPlanConsumed(planURL: auditPaths.planURL)
+            }
+            return
+        }
+        cleanupContext = CleanupGroupContext(
+            groupName: "\(plans.count) playlists",
+            targetName: "",
+            targetGuard: nil,
+            plans: plans,
+            paths: paths
+        )
+        let created = ISO8601DateFormatter().date(from: createdAt) ?? now()
+        mutationGatePhase = .armed(MutationGateState(
+            plan: firstPlan,
+            paths: firstPaths,
+            baseline: listing,
+            armedAt: now(),
+            freshnessDeadline: created.addingTimeInterval(600),
+            requiresCountToken: false,
+            requiresPIDSuffixToken: false,
+            collisionWarning: nil,
+            confirmationName: "\(plans.count)"
+        ))
+    }
 
     /// PIDs of the delete dispatch in flight — consumed by finishMutation
     /// to patch the display listing after a VERIFIED delete.
@@ -1061,16 +1236,31 @@ final class AuditFlowModel {
     /// the singletons, near-match-flagged ones included (they are legal to
     /// consolidate). Existing checks, including ones hidden by the active
     /// filter, survive.
+    /// True when this source already has its mode target in the loaded
+    /// listing (Sergio, 2026-08-06: block selection up front instead of
+    /// skipping at the gate). Display-cache check; the engine guard still
+    /// protects everything that runs.
+    func isAlreadyProcessed(name: String) -> Bool {
+        guard let loaded = loadedListing else { return false }
+        let target = defaultTargetName(mode: mode, sourceName: name)
+        return loaded.listings.contains { scalarExact($0.name, target) }
+    }
+
     func selectAllEligible() {
         guard let sections = displayedBrowserSections else { return }
         switch mode {
         case .merge:
             let additions = sections.groups.map(\.name).filter { name in
                 !checkedGroupNames.contains { scalarExact($0, name) }
+                    && !isAlreadyProcessed(name: name)
             }
             checkedGroupNames.append(contentsOf: additions)
         case .consolidate:
-            checkedPersistentIds.formUnion(sections.singletons.map(\.persistentId))
+            checkedPersistentIds.formUnion(
+                sections.singletons
+                    .filter { !isAlreadyProcessed(name: $0.name) }
+                    .map(\.persistentId)
+            )
         }
     }
 
@@ -2539,8 +2729,14 @@ final class AuditFlowModel {
             // Sergio, 2026-08-06: a VERIFIED delete disappears from the
             // browser lists immediately. Display-cache patch only — every
             // engine read stays live.
-            if display.verified, display.kind == .delete {
-                removeFromLoadedListing(persistentIDs: dispatchedDeletePIDs)
+            // A multi-playlist dispatch retires exactly the copies whose own
+            // readback verified, even when a later copy failed closed.
+            if display.kind == .delete {
+                let retired = display.verifiedDeletedPersistentIDs.isEmpty
+                    ? (display.verified ? dispatchedDeletePIDs : [])
+                    : display.verifiedDeletedPersistentIDs
+                removeFromLoadedListing(persistentIDs: retired)
+                checkedCleanupPIDs.subtract(retired)
             }
         }
         dispatchedDeletePIDs = []
@@ -2641,7 +2837,9 @@ final class AuditFlowModel {
     struct CleanupGroupContext: Equatable {
         let groupName: String
         let targetName: String
-        let targetGuard: MutationScriptBuilder.TargetGuardPayload
+        /// nil for a user-selected BATCH delete (no merged target to
+        /// protect); non-nil only for the evidence-derived group flow.
+        let targetGuard: MutationScriptBuilder.TargetGuardPayload?
         let plans: [MutationPlan]
         let paths: [MutationAuditPaths]
     }
@@ -3136,7 +3334,12 @@ final class AuditFlowModel {
                 informational: informational,
                 consumedPlanFileName: firstPlanFileName,
                 resultReportPath: resultReportPath,
-                resultWriteFailure: resultWriteFailure
+                resultWriteFailure: resultWriteFailure,
+                verifiedDeletedPersistentIDs: zip(context.plans, outcomes).compactMap {
+                    plan, outcome in
+                    if case .verified = outcome { return plan.playlistPersistentID }
+                    return nil
+                }
             ))
         }.value
     }
@@ -3153,16 +3356,26 @@ final class AuditFlowModel {
         informational: [String],
         verifiedAll: Bool
     ) -> String {
+        // A batch (no target guard) has no merged target and no evidence
+        // plan to cite; the group flow always has both.
+        let isBatch = context.targetGuard == nil
         var lines = [
-            "# Mutation result \u{2014} cleanup group delete",
+            "# Mutation result \u{2014} "
+                + (isBatch ? "user-selected batch delete" : "cleanup group delete"),
             "",
             "- Outcome: \(verifiedAll ? "VERIFIED" : "FAILED CLOSED")",
-            "- Group: \(context.groupName)",
-            "- Merged target: \(context.targetName)",
-            "- Copies planned: \(context.plans.count)",
-            "- Evidence merge plan: "
-                + (context.plans[0].evidence?.mergePlanFileName ?? "(none)"),
+            isBatch ? "- Selection: \(context.groupName)" : "- Group: \(context.groupName)",
         ]
+        if !isBatch {
+            lines.append("- Merged target: \(context.targetName)")
+        }
+        lines.append("- Copies planned: \(context.plans.count)")
+        if !isBatch {
+            lines.append(
+                "- Evidence merge plan: "
+                    + (context.plans[0].evidence?.mergePlanFileName ?? "(none)")
+            )
+        }
         for (index, plan) in context.plans.enumerated() {
             lines.append("")
             lines.append("## Copy \(index) \u{2014} \(plan.playlistPersistentID)")

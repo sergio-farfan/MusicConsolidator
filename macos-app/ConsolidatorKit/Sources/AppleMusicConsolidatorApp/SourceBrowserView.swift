@@ -99,18 +99,26 @@ struct MergeBrowserList: View {
                             // M10: check a group to queue its merge. Checking
                             // is independent of the row highlight (which only
                             // feeds the inspector).
+                            let alreadyDone = model.isAlreadyProcessed(name: group.name)
                             AppKitCheckbox(
                                 identifier: M10ControlID.groupCheckbox(group.name),
                                 isOn: model.isGroupChecked(group.name),
-                                help: "Queue \u{201C}\(group.name)\u{201D} "
-                                    + "(\(group.copies.count) copies) for merging."
+                                help: alreadyDone
+                                    ? "Already merged: \u{201C}\(group.name) \u{2014} "
+                                        + "Merged\u{201D} exists. Review it, then clean "
+                                        + "up the sources; delete it first to reprocess."
+                                    : "Queue \u{201C}\(group.name)\u{201D} "
+                                        + "(\(group.copies.count) copies) for merging."
                             ) {
                                 model.toggleChecked(
                                     name: group.name,
                                     rangeSelect: NSEvent.modifierFlags.contains(.shift)
                                 )
                             }
-                            .disabled(model.isQueueActive)
+                            .disabled(alreadyDone || model.isQueueActive)
+                            if alreadyDone {
+                                Chip(text: "already merged", tint: .green)
+                            }
                             BrowserNameText(name: group.name)
                             Chip(text: "x\(group.copies.count)", tint: .blue)
                             Spacer()
@@ -238,21 +246,29 @@ struct ConsolidateBrowserList: View {
                     // but-scalar-different name could render as blocked
                     // (or checkable) while the model disagreed.
                     let isGroupMember = sections.groups.contains { scalarExact($0.name, listing.name) }
+                    let alreadyDone = model.isAlreadyProcessed(name: listing.name)
                     HStack(spacing: 8) {
                         AppKitCheckbox(
                             identifier: M8ControlID.checkbox(listing.persistentId),
                             isOn: model.checkedPersistentIds.contains(listing.persistentId),
-                            help: isGroupMember
-                                ? consolidateBlockedHelp(copyCount: copyCount(of: listing.name))
-                                : "Queue \u{201C}\(listing.name)\u{201D} for consolidation."
+                            help: alreadyDone
+                                ? "Already consolidated: \u{201C}\(listing.name) "
+                                    + "\u{2014} Consolidated\u{201D} exists. Review it, "
+                                    + "then clean up; delete it first to reprocess."
+                                : isGroupMember
+                                    ? consolidateBlockedHelp(copyCount: copyCount(of: listing.name))
+                                    : "Queue \u{201C}\(listing.name)\u{201D} for consolidation."
                         ) {
                             model.toggleChecked(
                                 persistentId: listing.persistentId,
                                 rangeSelect: NSEvent.modifierFlags.contains(.shift)
                             )
                         }
-                        .disabled(isGroupMember || model.isQueueActive)
+                        .disabled(alreadyDone || isGroupMember || model.isQueueActive)
                         BrowserNameText(name: listing.name)
+                        if alreadyDone {
+                            Chip(text: "already consolidated", tint: .green)
+                        }
                         if nearMatchNames.contains(listing.name) {
                             Image(systemName: "exclamationmark.triangle.fill")
                                 .foregroundStyle(.orange)

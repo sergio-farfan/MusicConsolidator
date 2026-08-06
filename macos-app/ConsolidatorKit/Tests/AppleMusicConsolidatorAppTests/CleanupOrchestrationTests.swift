@@ -313,7 +313,7 @@ struct CleanupOrchestrationTests {
         #expect(armed.requiresPIDSuffixToken == false)
         #expect(armed.plan.evidence?.mergePlanFileName == planFileName)
         #expect(model.cleanupContext?.plans.count == 3)
-        #expect(model.cleanupContext?.targetGuard.orderedTrackPersistentIDs
+        #expect(model.cleanupContext?.targetGuard?.orderedTrackPersistentIDs
             == copyFacts.map(\.trackPID))
 
         model.typedMutationName = cleanupGroupName

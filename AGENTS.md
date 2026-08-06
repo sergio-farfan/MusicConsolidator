@@ -58,10 +58,16 @@ and never rewrite published history.
   immediately before mutating; and a bijective full-listing readback proving
   exactly the approved change and nothing else. Empty, reorder, and every
   other modification remain forbidden. Mutations never run inside any apply
-  or any unattended run. Approval is per playlist, with one exception: a
-  single typed approval may cover the source copies of one merge group after
-  fresh re-verification of the merged target, deleted one mutation per
-  compiled execution with readback between each. Playlists named
+  or any unattended run. Approval is per playlist, with two exceptions: (1)
+  a single typed approval may cover the source copies of one merge group
+  after fresh re-verification of the merged target, deleted one mutation per
+  compiled execution with readback between each; (2) (Sergio, 2026-08-06) a
+  single typed approval — the exact selection COUNT — may cover a
+  user-selected batch of playlists in the Cleanup list, each still its own
+  fresh-audited plan artifact and its own guarded compiled execution with
+  full-listing readback between deletes; contract-excluded and refused
+  playlists cannot be selected, and any refusal at arm time refuses the
+  whole batch fail-closed. Playlists named
   `#Musica xTotal` or `#Musica xTotal — Consolidated`, and persistent IDs
   `E02030832FD20B07` and `61EC0FC6E0F1C250`, are excluded from every
   mutation, including as rename destinations. The CLI has no delete or
