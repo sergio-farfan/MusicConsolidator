@@ -2,9 +2,11 @@
 // Task 4 (Sergio, 2026-08-06) — offscreen structural tests for
 // DirectMutationSheets: the batch-delete confirm anatomy (count title,
 // folder-cascade line, both buttons), the rename sheet's pre-filled token
-// field, and the error panel's verbatim reason. Same offscreen discipline as
-// the other structural suites (NSHostingView into a never-shown NSWindow,
-// ScriptedRunner fakes, zero Music contact).
+// field, the error panel's verbatim reason, and (final fix wave, Finding I1)
+// the in-progress panel plus the error > in-progress > pending > empty
+// precedence. Same offscreen discipline as the other structural suites
+// (NSHostingView into a never-shown NSWindow, ScriptedRunner fakes, zero
+// Music contact).
 
 import AppKit
 import SwiftUI
@@ -113,6 +115,90 @@ struct DirectMutationSheetTests {
         #expect(model.directMutationError == nil)
     }
 
+    // Final fix wave, Finding I1: the sheet now stays up THROUGH dispatch —
+    // confirm clears the pending action and a failure only arrives
+    // milliseconds later, so re-presenting a just-dismissed sheet was the
+    // only failure channel. While the dispatch runs the container shows the
+    // in-progress panel and NO confirm controls (there is nothing left to
+    // confirm or cancel).
+    @Test("the in-progress panel renders while a dispatch is in flight, with no confirm controls")
+    func inProgressPanelWhileDispatching() async throws {
+        let runner = StagedBlockingRunner(
+            outputs: [gateListingWire(), "", "ok"], blockAt: [1]
+        )
+        let harness = try MutationGateHarness(runner: runner)
+        defer { harness.cleanUp() }
+        let model = harness.model
+        model.rescanLibrary()
+        await model.scanTask?.value
+
+        model.requestDirectDelete(persistentIDs: ["SOLO000000000001"])
+        model.confirmPendingDirectAction()
+        #expect(await pollUntil { runner.runCount == 2 })
+        #expect(model.isDirectMutationRunning)
+        #expect(model.pendingDirectAction == nil)
+
+        let fixture = HostedFixture(DirectMutationSheets(model: model), width: 480, height: 360)
+        defer { fixture.tearDown() }
+        expectContained(DirectControlID.inProgressStatus, in: fixture)
+        expectContained(DirectControlID.inProgressCaption, in: fixture)
+        let status = try #require(
+            view(under: fixture.hosting, axIdentifier: DirectControlID.inProgressStatus)
+                as? NSTextField
+        )
+        #expect(status.stringValue == "Working\u{2026}")
+        #expect(view(under: fixture.hosting, axIdentifier: DirectControlID.confirmExecute) == nil)
+        #expect(view(under: fixture.hosting, axIdentifier: DirectControlID.confirmCancel) == nil)
+        #expect(view(under: fixture.hosting, axIdentifier: DirectControlID.errorDismiss) == nil)
+
+        runner.proceed.signal()
+        await model.directMutationTask?.value
+        #expect(model.directMutationError == nil)
+    }
+
+    // Precedence pin: error > in-progress. Reachable because
+    // `directMutationError` survives until the user dismisses it, so a NEXT
+    // dispatch can be in flight while an unread reason is still set — the
+    // reason must never be hidden behind the spinner.
+    @Test("the error panel wins over the in-progress panel")
+    func errorPanelWinsOverInProgress() async throws {
+        // Only the scan is scripted, so delete 1's compile call throws and
+        // sets the error; delete 2's compile call is the BLOCKED one.
+        let runner = StagedBlockingRunner(outputs: [gateListingWire()], blockAt: [2])
+        let harness = try MutationGateHarness(runner: runner)
+        defer { harness.cleanUp() }
+        let model = harness.model
+        model.rescanLibrary()
+        await model.scanTask?.value
+
+        model.requestDirectDelete(persistentIDs: ["SOLO000000000001"])
+        model.confirmPendingDirectAction()
+        await model.directMutationTask?.value
+        let message = try #require(model.directMutationError)
+        #expect(!model.isDirectMutationRunning)
+
+        // A second dispatch, in flight while the first reason is still unread.
+        model.requestDirectDelete(persistentIDs: ["TRAIL00000000001"])
+        model.confirmPendingDirectAction()
+        #expect(await pollUntil { runner.runCount == 3 })
+        #expect(model.isDirectMutationRunning)
+
+        let fixture = HostedFixture(DirectMutationSheets(model: model), width: 480, height: 360)
+        defer { fixture.tearDown() }
+        expectContained(DirectControlID.errorDismiss, in: fixture)
+        let text = try #require(
+            view(under: fixture.hosting, axIdentifier: DirectControlID.errorMessage) as? NSTextField
+        )
+        #expect(text.stringValue == message)
+        #expect(
+            view(under: fixture.hosting, axIdentifier: DirectControlID.inProgressStatus) == nil,
+            "the spinner must never hide an unread failure reason"
+        )
+
+        runner.proceed.signal()
+        await model.directMutationTask?.value
+    }
+
     @Test("neither error nor pending action renders nothing")
     func emptyWhenNeitherSet() async throws {
         let runner = ScriptedRunner(outputs: [gateListingWire()])
@@ -127,6 +213,7 @@ struct DirectMutationSheetTests {
         #expect(view(under: fixture.hosting, axIdentifier: DirectControlID.confirmExecute) == nil)
         #expect(view(under: fixture.hosting, axIdentifier: DirectControlID.renameField) == nil)
         #expect(view(under: fixture.hosting, axIdentifier: DirectControlID.errorDismiss) == nil)
+        #expect(view(under: fixture.hosting, axIdentifier: DirectControlID.inProgressStatus) == nil)
     }
 
     // Task 5 — the Cleanup tab hosts the row actions directly (no gate pane

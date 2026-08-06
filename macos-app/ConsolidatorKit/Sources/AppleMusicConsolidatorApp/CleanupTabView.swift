@@ -19,29 +19,12 @@ import MusicBridge
 struct CleanupTabView: View {
     @Bindable var model: AuditFlowModel
 
-    /// The one `.sheet(isPresented:)` binding for `DirectMutationSheets`:
-    /// presented while either a pending direct action or a dispatch error is
-    /// set; a dismiss (Escape, sheet-swipe) cancels the pending action or
-    /// clears the error, whichever is active.
-    private var directSheetShown: Binding<Bool> {
-        Binding(
-            get: { model.pendingDirectAction != nil || model.directMutationError != nil },
-            set: { shown in
-                guard !shown else { return }
-                if model.directMutationError != nil {
-                    model.dismissDirectMutationError()
-                } else {
-                    model.cancelPendingDirectAction()
-                }
-            }
-        )
-    }
-
     var body: some View {
+        // Finding I1: the shared anchor — presented through the whole
+        // dispatch, so a failure replaces the in-progress panel in place
+        // instead of re-presenting a sheet that is animating out.
         candidateColumn
-            .sheet(isPresented: directSheetShown) {
-                DirectMutationSheets(model: model)
-            }
+            .directMutationSheet(model: model)
     }
 
     // MARK: candidate column

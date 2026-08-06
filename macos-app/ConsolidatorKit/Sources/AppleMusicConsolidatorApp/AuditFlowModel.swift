@@ -581,6 +581,16 @@ final class AuditFlowModel {
     /// unchanged name is a no-op (no runner call at all).
     func confirmPendingDirectAction() {
         guard let action = pendingDirectAction else { return }
+        // Final fix wave, Finding I2: arbitrary time passes between staging
+        // and confirm (the sheet can sit open indefinitely), so re-check the
+        // SAME busy set `requestDirectDelete`/`requestDirectRename` check at
+        // staging time. A refusal cancels the stale confirmation outright
+        // rather than queueing a write behind whatever holds the OSA slot.
+        guard !isMutationBusy, !isRunning, !isScanning, !isApplying,
+              !isUnattendedRunActive else {
+            cancelPendingDirectAction()
+            return
+        }
         pendingDirectAction = nil
         isDirectMutationRunning = true
         let make = makeRunner
@@ -2338,12 +2348,15 @@ final class AuditFlowModel {
 
     /// Resolve the recorded leftover-target name against a FRESH live
     /// listing (never the browser cache), scalar-exactly. Exactly one match
-    /// opens the existing Wave B delete gate through startMutationAudit —
-    /// every B7/B6 guard, typed-token requirement, artifact, and readback
-    /// applies unchanged, and the gate presents at the existing sheet
-    /// anchors. Zero or multiple matches (and a failed listing read)
-    /// surface `leftoverResolveNotice` instead; no gate opens. Disabled
-    /// under the same conditions as every mutation entry point.
+    /// stages the SAME direct delete confirmation as every other delete
+    /// (`pendingDirectAction`), built from the fresh listing row this
+    /// resolve just read — the `DirectMutationSheets` anchor on the calling
+    /// screen presents it, and no plan artifact is written. (Final fix wave,
+    /// Finding C1: this used to arm the retired Wave B gate, which no view
+    /// can present anymore — a silent read, a stranded artifact, and no UI.)
+    /// Zero or multiple matches (and a failed listing read) surface
+    /// `leftoverResolveNotice` instead; nothing is staged. Disabled under the
+    /// same conditions as every mutation entry point.
     func startDeleteLeftoverTarget(named targetName: String) {
         guard !isRunning, !isScanning, !isApplying, !isMutationBusy,
               !isUnattendedRunActive else { return }
@@ -2373,8 +2386,9 @@ final class AuditFlowModel {
         generation: Int
     ) {
         // The busy flag always clears — a stale completion still frees the
-        // OSA slot it held. Everything else (gate arm, notice write) is a
-        // no-op when a newer resolve or a reset superseded this one.
+        // OSA slot it held. Everything else (staging the confirmation, notice
+        // write) is a no-op when a newer resolve or a reset superseded this
+        // one.
         isResolvingLeftoverTarget = false
         guard generation == leftoverResolveGeneration else { return }
         switch outcome {
@@ -2387,7 +2401,11 @@ final class AuditFlowModel {
         case .success(let listings):
             let matches = listings.filter { scalarExact($0.name, targetName) }
             if matches.count == 1 {
-                startMutationAudit(kind: .delete, persistentID: matches[0].persistentId)
+                // Staged from THIS fresh listing row, never through
+                // `requestDirectDelete`: that entry point resolves PIDs
+                // against the browser display cache, which may never have
+                // seen a target created moments ago by the failed apply.
+                pendingDirectAction = .delete(targets: [matches[0]])
             } else {
                 leftoverResolveNotice =
                     "Could not pin the leftover uniquely (\(matches.count) live matches) "

@@ -253,16 +253,16 @@ scanner ignores both new lines).
 
 Both surfaces also offer **Delete leftover target…** for those four
 classes: it re-reads the live listing fresh, matches the recorded target
-name scalar-exactly, and — only on exactly one match — arms the existing
-Wave B delete gate on that persistent ID (every guard, typed-token
-requirement, artifact, and readback unchanged). The gate's sheet anchors on
-the browser: armed from the failure or report screen, it presents when you
-return to the browser, with the usual freshness window still counting down
-from the arm. Zero or multiple matches, or a failed listing read, surface
-an inline notice instead and arm nothing. The resolve read holds the OSA
-slot in both directions like every other mutation activity: it refuses to
-start while anything else runs, and nothing else — including the gate's own
-Execute — dispatches while it is in flight.
+name scalar-exactly, and — only on exactly one match — stages the SAME
+direct delete confirmation as every other delete (2026-08-06), built from
+that fresh listing row and presented right there on the failure screen or
+the run report. Confirm deletes it; Cancel walks away. Nothing is written
+to `reports/` by this path, and no audit read runs beyond the one resolve.
+Zero or multiple matches, or a failed listing read, surface an inline
+notice instead and stage nothing. The resolve read holds the OSA slot in
+both directions like every other mutation activity: it refuses to start
+while anything else runs, and nothing else dispatches while it is in
+flight.
 
 ## Destination navigation (Wave C2, 2026-08-04)
 
@@ -272,7 +272,10 @@ five-step rail is gone; nothing changed inside the screens — containers
 moved, content did not.
 
 - Library is the unchanged source browser: Merge / Consolidate / Cleanup
-  tabs, selection, the queue rail, and the mutation-gate sheet.
+  tabs, selection, the queue rail, and the direct confirm/rename sheet.
+  That same sheet is anchored on the attended failure screen and the run
+  report too, so **Delete leftover target…** stages its confirmation where
+  you clicked it instead of parking anything on another screen.
 - Activity is the run surface, rendered by precedence over existing state:
   an active or paused unattended run shows the run screen exactly as before
   (including the judgment-pause review surface); an attended flow with a

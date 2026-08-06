@@ -381,24 +381,6 @@ struct BrowserInspector: View {
     /// two never stack.
     @State private var alignSheetShown = false
 
-    /// The one `.sheet(isPresented:)` anchor for `DirectMutationSheets`,
-    /// shared by both browser tabs: presented while either a pending direct
-    /// action or a dispatch error is set; a dismiss (Escape, sheet-swipe)
-    /// cancels the pending action or clears the error, whichever is active.
-    private var directSheetShown: Binding<Bool> {
-        Binding(
-            get: { model.pendingDirectAction != nil || model.directMutationError != nil },
-            set: { shown in
-                guard !shown else { return }
-                if model.directMutationError != nil {
-                    model.dismissDirectMutationError()
-                } else {
-                    model.cancelPendingDirectAction()
-                }
-            }
-        )
-    }
-
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
@@ -427,10 +409,9 @@ struct BrowserInspector: View {
             .padding(12)
         }
         .background(Color(nsColor: .underPageBackgroundColor))
-        .sheet(isPresented: directSheetShown) {
-            DirectMutationSheets(model: model)
-                .interactiveDismissDisabled(model.isMutationBusy)
-        }
+        // Finding I1: the shared anchor (see DirectMutationSheets.swift) —
+        // one condition and one dismiss rule across all four anchors.
+        .directMutationSheet(model: model)
     }
 
     /// Resolve a persistent id: a true singleton gets the single-copy note;

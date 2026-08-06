@@ -588,6 +588,14 @@ private struct ApplyFailureScreen: View {
             .padding(.vertical, 10)
             .background(.bar)
         }
+        // Final fix wave, Finding C1: the "Delete leftover target…" shortcut
+        // below now stages a direct delete confirmation, and this failure
+        // screen is its own navigation destination — neither the Cleanup nor
+        // the browser anchor is mounted here, so without this one the
+        // confirmation (and any failure) could never present. Shared
+        // modifier, so the condition and dismiss rule match every other
+        // anchor (Finding I1).
+        .directMutationSheet(model: model)
     }
 
     /// Wave C1 (spec C1.4/C1.5): the class banner (AppKit-backed, exact

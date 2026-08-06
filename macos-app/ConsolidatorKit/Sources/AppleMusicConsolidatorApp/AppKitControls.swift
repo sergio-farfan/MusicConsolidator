@@ -321,6 +321,11 @@ enum DirectControlID {
     static func rowRename(_ persistentId: String) -> String { "direct.rowRename.\(persistentId)" }
     static let folderCascadeNotice = "direct.folderCascadeNotice"
     static let errorMessage = "direct.errorMessage"
+    /// Final fix wave, Finding I1: the in-progress panel that keeps the sheet
+    /// up through dispatch (so a failure never has to re-present a sheet that
+    /// is mid-dismissal).
+    static let inProgressStatus = "direct.inProgressStatus"
+    static let inProgressCaption = "direct.inProgressCaption"
 }
 
 /// Stable accessibility identifiers for the Wave C1 failure-taxonomy
