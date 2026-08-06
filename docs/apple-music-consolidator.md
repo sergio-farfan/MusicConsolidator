@@ -194,14 +194,14 @@ playlists inside it.`, when the target is a folder; confirming executes
 immediately. Renaming opens a sheet pre-filled with the current name;
 Enter or the Rename button commits, Escape cancels, and committing the
 unchanged name is a no-op (no script runs at all). Checking N rows and
-choosing "Delete selected (N)…" raises one alert — `Delete N playlists?`,
+choosing "Delete selected (N)" raises one alert — `Delete N playlists?`,
 with the same folder-cascade line if any selection is a folder — then
 runs the batch: deletes execute sequentially in selection order, each
 success removes the row from the list immediately, and the first failure
 stops the batch, surfaces the verbatim error, and leaves the remaining
 rows untouched. The Library and Cleanup lists still order by clickable
 Name/Tracks headers — display-only; ordering never feeds a mutation.
-Browser rows (Merge/Consolidate tabs) carry the same Delete…/Rename…
+Browser rows (Merge/Consolidate tabs) carry the same Delete and Rename…
 actions. NEAR MATCHES clusters carry "Align names…": the canonical name
 is the variant equal to its own NFC form with no leading/trailing
 whitespace and no invisible scalars (Sergio picks when none or several
