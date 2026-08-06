@@ -47,27 +47,9 @@ struct CleanupTabView: View {
                 .font(.headline)
             BrowserSortHeader(model: model)
             Spacer()
-            if !model.checkedCleanupPIDs.isEmpty {
-                AppKitActionButton(
-                    identifier: WaveBControlID.cleanupDeleteSelected,
-                    title: "Delete selected (\(model.checkedCleanupPIDs.count))",
-                    help: "One confirmation covers the whole selection."
-                ) {
-                    model.requestDirectDelete(
-                        persistentIDs: Array(model.checkedCleanupPIDs)
-                    )
-                }
-                .disabled(
-                    model.isMutationBusy || model.isRunning || model.isScanning
-                        || model.isApplying || model.isUnattendedRunActive
-                )
-                AppKitActionButton(
-                    identifier: WaveBControlID.cleanupClearSelection,
-                    title: "Clear"
-                ) {
-                    model.clearCleanupSelection()
-                }
-            }
+            // Sergio, 2026-08-06: the batch controls live in the shared
+            // footer bar now (SourceSelectionView.cleanupFooter), matching
+            // the merge/consolidate bottom-bar anatomy.
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)

@@ -108,6 +108,51 @@ struct SelectionStructuralTests {
         #expect(harness.model.checkedPersistentIds.isEmpty)
     }
 
+    @Test("the Cleanup tab has a footer bar like the other modes: count plus batch actions, selection or not")
+    func cleanupFooterMirrorsOtherModes() async throws {
+        // Sergio, 2026-08-06: merge/consolidate carry a bottom bar (count +
+        // primary action); Cleanup's batch controls hid in the header and
+        // only with a selection. The footer renders them always.
+        let harness = try ModelHarness(
+            runner: ScriptedRunner(outputs: [selectionStructuralWire()]),
+            mode: .consolidate, playlistName: ""
+        )
+        defer { harness.cleanUp() }
+        harness.model.setBrowserTab(.cleanup)
+        harness.model.rescanLibrary()
+        await harness.model.scanTask?.value
+
+        let fixture = HostedFixture(
+            SourceSelectionView(model: harness.model), width: 1200, height: 800
+        )
+        defer { fixture.tearDown() }
+        let windowBox = NSRect(x: 0, y: 0, width: 1200, height: 800)
+
+        // Present and contained even with an EMPTY selection.
+        let deleteSelected = try #require(
+            view(under: fixture.hosting, axIdentifier: WaveBControlID.cleanupDeleteSelected)
+                as? NSButton
+        )
+        #expect(!deleteSelected.isEnabled, "no selection -> disabled, like Start Queue at 0")
+        let deleteFrame = deleteSelected.convert(deleteSelected.bounds, to: fixture.hosting)
+        #expect(windowBox.contains(deleteFrame), "Delete selected at \(deleteFrame)")
+        let clear = try #require(
+            view(under: fixture.hosting, axIdentifier: WaveBControlID.cleanupClearSelection)
+                as? NSButton
+        )
+        let clearFrame = clear.convert(clear.bounds, to: fixture.hosting)
+        #expect(windowBox.contains(clearFrame), "Clear at \(clearFrame)")
+
+        // With a selection the action enables.
+        harness.model.toggleCleanupChecked("S-E")
+        fixture.hosting.layoutSubtreeIfNeeded()
+        let enabledDelete = try #require(
+            view(under: fixture.hosting, axIdentifier: WaveBControlID.cleanupDeleteSelected)
+                as? NSButton
+        )
+        #expect(enabledDelete.isEnabled)
+    }
+
     @Test("a scan launched on the Cleanup tab shows the shared scanning state, not the empty caption")
     func cleanupTabShowsScanningState() async throws {
         // Sergio, 2026-08-06: browserArea routed .cleanup straight past the
