@@ -76,6 +76,13 @@ struct RunReportView: View {
                 .padding(.vertical, 10)
                 .background(.bar)
             }
+            // Final fix wave, Finding C1: this screen's per-row "Delete
+            // leftover target…" shortcut now stages a direct delete
+            // confirmation, and this is a separate navigation destination —
+            // without its own anchor the confirmation (and any failure) would
+            // have nowhere to present. Shared modifier, so the condition and
+            // dismiss rule match every other anchor (Finding I1).
+            .directMutationSheet(model: model)
         } else {
             ContentUnavailableView(
                 "No run report",

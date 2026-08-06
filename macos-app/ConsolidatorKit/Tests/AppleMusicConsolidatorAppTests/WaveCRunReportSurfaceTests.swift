@@ -49,21 +49,10 @@ private func reportLeftoverListingWire() -> String {
     return "{\"playlists\": [\(entries.joined(separator: ", "))]}"
 }
 
-private func reportLeftoverSnapshotWire() -> String {
-    wireSnapshot(playlists: [
-        wirePlaylist(
-            id: 900, name: itemTargetName, persistentId: "LEFTOVER00000000",
-            tracks: [
-                wireTrack(sourceIndex: 0, databaseId: 12, persistentId: "AAAA0002",
-                          title: "Shared Song", bitRate: 256),
-                wireTrack(sourceIndex: 1, databaseId: 13, persistentId: "AAAA0003",
-                          title: "Only Once"),
-                wireTrack(sourceIndex: 2, databaseId: 14, persistentId: "AAAA0004",
-                          title: "No Duration", duration: nil),
-            ]
-        )
-    ])
-}
+// (The leftover SNAPSHOT wire this file used to carry is gone with the gate
+// audit it fed: final fix wave, Finding C1 — the shortcut now stages a
+// direct delete confirmation off the resolve read alone, so no snapshot read
+// happens on this path.)
 
 /// One-item unattended run whose apply is a writer failure -> a finished
 /// report with a single failed item (class writerFailed, target name set).
@@ -188,14 +177,17 @@ struct WaveCRunReportSurfaceTests {
         #expect(!text.contains("- Created:"))
     }
 
-    @Test("shortcut click on the report arms the Wave B delete gate")
-    func reportShortcutClickArmsGate() async throws {
-        let (harness, _) = try await writerFailedReportHarness(extraOutputs: [
-            .success(reportLeftoverListingWire()),   // resolve read
-            .success(reportLeftoverListingWire()),   // gate audit listing
-            .success(reportLeftoverSnapshotWire()),  // gate audit snapshot
+    @Test("shortcut click on the report stages the direct delete confirmation")
+    func reportShortcutClickStagesDirectDelete() async throws {
+        // Final fix wave, Finding C1: the report's own shortcut used to arm
+        // the retired Wave B gate (nothing on this screen could present it).
+        // It now stages the direct confirmation, which THIS screen's own
+        // sheet anchor presents.
+        let (harness, runner) = try await writerFailedReportHarness(extraOutputs: [
+            .success(reportLeftoverListingWire()),   // the one resolve read
         ])
         defer { harness.cleanUp() }
+        let commandsBefore = runner.commands.count
 
         let fixture = HostedFixture(
             RunReportView(model: harness.model), width: 1200, height: 800
@@ -210,11 +202,16 @@ struct WaveCRunReportSurfaceTests {
         #expect(button.isEnabled)
         button.performClick(nil)
         await harness.model.leftoverResolveTask?.value
-        await harness.model.mutationTask?.value
 
-        let armed = try #require(harness.model.armedMutation)
-        #expect(armed.plan.kind == .delete)
-        #expect(scalarExact(armed.plan.playlistPersistentID, "LEFTOVER00000000"))
+        guard case .delete(let targets)? = harness.model.pendingDirectAction else {
+            Issue.record("expected a staged direct delete")
+            return
+        }
+        #expect(targets.count == 1)
+        #expect(scalarExact(targets[0].persistentId, "LEFTOVER00000000"))
+        #expect(harness.model.armedMutation == nil)
+        #expect(runner.commands.count == commandsBefore + 1,
+                "one resolve read; no gate audit")
     }
 
     @Test("a refusedBeforeWrite item renders the banner but no shortcut or leftover line")

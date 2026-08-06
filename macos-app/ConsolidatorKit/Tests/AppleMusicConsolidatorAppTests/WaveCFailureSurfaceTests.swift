@@ -1,9 +1,10 @@
 // WaveCFailureSurfaceTests.swift
 // Wave C1 Task 4 — the "Delete leftover target…" shortcut (spec C1.5) and
 // the attended failure screen's class banner (spec C1.4): fresh-listing
-// resolution (scalar-exact, exactly-1 opens the unchanged Wave B delete
-// gate; 0/N surface the pinned notice), the OSA mutual-exclusion fold, and
-// offscreen structural cells at 1200x800. All offline: ScriptedRunner only.
+// resolution (scalar-exact, exactly-1 stages the SAME direct delete
+// confirmation as every other delete — final fix wave, Finding C1; 0/N
+// surface the pinned notice), the OSA mutual-exclusion fold, and offscreen
+// structural cells at 1200x800. All offline: ScriptedRunner only.
 
 import AppKit
 import SwiftUI
@@ -89,28 +90,45 @@ private func writerFailedHarness(
 @Suite("Wave C1 — leftover-resolve model machinery")
 struct LeftoverResolveModelTests {
 
-    @Test("exactly one live match opens the Wave B delete gate on its persistent ID")
-    func exactlyOneMatchArmsTheGate() async throws {
+    @Test("exactly one live match stages the SAME direct delete confirmation as every other delete")
+    func exactlyOneMatchStagesTheDirectDelete() async throws {
+        // Final review, Finding C1: the shortcut used to arm the retired Wave
+        // B gate (a 6-8 s read, a silently written .delete.plan.json, and an
+        // armed artifact no view can present or consume). It now stages the
+        // direct confirmation off the FRESH listing it just resolved — one
+        // read, no artifact, and the same sheet every other delete uses.
         let (harness, runner) = try await writerFailedHarness(extraOutputs: [
             .success(leftoverListingWire(matchCount: 1)),  // resolve read
-            .success(leftoverListingWire(matchCount: 1)),  // gate audit listing
-            .success(leftoverSnapshotWire()),              // gate audit snapshot
         ])
         defer { harness.cleanUp() }
+        let artifactsBefore = try harness.artifactFileCount()
 
         harness.model.startDeleteLeftoverTarget(named: fixtureTargetName)
         await harness.model.leftoverResolveTask?.value
-        await harness.model.mutationTask?.value
 
         #expect(harness.model.leftoverResolveNotice == nil)
-        let armed = try #require(harness.model.armedMutation)
-        #expect(armed.plan.kind == .delete)
-        #expect(scalarExact(armed.plan.playlistPersistentID, "LEFTOVER00000000"))
-        #expect(scalarExact(armed.confirmationName, fixtureTargetName))
-        #expect(runner.commands.count == 10)
+        guard case .delete(let targets)? = harness.model.pendingDirectAction else {
+            Issue.record("expected a staged direct delete, got \(String(describing: harness.model.pendingDirectAction))")
+            return
+        }
+        #expect(targets.count == 1)
+        #expect(scalarExact(targets[0].persistentId, "LEFTOVER00000000"))
+        #expect(scalarExact(targets[0].name, fixtureTargetName))
+        // The retired gate stays untouched, and NOTHING is written to disk.
+        #expect(harness.model.armedMutation == nil)
+        guard case .idle = harness.model.mutationGatePhase else {
+            Issue.record("the shortcut must never arm the retired gate")
+            return
+        }
+        #expect(runner.commands.count == 8, "one resolve read; no gate audit")
+        #expect(try harness.artifactFileCount() == artifactsBefore)
+        let deletePlans = try FileManager.default.contentsOfDirectory(
+            atPath: harness.outputDirectory.path
+        ).filter { $0.hasSuffix(".delete.plan.json") }
+        #expect(deletePlans.isEmpty, "no delete plan artifact may be written by this path")
     }
 
-    @Test("zero matches surface the pinned notice and open no gate")
+    @Test("zero matches surface the pinned notice and stage nothing")
     func zeroMatchesNotice() async throws {
         let (harness, runner) = try await writerFailedHarness(extraOutputs: [
             .success(leftoverListingWire(matchCount: 0)),
@@ -123,6 +141,8 @@ struct LeftoverResolveModelTests {
         #expect(harness.model.leftoverResolveNotice
             == "Could not pin the leftover uniquely (0 live matches) \u{2014} "
                 + "delete it from the Library browser instead.")
+        #expect(harness.model.pendingDirectAction == nil,
+                "an ambiguous resolve must stage no confirmation")
         guard case .idle = harness.model.mutationGatePhase else {
             Issue.record("no gate may open on an ambiguous resolve")
             return
@@ -159,6 +179,8 @@ struct LeftoverResolveModelTests {
         #expect(scalarHasPrefix(
             notice, "Could not read the live library to pin the leftover: "))
         #expect(notice.contains("error -1743"))
+        #expect(harness.model.pendingDirectAction == nil,
+                "a failed resolve must stage no confirmation")
         guard case .idle = harness.model.mutationGatePhase else {
             Issue.record("no gate may open on a failed resolve")
             return
@@ -272,15 +294,16 @@ struct LeftoverResolveModelTests {
         #expect(harness.model.step == .source)
     }
 
-    @Test("a stale leftover resolve after a mode reset arms no gate and sets no notice")
+    @Test("a stale leftover resolve after a mode reset stages nothing and sets no notice")
     func staleResolveAfterModeResetArmsNothing() async throws {
         // Fix round 1 (combined Task 4+5 review, Important finding): unlike
         // startOver()/acknowledgeRunReport(), setMode() does NOT check
         // isMutationBusy (a real defense-in-depth vector), so it can bump
         // discardCompletedAudit()/resetQueue() while a resolve is in
         // flight. The blocked call is scripted to an EXACTLY-ONE-MATCH
-        // listing: without the generation guard, this would arm the Wave B
-        // delete gate on a context the reset already discarded.
+        // listing: without the generation guard, this would stage a delete
+        // confirmation (pre-C1: arm the Wave B gate) on a context the reset
+        // already discarded.
         let runner = StagedBlockingRunner(
             outputs: [
                 consolidateFixtureWire(), consolidateFixtureWire(),
@@ -306,6 +329,8 @@ struct LeftoverResolveModelTests {
         runner.proceed.signal()
         await harness.model.leftoverResolveTask?.value
         #expect(!harness.model.isResolvingLeftoverTarget)
+        #expect(harness.model.pendingDirectAction == nil,
+                "a stale resolve completion must never stage a confirmation")
         #expect(harness.model.armedMutation == nil)
         #expect(harness.model.leftoverResolveNotice == nil)
         guard case .idle = harness.model.mutationGatePhase else {
@@ -314,24 +339,25 @@ struct LeftoverResolveModelTests {
         }
     }
 
-    @Test("executeMutation is refused while a second leftover resolve is in flight, and succeeds once it settles")
+    @Test("executeMutation is refused while a leftover resolve is in flight, and succeeds once it settles")
     func executeMutationRefusedDuringSecondResolve() async throws {
-        // Final review, Finding I-1: `.armed` never sets isMutationBusy, so
-        // the shortcut stays enabled after resolve 1 arms the gate. A
-        // second resolve (started before the user dispatches) must still
-        // block dispatch — otherwise the guarded writer could run
-        // concurrently with the second resolve's listPlaylists() read.
+        // Final review, Finding I-1: `.armed` never sets isMutationBusy, and
+        // the shortcut stays enabled while a gate sits armed. A resolve
+        // started before the user dispatches must still block dispatch —
+        // otherwise the guarded writer could run concurrently with the
+        // resolve's listPlaylists() read. (Final fix wave, Finding C1: the
+        // shortcut no longer arms the gate at all, so the gate is armed here
+        // through its own entry point, `startMutationAudit`.)
         let runner = StagedBlockingRunner(
             outputs: [
                 consolidateFixtureWire(), consolidateFixtureWire(),
                 emptySnapshotWire(), "", "",
                 consolidateFixtureWire(), emptySnapshotWire(),
-                leftoverListingWire(matchCount: 1),   // resolve 1 -> arms the gate
                 leftoverListingWire(matchCount: 1),   // gate audit listing
                 leftoverSnapshotWire(),               // gate audit snapshot
-                leftoverListingWire(matchCount: 0),   // resolve 2 -> BLOCKED, then 0 matches
+                leftoverListingWire(matchCount: 0),   // resolve -> BLOCKED, then 0 matches
             ],
-            blockAt: [10]
+            blockAt: [9]
         )
         let harness = try ModelHarness(runner: runner)
         defer { harness.cleanUp() }
@@ -340,17 +366,16 @@ struct LeftoverResolveModelTests {
         await harness.awaitApply()
         #expect(harness.model.applyFailureClass == .unverifiable)
 
-        harness.model.startDeleteLeftoverTarget(named: fixtureTargetName)
-        await harness.model.leftoverResolveTask?.value
+        harness.model.startMutationAudit(kind: .delete, persistentID: "LEFTOVER00000000")
         await harness.model.mutationTask?.value
         let armed = try #require(harness.model.armedMutation)
         #expect(armed.plan.kind == .delete)
         harness.model.typedMutationName = fixtureTargetName
         #expect(harness.model.mutationGateSatisfied)
 
-        // Resolve 2, in flight while the gate sits armed.
+        // The resolve, in flight while the gate sits armed.
         harness.model.startDeleteLeftoverTarget(named: fixtureTargetName)
-        #expect(await pollUntil { runner.runCount == 11 })
+        #expect(await pollUntil { runner.runCount == 10 })
         #expect(harness.model.isResolvingLeftoverTarget)
         #expect(harness.model.isMutationBusy)
 
@@ -359,7 +384,7 @@ struct LeftoverResolveModelTests {
             Issue.record("executeMutation must refuse while a resolve is in flight")
             return
         }
-        #expect(runner.runCount == 11, "no compile/execute call must be dispatched while refused")
+        #expect(runner.runCount == 10, "no compile/execute call must be dispatched while refused")
 
         runner.proceed.signal()
         await harness.model.leftoverResolveTask?.value
@@ -541,12 +566,10 @@ struct WaveCAttendedStructuralTests {
         ) == nil)
     }
 
-    @Test("shortcut click plumbing reaches startMutationAudit and arms the gate")
-    func shortcutClickArmsGate() async throws {
+    @Test("shortcut click plumbing stages the direct delete confirmation")
+    func shortcutClickStagesDirectDelete() async throws {
         let (harness, _) = try await writerFailedHarness(extraOutputs: [
             .success(leftoverListingWire(matchCount: 1)),
-            .success(leftoverListingWire(matchCount: 1)),
-            .success(leftoverSnapshotWire()),
         ])
         defer { harness.cleanUp() }
 
@@ -561,10 +584,13 @@ struct WaveCAttendedStructuralTests {
         #expect(button.isEnabled)
         button.performClick(nil)
         await harness.model.leftoverResolveTask?.value
-        await harness.model.mutationTask?.value
 
-        let armed = try #require(harness.model.armedMutation)
-        #expect(scalarExact(armed.plan.playlistPersistentID, "LEFTOVER00000000"))
+        guard case .delete(let targets)? = harness.model.pendingDirectAction else {
+            Issue.record("expected a staged direct delete")
+            return
+        }
+        #expect(scalarExact(targets[0].persistentId, "LEFTOVER00000000"))
+        #expect(harness.model.armedMutation == nil)
     }
 
     @Test("an ambiguous resolve renders the notice, contained, with the exact copy")

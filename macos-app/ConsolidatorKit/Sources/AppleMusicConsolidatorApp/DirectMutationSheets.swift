@@ -2,9 +2,19 @@
 // Task 4 (Sergio, 2026-08-06) — the presentation layer for direct playlist
 // mutations dispatched straight from the browser/cleanup UI (Task 3's
 // `AuditFlowModel.pendingDirectAction` / `directMutationError`). Renders the
-// delete confirm panel, the rename panel, or the error panel; the error
-// panel wins over a pending action when both are set, and the view is empty
-// when neither is set. Task 5 hosts this container in a `.sheet`.
+// delete confirm panel, the in-progress panel, the rename panel, or the
+// error panel, in that precedence: error > in-progress > pending > empty;
+// the view is empty when none of the three states is set.
+//
+// Final fix wave, Finding I1: the sheet stays up THROUGH dispatch. Confirm
+// clears `pendingDirectAction` and a failure only arrives milliseconds
+// later, so a presentation condition without `isDirectMutationRunning` asks
+// SwiftUI to re-present a sheet that is still animating out — a known
+// dropped-presentation class, and this sheet is the only failure channel.
+// Every anchor is therefore built by the shared `directMutationSheet(model:)`
+// modifier at the bottom of this file, so all four (Cleanup tab, browser
+// inspector, attended failure screen, run report) carry the same condition
+// and the same interactive-dismiss rule.
 //
 // Composition rules (M8 lesson, non-negotiable): every load-bearing control
 // is AppKit-backed (AppKitActionButton / AppKitTokenField / AppKitStaticText)
@@ -23,9 +33,15 @@ struct DirectMutationSheets: View {
 
     var body: some View {
         Group {
-            // Error wins over a pending action when both happen to be set.
+            // Precedence: error > in-progress > pending > empty. The error
+            // wins even while `isDirectMutationRunning` is still true (a
+            // batch's first failure surfaces before the task's last hop
+            // clears the flag) — the reason must never be hidden behind a
+            // spinner.
             if let error = model.directMutationError {
                 errorPanel(error)
+            } else if model.isDirectMutationRunning {
+                inProgressPanel
             } else if let action = model.pendingDirectAction {
                 switch action {
                 case .delete(let targets):
@@ -79,6 +95,36 @@ struct DirectMutationSheets: View {
                     model.confirmPendingDirectAction()
                 }
             }
+        }
+        .frame(maxWidth: 460, alignment: .leading)
+        .padding(20)
+    }
+
+    // MARK: in progress (Finding I1)
+
+    /// Shown while a dispatch is in flight and no error has arrived yet. No
+    /// buttons: the sheet is deliberately not dismissable here (the anchors
+    /// apply `.interactiveDismissDisabled`), so the failure panel replaces
+    /// this content in place instead of re-presenting a dismissed sheet.
+    /// Deliberately stateless — the model gains no per-item progress state.
+    private var inProgressPanel: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 10) {
+                ProgressView()
+                    .controlSize(.small)
+                AppKitStaticText(
+                    identifier: DirectControlID.inProgressStatus,
+                    text: "Working\u{2026}",
+                    maximumLines: 1
+                )
+            }
+            AppKitStaticText(
+                identifier: DirectControlID.inProgressCaption,
+                text: "Deleting or renaming in Music. A batch runs one playlist "
+                    + "at a time, so several can take a few seconds.",
+                maximumLines: 3
+            )
+            .foregroundStyle(.secondary)
         }
         .frame(maxWidth: 460, alignment: .leading)
         .padding(20)
@@ -147,5 +193,40 @@ struct DirectMutationSheets: View {
         }
         .frame(maxWidth: 460, alignment: .leading)
         .padding(20)
+    }
+}
+
+// MARK: - the one shared sheet anchor (Finding I1)
+
+extension View {
+    /// Host `DirectMutationSheets` at this view. Every screen that can stage a
+    /// direct mutation mounts this ONE modifier, so the presentation
+    /// condition, the dismiss routing, and the interactive-dismiss rule can
+    /// never drift apart between anchors (Finding I1): presented while a
+    /// pending action, a dispatch in flight, or an unread error exists;
+    /// dismissal (Escape, sheet-swipe) clears the error or cancels the
+    /// pending action, and is disabled outright while a dispatch runs.
+    @MainActor
+    func directMutationSheet(model: AuditFlowModel) -> some View {
+        sheet(
+            isPresented: Binding(
+                get: {
+                    model.pendingDirectAction != nil
+                        || model.directMutationError != nil
+                        || model.isDirectMutationRunning
+                },
+                set: { shown in
+                    guard !shown else { return }
+                    if model.directMutationError != nil {
+                        model.dismissDirectMutationError()
+                    } else {
+                        model.cancelPendingDirectAction()
+                    }
+                }
+            )
+        ) {
+            DirectMutationSheets(model: model)
+                .interactiveDismissDisabled(model.isDirectMutationRunning)
+        }
     }
 }
