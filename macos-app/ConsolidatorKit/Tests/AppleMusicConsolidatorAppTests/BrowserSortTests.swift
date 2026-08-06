@@ -75,11 +75,13 @@ struct BrowserSortModelTests {
 @Suite("Cleanup all-playlists section", .serialized)
 struct CleanupAllPlaylistsTests {
 
-    @Test("rows render with per-row delete; refused rows disable; click reaches the gate")
+    @Test("rows render with per-row delete/rename, zero refusal filtering; click stages the pending direct delete")
     func allPlaylistsRows() async throws {
         // gateListingWire carries a plain singleton (SOLO000000000001), a
         // smart playlist (SMART00000000001), and the contract-excluded
-        // pilot PID — the refusal split is pinned per row.
+        // pilot PID — direct mutations apply ZERO refusal filtering to any
+        // of them (Task 5, Sergio 2026-08-06): the confirm sheet is the
+        // only gate now.
         let runner = ScriptedRunner(outputs: [gateListingWire()])
         let harness = try MutationGateHarness(runner: runner)
         defer { harness.cleanUp() }
@@ -104,22 +106,22 @@ struct CleanupAllPlaylistsTests {
             under: fixture.hosting,
             axIdentifier: WaveBControlID.cleanupDelete("SMART00000000001")
         ) as? NSButton)
-        #expect(!smart.isEnabled, "smart playlists must be refused pre-gate")
+        #expect(smart.isEnabled, "direct mutations apply zero refusal filtering")
 
         let pilot = try #require(view(
             under: fixture.hosting,
             axIdentifier: WaveBControlID.cleanupDelete("E02030832FD20B07")
         ) as? NSButton)
-        #expect(!pilot.isEnabled, "contract-excluded PIDs must be refused pre-gate")
+        #expect(pilot.isEnabled, "direct mutations apply zero refusal filtering")
 
-        // Click plumbing: the enabled row reaches the existing gate entry
-        // (the empty runner then refuses the audit — the pin is that the
-        // gate LEFT idle, exactly like the inspector's plumbing test).
+        // Click plumbing: the click stages a pending direct delete
+        // confirmation (no audited gate anymore).
         plain.performClick(nil)
-        await harness.awaitMutation()
-        if case .idle = model.mutationGatePhase {
-            Issue.record("the Delete\u{2026} click never reached startMutationAudit")
+        guard case .delete(let targets) = model.pendingDirectAction else {
+            Issue.record("the Delete click never reached requestDirectDelete")
+            return
         }
+        #expect(targets.map(\.persistentId) == ["SOLO000000000001"])
     }
 
     @Test("sort headers present; clicking Tracks switches the model key")

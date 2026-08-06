@@ -105,8 +105,8 @@ struct NarrowWindowStructuralTests {
     // pushing its destination rows' left edge negative — the reported
     // "brary" / "ctivity" / "eports" / "ettings" truncation.
     @Test("the root destination shell fits 900x620 with the Cleanup tab selected")
-    func rootFitsNarrowWindowOnCleanupTab() throws {
-        let harness = try ModelHarness(runner: ScriptedRunner(outputs: []))
+    func rootFitsNarrowWindowOnCleanupTab() async throws {
+        let harness = try ModelHarness(runner: ScriptedRunner(outputs: [gateListingWire()]))
         defer { harness.cleanUp() }
         harness.model.setBrowserTab(.cleanup)
         // UI rework Part 2: ConsolidatorFlowView's one-shot launch effect
@@ -117,6 +117,12 @@ struct NarrowWindowStructuralTests {
         // mirroring how `confirmEachApply` is declared to match the queue
         // mode under test elsewhere in this suite.
         harness.model.setDefaultBrowserTabOnLaunch(.cleanup)
+        harness.model.rescanLibrary()
+        await harness.model.scanTask?.value
+        // Task 5: the gate pane is retired from this composition — pin the
+        // direct row/batch controls instead (a selection is required for
+        // the batch control to render at all).
+        harness.model.toggleCleanupChecked("SOLO000000000001")
         let fixture = HostedFixture(
             ConsolidatorFlowView(model: harness.model), width: 900, height: 620
         )
@@ -132,43 +138,35 @@ struct NarrowWindowStructuralTests {
             WaveBControlID.sortByName, in: fixture.hosting, box: narrowRootWindowBox
         )
         expectContained(
-            WaveBControlID.mutationDismiss, in: fixture.hosting, box: narrowRootWindowBox
+            WaveBControlID.cleanupDeleteSelected, in: fixture.hosting, box: narrowRootWindowBox
+        )
+        expectContained(
+            DirectControlID.rowRename("SOLO000000000001"), in: fixture.hosting,
+            box: narrowRootWindowBox
         )
         expectAllControlsWithinHorizontalBounds(in: fixture.hosting, maxX: 900)
     }
 
-    @Test("the cleanup tab's candidate column and gate pane both fit 900x620 standalone")
-    func cleanupTabFitsNarrowWindow() throws {
-        let harness = try ModelHarness(runner: ScriptedRunner(outputs: []))
+    @Test("the cleanup tab's candidate column and its direct row/batch controls fit 900x620 standalone")
+    func cleanupTabFitsNarrowWindow() async throws {
+        let harness = try ModelHarness(runner: ScriptedRunner(outputs: [gateListingWire()]))
         defer { harness.cleanUp() }
+        harness.model.rescanLibrary()
+        await harness.model.scanTask?.value
+        // Task 5: the fixed-width gate pane this suite used to pin is
+        // retired from this composition — CleanupTabView is now the
+        // candidate column alone. Pin the direct controls instead: the
+        // sort header (always present), the batch delete control (present
+        // once a row is checked), and one row's Rename... control.
+        harness.model.toggleCleanupChecked("SOLO000000000001")
         let fixture = HostedFixture(
             CleanupTabView(model: harness.model), width: 900, height: 620
         )
         defer { fixture.tearDown() }
 
-        // Column proof: the All-playlists sort header always renders
-        // regardless of listing state (post-merge section removed 2026-08-06).
         expectContained(WaveBControlID.sortByName, in: fixture.hosting)
-        // Gate pane proof: MutationGateView's dismiss control always renders
-        // in its safeAreaInset footer regardless of gate phase.
-        expectContained(WaveBControlID.mutationDismiss, in: fixture.hosting)
-        // Direct proof of the fixed-480pt pane: MutationGateView's own
-        // ScrollView (the one AppKit-backed container that spans its full
-        // applied width) must itself fit inside the window box — this is
-        // the assertion that actually pins the CleanupTabView.swift
-        // `.frame(width: 480)` defect, since the two buttons above both hug
-        // their pane's LEADING edge and never reach the far side of a
-        // too-wide pane. In the idle scan state (no candidate list
-        // rendered) this is the ONLY HostingScrollView in the tree.
-        let scrollViews = views(under: fixture.hosting, classNameContains: "HostingScrollView")
-        let gateScrollView = try #require(
-            scrollViews.first, "MutationGateView's ScrollView is missing"
-        )
-        let gateFrame = gateScrollView.convert(gateScrollView.bounds, to: fixture.hosting)
-        #expect(
-            narrowWindowBox.contains(gateFrame),
-            "mutation gate pane at \(gateFrame) (hosting width \(fixture.hosting.frame.width))"
-        )
+        expectContained(WaveBControlID.cleanupDeleteSelected, in: fixture.hosting)
+        expectContained(DirectControlID.rowRename("SOLO000000000001"), in: fixture.hosting)
         expectAllControlsWithinHorizontalBounds(in: fixture.hosting, maxX: 900)
     }
 }

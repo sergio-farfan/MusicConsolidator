@@ -162,9 +162,8 @@ struct SourceSelectionView: View {
 
     private var modeCaption: String {
         if model.browserTab == .cleanup {
-            return "Delete any playlist behind an individually typed, verified "
-                + "gate. Contract-excluded playlists are refused up front; "
-                + "deleting a playlist never removes songs from the library."
+            return "Delete or rename any playlist directly. Deleting a "
+                + "playlist never removes songs from your library."
         }
         switch model.mode {
         case .consolidate:
@@ -275,16 +274,7 @@ struct SourceSelectionView: View {
 
     private var footer: some View {
         VStack(alignment: .leading, spacing: 10) {
-            if model.browserTab == .cleanup {
-                Text(
-                    "Cleanup never runs unattended and never joins any queue: each "
-                        + "group is one gate, each copy one compiled execution with "
-                        + "readback between copies."
-                )
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .lineLimit(3)
-            } else {
+            if model.browserTab != .cleanup {
                 switch model.mode {
                 case .merge:
                     mergeFooter

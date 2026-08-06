@@ -1,10 +1,15 @@
 // BrowserMutationStructuralTests.swift
 // Wave B (B4/B5) — offscreen structural cells for the browser inspector's
-// Delete.../Rename... actions (refusals surfaced BEFORE any gate as a
-// disabled action plus the verbatim reason), the rename editor, the
-// NEAR MATCHES "Align names..." entry point, and the AlignNamesSheet
-// content (pick list + N-1 rename rows). Same offscreen discipline as the
-// M8-M11 suites; Music is never contacted (ScriptedRunner only).
+// Delete/Rename... actions. Task 5 (Sergio, 2026-08-06) retired the audited
+// mutation gate from this composition: every row action now stages a direct
+// pending action with ZERO refusal filtering (smart playlists, folders, the
+// contract-excluded pilot all included) — the confirm/rename sheet
+// (`DirectMutationSheets`, pinned separately) is the only thing standing
+// between a click and the guarded AppleScript writer. This suite pins the
+// NEAR MATCHES "Align names..." entry point and the AlignNamesSheet content
+// (pick list + N-1 rename rows), which are unchanged. Same offscreen
+// discipline as the M8-M11 suites; Music is never contacted (ScriptedRunner
+// only).
 
 import AppKit
 import SwiftUI
@@ -39,11 +44,31 @@ private func browserFixtureSections() -> PlaylistBrowseSections {
     ])
 }
 
+/// The same rows as `browserFixtureSections`, as scan wire text: the direct
+/// mutation entry points (`requestDirectDelete`/`requestDirectRename`)
+/// resolve against `model.loadedListing` — the CACHED scan result — not the
+/// `sections:` parameter handed to `BrowserInspector` directly, so a real
+/// scan is required for those click-plumbing tests to find anything.
+private func browserFixtureListingWire() -> String {
+    let entries = [
+        gateEntry(id: 10, name: "Solo List", pid: "S-E", count: 4),
+        gateEntry(id: 20, name: "Smarty", pid: "S-SMART", count: 6, smart: true),
+        gateEntry(id: 30, name: "#Musica xTotal", pid: "S-XT", count: 100),
+        gateEntry(id: 40, name: "Trance 2022", pid: "G-A", count: 9),
+        gateEntry(id: 50, name: "Trance 2022", pid: "G-B", count: 10),
+        gateEntry(id: 60, name: "Kdrama", pid: "S-C", count: 7),
+        gateEntry(id: 70, name: "Kdrama ", pid: "S-D", count: 9),
+    ]
+    return "{\"playlists\": [\(entries.joined(separator: ", "))]}"
+}
+
 @MainActor
 private func inspectorFixture(
     selecting selection: BrowserSelection
-) throws -> (harness: MutationGateHarness, fixture: HostedFixture<BrowserInspector>) {
-    let harness = try MutationGateHarness(runner: ScriptedRunner(outputs: []))
+) async throws -> (harness: MutationGateHarness, fixture: HostedFixture<BrowserInspector>) {
+    let harness = try MutationGateHarness(runner: ScriptedRunner(outputs: [browserFixtureListingWire()]))
+    harness.model.rescanLibrary()
+    await harness.model.scanTask?.value
     harness.model.browserSelection = selection
     let fixture = HostedFixture(
         BrowserInspector(model: harness.model, sections: browserFixtureSections()),
@@ -58,7 +83,7 @@ struct BrowserMutationStructuralTests {
 
     @Test("a plain singleton exposes enabled Delete/Rename actions and no refusal note")
     func singletonActionsEnabled() async throws {
-        let (harness, fixture) = try inspectorFixture(selecting: .singleton("S-E"))
+        let (harness, fixture) = try await inspectorFixture(selecting: .singleton("S-E"))
         defer { harness.cleanUp(); fixture.tearDown() }
         let deleteButton = try #require(
             view(under: fixture.hosting, axIdentifier: WaveBControlID.rowDelete("S-E")) as? NSButton
@@ -73,10 +98,14 @@ struct BrowserMutationStructuralTests {
         #expect(browserBox.contains(frame))
     }
 
-    @Test("refused rows surface the reason BEFORE any gate: disabled actions + verbatim note")
-    func refusedRowsAreDisabledWithReason() async throws {
+    // Task 5 (Sergio, 2026-08-06): direct mutations apply ZERO refusal
+    // filtering — smart playlists and the contract-excluded pilot are just
+    // as directly deletable/renamable as a plain singleton. This replaces
+    // the retired pre-gate refusal-disabling pin with the new anatomy.
+    @Test("smart and contract-excluded rows are directly actionable too (no refusal filtering)")
+    func allRowsAreDirectlyActionable() async throws {
         for pid in ["S-SMART", "S-XT"] {
-            let (harness, fixture) = try inspectorFixture(selecting: .singleton(pid))
+            let (harness, fixture) = try await inspectorFixture(selecting: .singleton(pid))
             defer { harness.cleanUp(); fixture.tearDown() }
             let deleteButton = try #require(
                 view(under: fixture.hosting, axIdentifier: WaveBControlID.rowDelete(pid)) as? NSButton
@@ -84,24 +113,18 @@ struct BrowserMutationStructuralTests {
             let renameButton = try #require(
                 view(under: fixture.hosting, axIdentifier: WaveBControlID.rowRename(pid)) as? NSButton
             )
-            #expect(!deleteButton.isEnabled, "\(pid)")
-            #expect(!renameButton.isEnabled, "\(pid)")
-            let note = try #require(
-                view(under: fixture.hosting, axIdentifier: WaveBControlID.browserRefusal)
+            #expect(deleteButton.isEnabled, "\(pid)")
+            #expect(renameButton.isEnabled, "\(pid)")
+            #expect(
+                view(under: fixture.hosting, axIdentifier: WaveBControlID.browserRefusal) == nil,
+                "\(pid)"
             )
-            let frame = note.convert(note.bounds, to: fixture.hosting)
-            #expect(browserBox.contains(frame), "\(pid)")
-            // Refusal is pre-gate: nothing was audited, armed, or written.
-            guard case .idle = harness.model.mutationGatePhase else {
-                Issue.record("the gate must stay idle for a refused row (\(pid))")
-                continue
-            }
         }
     }
 
     @Test("a same-name group exposes per-copy Delete/Rename actions pinned by persistent ID")
     func groupPerCopyActions() async throws {
-        let (harness, fixture) = try inspectorFixture(selecting: .group("Trance 2022"))
+        let (harness, fixture) = try await inspectorFixture(selecting: .group("Trance 2022"))
         defer { harness.cleanUp(); fixture.tearDown() }
         for pid in ["G-A", "G-B"] {
             #expect(
@@ -113,45 +136,45 @@ struct BrowserMutationStructuralTests {
         }
     }
 
-    @Test("Rename... opens the editor: empty destination field, audit disabled until non-empty")
-    func renameEditor() async throws {
-        let (harness, fixture) = try inspectorFixture(selecting: .singleton("S-E"))
+    // Task 5: the old inline rename editor (browserRenamePID/
+    // browserRenameDraft, model-level state, stays dormant) is retired from
+    // this view — Rename... now stages a pending direct rename pre-filled
+    // with the row's current name, same as the Cleanup tab and the Align
+    // sheet.
+    @Test("clicking Rename... stages a pending direct rename pre-filled with the current name")
+    func renameClickPlumbing() async throws {
+        let (harness, fixture) = try await inspectorFixture(selecting: .singleton("S-E"))
         defer { harness.cleanUp(); fixture.tearDown() }
-        harness.model.browserRenamePID = "S-E"
-        fixture.pump()
-        let field = try #require(
-            view(under: fixture.hosting, axIdentifier: WaveBControlID.browserRenameField)
+        let renameButton = try #require(
+            view(under: fixture.hosting, axIdentifier: WaveBControlID.rowRename("S-E")) as? NSButton
         )
-        let audit = try #require(
-            view(under: fixture.hosting, axIdentifier: WaveBControlID.browserRenameAudit) as? NSButton
-        )
-        let frame = field.convert(field.bounds, to: fixture.hosting)
-        #expect(browserBox.contains(frame))
-        #expect(!audit.isEnabled, "an empty destination must not be auditable")
-        harness.model.browserRenameDraft = "Solo Listing"
-        fixture.pump()
-        #expect(audit.isEnabled)
+        renameButton.performClick(nil)
+        guard case .rename(let target) = harness.model.pendingDirectAction else {
+            Issue.record("the Rename... click never reached requestDirectRename")
+            return
+        }
+        #expect(target.persistentId == "S-E")
+        #expect(harness.model.typedRenameName == "Solo List")
     }
 
-    @Test("clicking Delete... starts the mutation audit (click plumbing)")
+    @Test("clicking Delete stages the pending direct delete confirmation (click plumbing)")
     func deleteClickPlumbing() async throws {
-        let (harness, fixture) = try inspectorFixture(selecting: .singleton("S-E"))
+        let (harness, fixture) = try await inspectorFixture(selecting: .singleton("S-E"))
         defer { harness.cleanUp(); fixture.tearDown() }
         let deleteButton = try #require(
             view(under: fixture.hosting, axIdentifier: WaveBControlID.rowDelete("S-E")) as? NSButton
         )
         deleteButton.performClick(nil)
-        await harness.model.mutationTask?.value
-        // The empty ScriptedRunner makes the audit read fail -> refused;
-        // what this test pins is that the click REACHED startMutationAudit.
-        if case .idle = harness.model.mutationGatePhase {
-            Issue.record("the Delete... click never reached startMutationAudit")
+        guard case .delete(let targets) = harness.model.pendingDirectAction else {
+            Issue.record("the Delete click never reached requestDirectDelete")
+            return
         }
+        #expect(targets.map(\.persistentId) == ["S-E"])
     }
 
     @Test("a near-match cluster exposes the Align names... entry point")
     func alignEntryPoint() async throws {
-        let (harness, fixture) = try inspectorFixture(selecting: .nearMatch("Kdrama"))
+        let (harness, fixture) = try await inspectorFixture(selecting: .nearMatch("Kdrama"))
         defer { harness.cleanUp(); fixture.tearDown() }
         let open = try #require(
             view(under: fixture.hosting, axIdentifier: WaveBControlID.alignOpen) as? NSButton
