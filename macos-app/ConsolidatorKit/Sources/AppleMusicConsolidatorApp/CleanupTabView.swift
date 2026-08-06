@@ -95,7 +95,6 @@ struct CleanupTabView: View {
                         Text(trackCountText(copyCounts: [listing.trackCount]))
                             .foregroundStyle(.secondary)
                             .monospacedDigit()
-                        IdentifierText(text: listing.persistentId)
                         Spacer()
                         AppKitActionButton(
                             identifier: WaveBControlID.cleanupDelete(listing.persistentId),
