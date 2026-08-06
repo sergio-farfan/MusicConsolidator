@@ -180,9 +180,13 @@ struct SourceSelectionView: View {
 
     // MARK: browser area
 
+    /// The idle / scanning / failed states are shared by ALL three tabs
+    /// (Sergio, 2026-08-06: Cleanup previously bypassed this switch and
+    /// showed its empty caption inside a full-height void while a scan was
+    /// in flight). Only a loaded listing routes to the Cleanup list.
     @ViewBuilder
     private var browserArea: some View {
-        if model.browserTab == .cleanup {
+        if case .loaded = model.listingState, model.browserTab == .cleanup {
             CleanupTabView(model: model)
         } else {
             existingBrowserArea
@@ -216,8 +220,13 @@ struct SourceSelectionView: View {
                     HStack(spacing: 8) {
                         ProgressView()
                             .controlSize(.small)
-                        Text("Scanning library\u{2026}")
-                            .bold()
+                        // AppKit-backed so the structural tests can pin this
+                        // state on every tab (SwiftUI Text publishes no NSView).
+                        AppKitStaticText(
+                            identifier: WaveC2ControlID.browserScanningStatus,
+                            text: "Scanning library\u{2026}",
+                            maximumLines: 1
+                        )
                         Text("elapsed \(ProgressPhaseView.elapsedText(from: started, to: context.date))")
                             .monospacedDigit()
                             .foregroundStyle(.secondary)

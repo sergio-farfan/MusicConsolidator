@@ -107,4 +107,35 @@ struct SelectionStructuralTests {
         clear.performClick(nil)
         #expect(harness.model.checkedPersistentIds.isEmpty)
     }
+
+    @Test("a scan launched on the Cleanup tab shows the shared scanning state, not the empty caption")
+    func cleanupTabShowsScanningState() async throws {
+        // Sergio, 2026-08-06: browserArea routed .cleanup straight past the
+        // listingState switch, so a scan-in-flight rendered CleanupTabView's
+        // "Rescan the library" empty caption inside a full-height void.
+        let runner = BlockingRunner(payload: selectionStructuralWire())
+        let harness = try ModelHarness(
+            runner: runner, mode: .consolidate, playlistName: ""
+        )
+        defer { harness.cleanUp() }
+        harness.model.setBrowserTab(.cleanup)
+        harness.model.rescanLibrary()
+        guard case .scanning = harness.model.listingState else {
+            Issue.record("expected a synchronous .scanning state")
+            return
+        }
+
+        let fixture = HostedFixture(
+            SourceSelectionView(model: harness.model), width: 1200, height: 800
+        )
+        let status = view(
+            under: fixture.hosting,
+            axIdentifier: WaveC2ControlID.browserScanningStatus
+        )
+        #expect(status != nil, "the shared scanning indicator renders on the Cleanup tab")
+        fixture.tearDown()
+
+        runner.proceed.signal()
+        await harness.model.scanTask?.value
+    }
 }

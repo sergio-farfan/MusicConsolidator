@@ -384,6 +384,9 @@ enum WaveC2ControlID {
     /// the report screen's own way back to that precedence.
     static let pendingReportBanner = "wc2.pendingReportBanner"
     static let pendingReportBack = "wc2.pendingReportBack"
+    /// The browser area's scan-in-flight status line — shared by all three
+    /// tabs (Sergio, 2026-08-06: Cleanup previously bypassed it).
+    static let browserScanningStatus = "wc2.browserScanningStatus"
 }
 
 /// Stable accessibility identifiers for the UI-rework-Part-2 Settings
