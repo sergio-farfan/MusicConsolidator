@@ -192,7 +192,12 @@ struct RunReportView: View {
             .frame(maxWidth: .infinity)
             .contentShape(Rectangle().inset(by: -8))
             .gesture(
-                DragGesture(minimumDistance: 1)
+                // Global coordinate space (Sergio, 2026-08-06): with .local,
+                // the grabber moves under the pointer as the box resizes, so
+                // the translation it reports oscillates — the erratic
+                // flashing drag. Global coordinates are stable while the
+                // view moves.
+                DragGesture(minimumDistance: 1, coordinateSpace: .global)
                     .onChanged { value in
                         if judgmentDragBase == nil { judgmentDragBase = judgmentBoxHeight }
                         judgmentBoxHeight = min(
