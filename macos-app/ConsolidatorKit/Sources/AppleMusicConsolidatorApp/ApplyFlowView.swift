@@ -193,19 +193,29 @@ struct ApplyStageListView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .monospacedDigit()
+            // Sergio, 2026-08-06: Status and Elapsed are FIXED-width, sized
+            // for their longest content ("pending" / "elapsed 88:88") — a
+            // Grid column that tracks its widest visible cell re-lays the
+            // table out on every tick and status change. Step takes the rest.
             Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 0) {
                 GridRow {
                     stageHeaderCell("Step")
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     stageHeaderCell("Status")
+                        .frame(width: Self.statusColumnWidth, alignment: .leading)
                     stageHeaderCell("Elapsed")
+                        .frame(width: Self.elapsedColumnWidth, alignment: .leading)
                 }
                 Divider()
                     .gridCellUnsizedAxes(.horizontal)
                 ForEach(applyStageRows(stages: stages)) { row in
                     GridRow {
                         stageLabelCell(row)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                         stageStatusCell(row)
+                            .frame(width: Self.statusColumnWidth, alignment: .leading)
                         stageElapsedCell(row)
+                            .frame(width: Self.elapsedColumnWidth, alignment: .leading)
                     }
                     .padding(.vertical, 3)
                     .font(.callout)
@@ -224,6 +234,9 @@ struct ApplyStageListView: View {
             }
         }
     }
+
+    static let statusColumnWidth: CGFloat = 60
+    static let elapsedColumnWidth: CGFloat = 92
 
     private func stageHeaderCell(_ title: String) -> some View {
         Text(title)
