@@ -115,10 +115,11 @@ private struct UnattendedRunScreen: View {
                 GroupBox {
                     Label {
                         Text(
-                            "Every item is its own fresh live read and guarded, "
-                                + "verified apply; failures fail closed and the run "
-                                + "continues. The post-run report collects every "
-                                + "auto-decided judgment item for review."
+                            "Each playlist is read fresh from Music and applied "
+                                + "with full verification. If one fails, nothing is "
+                                + "changed for it and the run moves on. The "
+                                + "Processing Report lists every decision made "
+                                + "automatically."
                         )
                         .font(.caption)
                         .foregroundStyle(.secondary)

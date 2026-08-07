@@ -59,11 +59,18 @@ struct QueueTableView: View {
         self.rows = rows
     }
 
+    /// Sergio, 2026-08-06: the status column is FIXED-width, sized for the
+    /// longest chip ("applying step 6 of 7" with its spinner) — a Grid
+    /// column that tracks the widest visible chip re-lays the whole table
+    /// out every time a status changes.
+    static let statusColumnWidth: CGFloat = 150
+
     var body: some View {
         Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 0) {
             GridRow {
                 headerCell("Playlist")
                 headerCell("Status")
+                    .frame(width: Self.statusColumnWidth, alignment: .leading)
             }
             Divider()
                 .gridCellUnsizedAxes(.horizontal)
@@ -78,6 +85,7 @@ struct QueueTableView: View {
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     StatusChipView(state: row.state)
+                        .frame(width: Self.statusColumnWidth, alignment: .leading)
                 }
                 .padding(.vertical, 4)
                 .background(rowBackground(index))
