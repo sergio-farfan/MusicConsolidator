@@ -525,10 +525,16 @@ final class AuditFlowModel {
     enum PendingDirectAction: Equatable {
         case delete(targets: [PlaylistListing])
         case rename(target: PlaylistListing)
+        case batchRename(targets: [PlaylistListing])
     }
     private(set) var pendingDirectAction: PendingDirectAction?
     /// Rename sheet binding, pre-filled by `requestDirectRename`.
     var typedRenameName: String = ""
+    /// Batch-rename sheet drafts (2026-08-06), keyed by persistent ID —
+    /// seeded with current names by `requestDirectBatchRename`, edited via
+    /// `setBatchRenameDraft`/`applyBatchRenameReplacement`, and cleared by
+    /// `cancelPendingDirectAction` and the dispatch's finish path.
+    private(set) var batchRenameDrafts: [String: String] = [:]
     /// Verbatim failure from the last direct dispatch; nil means none.
     private(set) var directMutationError: String?
     private(set) var isDirectMutationRunning = false
@@ -566,10 +572,57 @@ final class AuditFlowModel {
         pendingDirectAction = .rename(target: target)
     }
 
+    /// Resolve PIDs against the live listing cache and stage a pending
+    /// batch-rename confirmation, seeding `batchRenameDrafts` with each
+    /// target's current name. Same busy/no-op guards and unknown-PID
+    /// handling as `requestDirectDelete`; targets are kept in the caller's
+    /// selection order, not the listing's.
+    func requestDirectBatchRename(persistentIDs: [String]) {
+        guard !isMutationBusy, !isRunning, !isScanning, !isApplying,
+              !isUnattendedRunActive else { return }
+        guard let loaded = loadedListing else { return }
+        let targets = persistentIDs.compactMap { pid in
+            loaded.listings.first { scalarExact($0.persistentId, pid) }
+        }
+        guard !targets.isEmpty else { return }
+        batchRenameDrafts = Dictionary(
+            uniqueKeysWithValues: targets.map { ($0.persistentId, $0.name) }
+        )
+        pendingDirectAction = .batchRename(targets: targets)
+    }
+
+    /// Update one row's draft in the pending batch-rename sheet.
+    func setBatchRenameDraft(_ draft: String, for persistentID: String) {
+        batchRenameDrafts[persistentID] = draft
+    }
+
+    /// Literal (non-regex) find/replace applied to every CURRENT draft — a
+    /// second call composes on the first call's result. A no-op when `find`
+    /// is empty (never a "replace with everything" trap).
+    func applyBatchRenameReplacement(find: String, replaceWith: String) {
+        guard !find.isEmpty else { return }
+        for (pid, draft) in batchRenameDrafts {
+            batchRenameDrafts[pid] = draft.replacingOccurrences(of: find, with: replaceWith)
+        }
+    }
+
+    /// Count of drafts that would actually dispatch a rename: non-empty and
+    /// scalar-differing from the name captured when the batch was requested.
+    var batchRenameChangedCount: Int {
+        guard case .batchRename(let targets) = pendingDirectAction else { return 0 }
+        return targets.reduce(into: 0) { count, target in
+            guard let draft = batchRenameDrafts[target.persistentId], !draft.isEmpty,
+                  !scalarExact(draft, target.name)
+            else { return }
+            count += 1
+        }
+    }
+
     /// Clear a pending direct action without dispatching anything.
     func cancelPendingDirectAction() {
         pendingDirectAction = nil
         typedRenameName = ""
+        batchRenameDrafts = [:]
     }
 
     func dismissDirectMutationError() {
@@ -634,6 +687,41 @@ final class AuditFlowModel {
                     return
                 }
                 self.renameInLoadedListing(persistentID: persistentID, to: newName)
+            }
+        case .batchRename(let targets):
+            // Snapshot the drafts now: `batchRenameDrafts` is cleared by the
+            // finish path below, and the dispatch itself must compare each
+            // rename against the name captured AT REQUEST TIME (mirrors
+            // `.rename`'s `target.name`), not a live re-lookup.
+            let drafts = batchRenameDrafts
+            let items = targets.map { target in
+                (
+                    pid: target.persistentId,
+                    originalName: target.name,
+                    draft: drafts[target.persistentId] ?? ""
+                )
+            }
+            directMutationTask = Task { [weak self] in
+                defer {
+                    self?.batchRenameDrafts = [:]
+                    self?.isDirectMutationRunning = false
+                }
+                for item in items {
+                    guard !item.draft.isEmpty, !scalarExact(item.draft, item.originalName)
+                    else { continue }
+                    do {
+                        try await Task.detached(priority: .userInitiated) {
+                            let session = MusicBridgeSession(runner: make())
+                            try session.renamePlaylistDirect(
+                                persistentID: item.pid, newName: item.draft
+                            )
+                        }.value
+                    } catch {
+                        self?.directMutationError = String(describing: error)
+                        break
+                    }
+                    self?.renameInLoadedListing(persistentID: item.pid, to: item.draft)
+                }
             }
         }
     }
