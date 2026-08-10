@@ -50,6 +50,10 @@ struct DirectMutationSheets: View {
                     deleteConfirmPanel(targets: targets)
                 case .rename(let target):
                     renamePanel(target: target)
+                case .batchRename:
+                    // Task 2 (model-only so far) replaces this with the real
+                    // batch-rename panel — editable rows, find/replace helper.
+                    EmptyView()
                 }
             } else {
                 EmptyView()
