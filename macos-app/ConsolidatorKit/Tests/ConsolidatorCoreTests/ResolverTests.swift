@@ -1,4 +1,6 @@
 // ResolverTests.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // Port of tests/test_resolver.py (ResolverTests + MergeResolverTests) against
 // the Swift resolver. Fingerprint tests compare Swift-side RESULTS only —
 // fingerprint bytes are Swift-canonical, never Python-byte-identical.

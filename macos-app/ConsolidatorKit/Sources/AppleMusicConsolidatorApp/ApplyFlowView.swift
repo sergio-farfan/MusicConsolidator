@@ -1,4 +1,6 @@
 // ApplyFlowView.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // M9 — screens 4-6: apply progress (the guarded sequence streamed as a
 // phase list with an elapsed ticker; NO cancel — the guarded write is
 // atomic from the app's view), success (the CLI's verification sentence

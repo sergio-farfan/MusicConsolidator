@@ -1,4 +1,6 @@
 // WaveCFailureSurfaceTests.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // Wave C1 Task 4 — the "Delete leftover target…" shortcut (spec C1.5) and
 // the attended failure screen's class banner (spec C1.4): fresh-listing
 // resolution (scalar-exact, exactly-1 stages the SAME direct delete

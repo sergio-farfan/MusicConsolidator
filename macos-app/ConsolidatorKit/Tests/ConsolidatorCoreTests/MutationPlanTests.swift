@@ -1,4 +1,6 @@
 // MutationPlanTests.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // Wave B Task 1 — the guarded-mutation artifact model (spec B2): strict
 // Codable (unknown AND missing keys reject; nullable fields must be explicit
 // nulls), the integral-float raw-token gate, canonical sorted-keys SHA-256,

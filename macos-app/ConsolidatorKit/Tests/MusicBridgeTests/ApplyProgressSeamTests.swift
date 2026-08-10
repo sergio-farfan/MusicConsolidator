@@ -1,4 +1,6 @@
 // ApplyProgressSeamTests.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // M9 — the ADDITIVE apply-progress seam on MusicBridgeSession: an optional
 // phase callback the orchestration invokes at its EXISTING internal stage
 // boundaries (re-reading source(s) → revalidating → asserting target absent

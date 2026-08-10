@@ -1,4 +1,6 @@
 // MutationVerification.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // Wave B (spec B1) — the inverted, bijective readback post-condition. The
 // apply verifiers prove "sources unchanged"; this verifier proves: exactly
 // this persistent ID changed in exactly the approved way, and NOTHING else

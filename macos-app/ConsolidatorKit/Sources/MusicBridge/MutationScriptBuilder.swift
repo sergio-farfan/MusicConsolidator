@@ -1,4 +1,6 @@
 // MutationScriptBuilder.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // The second write class (spec B1): guarded playlist-mutation writers,
 // beside — never inside — the create+duplicate writers in
 // MusicScriptBuilder.swift. Every emitted script revalidates the pinned

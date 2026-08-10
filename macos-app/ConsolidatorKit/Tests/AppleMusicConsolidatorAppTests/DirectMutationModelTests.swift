@@ -1,4 +1,6 @@
 // DirectMutationModelTests.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // Direct mutations (Sergio, 2026-08-06): confirm-then-dispatch, zero
 // refusals, display patch per success, first failure stops the batch.
 import Foundation

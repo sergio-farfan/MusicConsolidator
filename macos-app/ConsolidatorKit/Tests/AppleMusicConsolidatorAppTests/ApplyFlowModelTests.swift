@@ -1,4 +1,6 @@
 // ApplyFlowModelTests.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // M9 — headless flow tests for IN-APP APPLY (screens 4-6). Everything rides
 // scripted ScriptRunner fakes: no OSAKit, no Apple events, no live Music,
 // and no script is ever executed. The contract pinned here:

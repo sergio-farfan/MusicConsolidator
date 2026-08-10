@@ -1,4 +1,6 @@
 // DestinationModelTests.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // Wave C2 Task 1 — the destination selection state machine (spec C2.1/C2.3):
 // auto-select on the three run entry points, the hot-path lock (the exact
 // canNavigate predicate), the reused blocked-reason strings, and the report

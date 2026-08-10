@@ -1,4 +1,6 @@
 // ActivityView.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // Wave C2 (spec C2.2) — the Activity destination: the run surface as a
 // state machine rendered by precedence over EXISTING model state (no new
 // run state is introduced). Precedence order is load-bearing: during a

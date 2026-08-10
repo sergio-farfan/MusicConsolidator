@@ -1,4 +1,6 @@
 // DiagnosticsView.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // The M6b read harness, retained as the app's DIAGNOSTICS surface (M7):
 // preflight, raw all-copies read, and raw-wire-JSON export — the fidelity-
 // probe surface for future checks (opened from the Window menu or with

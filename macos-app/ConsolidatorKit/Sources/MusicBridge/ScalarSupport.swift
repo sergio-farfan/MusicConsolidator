@@ -1,4 +1,6 @@
 // ScalarSupport.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // Code-point-exact comparison helpers for the MusicBridge target.
 //
 // These mirror ConsolidatorCore's internal ScalarEquality helpers (only the

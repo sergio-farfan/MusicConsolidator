@@ -1,4 +1,6 @@
 // ListingCache.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // M11 — the persisted listing cache: names/persistent IDs/counts + the scan
 // timestamp, as lightweight JSON under Application Support. THE CACHE
 // SERVES THE BROWSER ONLY: audits and applies remain live-read against

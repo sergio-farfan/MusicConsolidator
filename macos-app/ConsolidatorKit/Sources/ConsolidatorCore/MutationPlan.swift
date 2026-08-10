@@ -1,4 +1,6 @@
 // MutationPlan.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // Wave B (spec B2, artifact-first) — the guarded-mutation artifact model:
 // one reviewable, session-bound, single-use plan per delete/rename, plus the
 // canonical full-listing fingerprint the gate rechecks against a fresh live

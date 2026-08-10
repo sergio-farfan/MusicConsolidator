@@ -1,4 +1,6 @@
 // HistoryCountTests.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // Wave A (A5) — history entries carry input/output counts strictly decoded
 // from their .plan.json artifacts through the same fail-closed loaders the
 // apply uses. ANY loader failure yields an entry WITHOUT counts, never an

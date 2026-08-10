@@ -1,4 +1,6 @@
 // MutationBridgeTests.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // Wave B — the guarded mutation orchestration on MusicBridgeSession:
 // performMutation's fail-closed sequence (fresh listing + fingerprint
 // recheck -> compile -> execute the exact compiled artifact -> fresh

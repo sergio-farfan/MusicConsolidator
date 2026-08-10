@@ -1,4 +1,6 @@
 // RunReportView.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // M11 — the mandatory post-run report screen (the batch amendment's
 // after-the-fact review): outcomes per item, and PROMINENTLY every
 // auto-decided judgment item — near-identical pairs kept, distinct-entry

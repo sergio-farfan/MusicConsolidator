@@ -1,4 +1,6 @@
 // RangeToggleTests.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // Wave A (spec A4) — the pure shift-click range toggle. No UI, no model,
 // no Music: applyRangeToggle is a value-level function over row ids.
 

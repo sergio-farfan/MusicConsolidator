@@ -1,4 +1,6 @@
 // AppKitControls.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // M8 fix round 2 — AppKit-backed load-bearing controls. SwiftUI-drawn
 // buttons and toggles publish NO in-process-introspectable representation
 // on macOS (no NSView, and the SwiftUI accessibility-element tree does not

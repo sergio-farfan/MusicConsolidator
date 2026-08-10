@@ -1,4 +1,6 @@
 // PlanReviewView.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // Screen 2 — plan review. Renders EXCLUSIVELY from the canonical plan object
 // returned by the build (the binding M7 data-flow rule; no plan is ever
 // decoded here). Header counts + fingerprint, the persisted artifact triple

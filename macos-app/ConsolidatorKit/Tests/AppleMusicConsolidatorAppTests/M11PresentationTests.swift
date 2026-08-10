@@ -1,4 +1,6 @@
 // M11PresentationTests.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // M11 pure layers: the run report's judgment summaries (pinned against the
 // THREE REAL merge plans in reports/ — the live Trance 2022 / Soka Varios /
 // SGI Artists ground truths), report rendering + never-overwrite artifact

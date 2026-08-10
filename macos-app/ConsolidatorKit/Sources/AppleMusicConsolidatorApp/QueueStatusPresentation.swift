@@ -1,4 +1,6 @@
 // QueueStatusPresentation.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // Wave A (A1 + A5) — pure presentation under the queue tables and the
 // steps table: the DERIVED display state (the stored AuditQueueStatus
 // keeps exactly its five cases; the two live states exist only here,

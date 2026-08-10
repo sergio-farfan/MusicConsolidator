@@ -1,4 +1,6 @@
 // MutationVerificationTests.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // Wave B Task 2 — the inverted, bijective, persistent-ID-keyed listing diff
 // (spec B1, test matrix B8). The apply verifiers prove "sources unchanged";
 // this verifier proves "exactly this persistent ID changed in exactly the

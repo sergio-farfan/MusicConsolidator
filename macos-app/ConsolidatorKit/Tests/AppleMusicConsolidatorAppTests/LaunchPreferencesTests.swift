@@ -1,4 +1,6 @@
 // LaunchPreferencesTests.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // UI rework Part 2 — the four new Settings preferences (Appearance,
 // Startup: reload-library-on-start and default-tab-on-launch, and
 // Notifications: play-sound-on-run-finish): the pure `nsAppearance`

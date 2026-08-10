@@ -1,4 +1,6 @@
 // QueueStatusPresentationTests.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // Wave A (A1 + A5) — the pure queue-status presentation layer: display-
 // state derivation (the five stored AuditQueueStatus cases plus the two
 // live states derived from current-row + RunState/ApplyState) and the

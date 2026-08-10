@@ -1,4 +1,6 @@
 // TestHelpers.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // Shared fixture builder mirroring tests/helpers.py `track()` — identical
 // defaults so ported cases read one-to-one against the Python reference implementation tests.
 

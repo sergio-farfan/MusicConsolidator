@@ -1,4 +1,6 @@
 // M11StructuralTests.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // M11 structural cells: unattended-run in-flight, the post-run report
 // screen (with a judgment-heavy report), the settings panel additions, and
 // the history browser. Same offscreen discipline as the M8-M10 structural

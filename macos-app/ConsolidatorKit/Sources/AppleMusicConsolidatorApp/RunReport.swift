@@ -1,4 +1,6 @@
 // RunReport.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // M11 — the mandatory post-run report: pure data + rendering for the batch
 // run's after-the-fact review (the AGENTS.md batch amendment's relocated
 // conscience). Every auto-decided judgment item is surfaced PROMINENTLY:

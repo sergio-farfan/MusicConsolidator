@@ -1,4 +1,6 @@
 // DestinationPresentation.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // Wave C2 (spec C2.1/C2.3) — the destination shell's value layer: the three
 // app destinations the sidebar navigates between. Pure value types only —
 // headlessly testable, no Music, no I/O. The selection STATE lives on

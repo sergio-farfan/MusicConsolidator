@@ -1,4 +1,6 @@
 // MutationGateStructuralTests.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // Wave B — offscreen structural cells for MutationGateView: disarmed and
 // armed states, the ambiguity-driven extra token fields, the rename
 // collision warning, the unattended-run lockout notice, and the failed

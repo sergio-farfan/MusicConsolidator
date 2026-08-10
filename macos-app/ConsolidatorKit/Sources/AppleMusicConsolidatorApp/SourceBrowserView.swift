@@ -1,4 +1,6 @@
 // SourceBrowserView.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // M8 — the sectioned source browser (design Option B), recomposed in fix
 // round 2. Merge tab: an eligibility-sectioned list (MERGEABLE GROUPS /
 // NEAR MATCHES / SINGLETONS) where a tap highlights ONE row for the

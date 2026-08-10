@@ -9,3 +9,6 @@ macos-app/build/
 .superpowers/
 
 .DS_Store
+
+# DMG installers (rebuild via macos-app/scripts/package-dmg.sh)
+macos-app/dist/

@@ -1,4 +1,6 @@
 // OrchestrationScalarPinTests.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // BINDING (M5 brief): mutation-sensitive NFC/NFD regression pins for every
 // NEW comparison surface the fail-closed orchestration adds — snapshot-parse
 // name matching, target-absence matching, readback verification (consolidate

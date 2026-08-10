@@ -1,4 +1,6 @@
 // OrchestrationTestSupport.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // Shared fakes for the M5 orchestration suites, mirroring the reference's
 // in-memory bridge fakes in tests/test_music_bridge.py (FakeRunner,
 // InputCapturingRunner, InMemoryBridge, BoundaryRecordingBridge,

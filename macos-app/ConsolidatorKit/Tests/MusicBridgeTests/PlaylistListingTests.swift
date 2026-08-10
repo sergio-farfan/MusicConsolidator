@@ -1,4 +1,6 @@
 // PlaylistListingTests.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // M8 Part 1 — the playlist-enumeration read surface: the STATIC
 // `buildListPlaylistsJXA` script (zero parameters, zero interpolation — the
 // full text is pinned verbatim below so ANY interpolation of ANY value would

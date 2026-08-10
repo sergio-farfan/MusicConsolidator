@@ -1,4 +1,6 @@
 // WaveCRunReportSurfaceTests.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // Wave C1 Task 5 — the run-report screen (the live surface backed by
 // RunItemRecords, spec C1.4/C1.5): failed items render the two additive
 // lines, the guidance, and the delete shortcut; refusedBeforeWrite items

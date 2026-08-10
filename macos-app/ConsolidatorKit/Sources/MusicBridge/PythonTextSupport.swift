@@ -1,4 +1,6 @@
 // PythonTextSupport.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // Byte-faithful ports of the Python text formatting the orchestration's
 // operator-facing messages depend on:
 //   - `repr(str)` — the `{value!r}` interpolations in every mismatch message

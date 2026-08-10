@@ -1,4 +1,6 @@
 // BrowserFlowModelTests.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // M8 — headless model tests for the sectioned source browser and the
 // consolidate batch queue: listing rescan (single-flight, generation-
 // guarded, mutually exclusive with audits), merge batch-queueing from checked groups

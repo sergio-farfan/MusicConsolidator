@@ -1,4 +1,6 @@
 // PlanPresentationTests.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // Headless tests for the pure presentation layer the M7 screens render from:
 // omission classification (identical library track vs distinct library
 // entries), merge per-copy provenance, target-name suffixes, and the

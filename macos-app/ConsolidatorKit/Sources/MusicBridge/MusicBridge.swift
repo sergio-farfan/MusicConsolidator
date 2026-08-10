@@ -1,4 +1,6 @@
 // MusicBridge.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // Swift port of the IMPURE orchestration half of
 // apple_music_consolidator/music_bridge.py (M5): strict parsing of the read
 // JXA's JSON output, the fail-closed ensure/assert preflight, the guarded

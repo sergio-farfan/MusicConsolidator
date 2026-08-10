@@ -1,4 +1,6 @@
 // PlanIntegrityTests.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // Port of the validate_plan_integrity / validate_merge_plan_integrity cases
 // from tests/test_audit.py (writer/loader cases are M3 and NOT ported here).
 // Python's load_plan = from_dict + validate; the M2 equivalent is strict

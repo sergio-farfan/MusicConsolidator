@@ -1,4 +1,6 @@
 // Persistence.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // Swift port of the PERSISTENCE half of apple_music_consolidator/audit.py:
 // artifact renderers (write_json / write_csv / write_markdown and the merge
 // variants), the atomic no-overwrite path reservation (_reserve_paths), the

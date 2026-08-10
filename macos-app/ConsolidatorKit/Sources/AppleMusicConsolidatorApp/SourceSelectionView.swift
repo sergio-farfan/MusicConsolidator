@@ -1,4 +1,6 @@
 // SourceSelectionView.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // Screen 1 — M8 sectioned source browser (Option B), recomposed in fix
 // round 2. The typed playlist name is REPLACED by the browsable listing:
 // Merge tab = checkbox-per-group batch queue (M10); highlight = inspection;

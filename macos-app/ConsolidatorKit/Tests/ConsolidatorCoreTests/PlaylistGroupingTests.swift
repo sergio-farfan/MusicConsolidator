@@ -1,4 +1,6 @@
 // PlaylistGroupingTests.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // M8 Part 1.4 — eligibility grouping for the sectioned source browser:
 // exact-scalar name classes into {groups (N>=2), singletons, nearMatches},
 // where a near match is a set of names that COLLIDE after the sweep

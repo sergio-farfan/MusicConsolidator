@@ -1,4 +1,6 @@
 // MusicBridgeMergeTests.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // Ported same-name merge orchestration cases from tests/test_music_bridge.py:
 // EnsureAllCopiesMatchTests and MergeApplyTests. Expected messages and result
 // shapes were verified against the reference in python3 first (including the

@@ -1,4 +1,6 @@
 // ActivityStructuralTests.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // Wave C2 Tasks 4-5 — the Activity destination's state machine (spec C2.2):
 // precedence cells rendered offscreen at 1200x800. Same discipline as every
 // structural suite: never-shown windows, fixture-driven models, canned wire

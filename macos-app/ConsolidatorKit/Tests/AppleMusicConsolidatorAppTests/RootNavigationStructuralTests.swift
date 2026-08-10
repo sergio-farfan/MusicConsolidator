@@ -1,4 +1,6 @@
 // RootNavigationStructuralTests.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // Wave C2 Task 6 — the destination root (spec C2.5): three sidebar
 // destination rows (present, contained, lock-aware), the live Activity
 // chip, and per-destination detail spot-checks. Offscreen at 1200x800;

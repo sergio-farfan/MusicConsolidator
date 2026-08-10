@@ -1,4 +1,6 @@
 // BrowserPresentationTests.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // M8 — pure presentation layer under the sectioned source browser and the
 // confirm-gate diagnostics: visible rendering of invisible scalars, the
 // first-divergence scalar diff (golden-test diagnostic style), the

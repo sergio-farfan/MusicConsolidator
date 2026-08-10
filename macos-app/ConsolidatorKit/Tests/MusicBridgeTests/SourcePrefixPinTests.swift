@@ -1,4 +1,6 @@
 // SourcePrefixPinTests.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // Wave C1 Task 2 — pins the "source " prefix contract the taxonomy's rule 4
 // rides on (spec C1.2): EVERY source-side readback message constructor in
 // MusicBridge.swift emits a line whose first seven scalars are exactly

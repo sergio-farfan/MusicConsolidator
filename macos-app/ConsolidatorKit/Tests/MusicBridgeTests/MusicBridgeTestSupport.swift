@@ -1,4 +1,6 @@
 // MusicBridgeTestSupport.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // Shared helpers for the M4 MusicBridge suites: the tests/helpers.py `track()`
 // fixture builder, golden-file loading, UTF-8 byte-diff diagnostics, scalar
 // utilities, a subprocess runner for /usr/bin/osacompile and /usr/bin/osascript,

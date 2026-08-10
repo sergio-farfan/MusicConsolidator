@@ -1,4 +1,6 @@
 // ScriptCompileTests.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // Compile-only gates and non-tell handler probes, mirroring the reference's test
 // mechanics in tests/test_music_bridge.py.
 //

@@ -1,4 +1,6 @@
 // BrowserPresentation.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // M8 — pure presentation helpers under the sectioned source browser
 // (Option B) and the confirm-gate diagnostics: visible rendering of
 // invisible scalars (trailing space as ·, other invisibles as U+XXXX),

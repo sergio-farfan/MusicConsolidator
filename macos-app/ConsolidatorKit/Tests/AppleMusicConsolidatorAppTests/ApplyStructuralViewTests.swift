@@ -1,4 +1,6 @@
 // ApplyStructuralViewTests.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // M9 — offscreen structural tests for the rewired confirm gate (screen 3)
 // and the new apply screens (4-6), extending the per-state matrix to:
 // apply-in-flight, success, and failure (with a TALL mismatch fixture), each

@@ -1,4 +1,6 @@
 // PlanGoldenTests.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // Golden-fixture parity for the resolver: assert Swift buildPlan /
 // buildMergePlan match the Python reference implementation exactly, using fixtures exported by
 // macos-app/golden/generate_plan_golden.py. Fingerprint bytes are deliberately

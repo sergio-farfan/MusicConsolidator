@@ -1,4 +1,6 @@
 // CleanupDiscoveryTests.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // B3 discovery: reports/ scan, strict MergePlan gate, grouping by the
 // copies' persistent-ID set, newest-plan selection by the basename stamp,
 // and target-name resolution (run-report record, else the Merged default).

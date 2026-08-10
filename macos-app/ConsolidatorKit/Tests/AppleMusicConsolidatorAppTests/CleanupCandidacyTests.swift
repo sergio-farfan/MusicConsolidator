@@ -1,4 +1,6 @@
 // CleanupCandidacyTests.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // B3 candidacy rules 1-4 over injected live fixtures: one fixture per rule
 // outcome, plus the partially-cleaned-still-candidate and
 // zero-copies-left-drops-out boundaries. No live Music, ever.

@@ -1,4 +1,6 @@
 // SettingsDestinationView.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // UI rework Part 2 — the Settings destination reworked from the M11
 // "Artifacts & Automation" plumbing panel (output-directory chooser, batch
 // toggles, Automation preflight) into a genuine USER PREFERENCES screen:

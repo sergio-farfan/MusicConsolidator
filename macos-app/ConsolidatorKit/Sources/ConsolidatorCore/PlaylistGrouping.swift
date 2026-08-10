@@ -1,4 +1,6 @@
 // PlaylistGrouping.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // M8 — eligibility grouping for the sectioned source browser (design Option
 // B). This is the first ConsolidatorCore surface WITHOUT a Python reference implementation
 // counterpart: it derives browser sections from the playlist-enumeration

@@ -1,4 +1,6 @@
 // OSAKitRunner.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // The real, in-process ScriptRunner over OSAKit (M6a) — the Swift analog of
 // the reference's SubprocessRunner (music_bridge.py:121-140), which shells out
 // to osascript/osacompile. In-process execution is the point of the app: the

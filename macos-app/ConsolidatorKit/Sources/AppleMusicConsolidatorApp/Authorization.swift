@@ -1,4 +1,6 @@
 // Authorization.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // Apple-events automation preflight against com.apple.Music via
 // AEDeterminePermissionToAutomateTarget (AE framework, part of
 // CoreServices; `import ApplicationServices` re-exports it). The target is

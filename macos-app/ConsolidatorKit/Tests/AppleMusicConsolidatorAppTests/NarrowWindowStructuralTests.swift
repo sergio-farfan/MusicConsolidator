@@ -1,4 +1,6 @@
 // NarrowWindowStructuralTests.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // Wave C hotfix (2026-08-04) — the M8 defect class: FIXED WIDTHS that cannot
 // compress. At a real window narrower than ~1150pt the aggregate MINIMUM
 // width of the root split (the sidebar plus SourceSelectionView's header

@@ -1,4 +1,6 @@
 // FixRound2Tests.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // Regression pins for the M5 fix round 2 finding: the wire layer accepted
 // JSON that json.loads rejects (trailing commas, document-leading BOM) and
 // resolved duplicate object keys FIRST-wins where Python resolves LAST-wins

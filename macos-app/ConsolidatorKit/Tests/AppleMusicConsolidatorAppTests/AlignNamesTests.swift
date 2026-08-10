@@ -1,4 +1,6 @@
 // AlignNamesTests.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // Wave B (B5 Align names) — the canonical-name rule (NFC-equal, no
 // leading/trailing whitespace, no invisible scalars), candidate selection
 // (clear winner / none / several), the N-1 rename derivation, and the

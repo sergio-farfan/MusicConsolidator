@@ -1,4 +1,6 @@
 // Resolver.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // Swift port of apple_music_consolidator/resolver.py — deterministic duplicate
 // resolution for immutable playlist snapshots. The Python reference implementation governs every
 // behavioral detail; line references below point into resolver.py.

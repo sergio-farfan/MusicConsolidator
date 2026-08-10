@@ -1,4 +1,6 @@
 // ApplyFailureCaptureTests.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // Wave C1 Task 3 — the model captures the failed stage race-free and
 // classifies every failed apply (spec C1.3): the attended state gains
 // applyFailureClass, RunItemRecord gains failureClass on the batch path,
