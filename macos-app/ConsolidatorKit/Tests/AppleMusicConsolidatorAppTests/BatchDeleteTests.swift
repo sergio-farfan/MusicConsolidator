@@ -1,4 +1,6 @@
 // BatchDeleteTests.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // AGENTS.md exception 2 (Sergio, 2026-08-06): user-selected batch delete
 // behind ONE count-typed gate — every playlist still its own fresh-audited
 // plan artifact and its own guarded execution with readback between; any

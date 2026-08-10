@@ -1,4 +1,6 @@
 // ConsolidatorFlowView.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // The Wave C2 root: NavigationSplitView with DESTINATIONS in the
 // sidebar (Library / Activity / Settings — places, not
 // wizard steps; spec C2.1) and the selected destination in the detail

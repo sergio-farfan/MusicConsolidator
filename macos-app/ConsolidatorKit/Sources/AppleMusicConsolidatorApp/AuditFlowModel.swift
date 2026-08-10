@@ -1,4 +1,6 @@
 // AuditFlowModel.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // The @Observable view model behind the review→approve→apply flow (screens
 // 1–6), extended in M8 with the sectioned source browser (listing scan +
 // sections + selection) and the consolidate batch queue, and in M9 with

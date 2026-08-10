@@ -1,4 +1,6 @@
 // BrowserMutationStructuralTests.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // Wave B (B4/B5) — offscreen structural cells for the browser inspector's
 // Delete/Rename... actions. Task 5 (Sergio, 2026-08-06) retired the audited
 // mutation gate from this composition: every row action now stages a direct

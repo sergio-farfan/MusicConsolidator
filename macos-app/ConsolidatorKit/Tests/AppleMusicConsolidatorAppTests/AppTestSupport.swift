@@ -1,4 +1,6 @@
 // AppTestSupport.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // Test-local support for the M7 view-model suites. The library test targets'
 // fakes (Tests/MusicBridgeTests/OrchestrationTestSupport.swift) are
 // test-target-internal by design, so this target carries its own scripted

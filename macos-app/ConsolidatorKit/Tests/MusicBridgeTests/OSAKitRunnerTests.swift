@@ -1,4 +1,6 @@
 // OSAKitRunnerTests.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // M6a gate tests for the real in-process ScriptRunner over OSAKit.
 //
 // ABSOLUTE SAFETY RULES (m6a-brief.md, unchanged from M4/M5):

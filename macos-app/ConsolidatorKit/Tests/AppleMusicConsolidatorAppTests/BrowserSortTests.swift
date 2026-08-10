@@ -1,4 +1,6 @@
 // BrowserSortTests.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // Browser list ordering (Sergio, 2026-08-05): the pure display-only sort,
 // the model's toggle semantics, and the Cleanup tab's All-playlists section
 // (general guarded deletion rows wired to the existing Wave B gate).

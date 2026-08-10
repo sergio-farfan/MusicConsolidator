@@ -1,4 +1,8 @@
 #!/bin/bash
+# build-app.sh
+# Apple Music Consolidator
+# Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
+#
 # build-app.sh — build, assemble, and sign AppleMusicConsolidator.app
 #
 # Author: Sergio Farfan
@@ -85,7 +89,7 @@ cat > "${APP}/Contents/Info.plist" <<'PLIST'
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>0.1.0</string>
+	<string>1.0.0</string>
 	<key>CFBundleVersion</key>
 	<string>1</string>
 	<key>LSMinimumSystemVersion</key>

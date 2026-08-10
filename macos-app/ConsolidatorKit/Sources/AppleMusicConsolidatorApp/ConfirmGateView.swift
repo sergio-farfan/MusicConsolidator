@@ -1,4 +1,6 @@
 // ConfirmGateView.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // Screen 3 — the confirm gate. M9: completing the gate reveals the Apply
 // button (in-app apply; the M7/M8 CLI hand-off panel is GONE — the python
 // CLI remains the development reference only, invisible to users). The gates,

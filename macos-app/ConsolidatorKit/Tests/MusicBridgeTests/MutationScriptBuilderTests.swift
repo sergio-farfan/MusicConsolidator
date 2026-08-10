@@ -1,4 +1,6 @@
 // MutationScriptBuilderTests.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // Generated-source shape, injection-defense, and compile-only gates for the
 // guarded delete writer (spec B1). Nothing here executes any script text:
 // shape asserts run on bytes, and the compile gates go through `compileOnly`

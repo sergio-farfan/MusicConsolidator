@@ -1,4 +1,6 @@
 // MusicScriptBuilder.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // Swift port of the PURE script-generation half of
 // apple_music_consolidator/music_bridge.py (M4). Every template, encoder, and
 // fail-closed guard below is a verbatim-in-behavior port; comments carry

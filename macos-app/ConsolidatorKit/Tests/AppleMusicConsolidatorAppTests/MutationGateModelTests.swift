@@ -1,4 +1,6 @@
 // MutationGateModelTests.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // Wave B (B2/B4/B5/B6) — the mutation gate state machine on AuditFlowModel:
 // artifact-first arming (fresh listing + fresh snapshot -> MutationPlan ->
 // writeMutationAudit), entry refusals, the unique-identity typed tokens

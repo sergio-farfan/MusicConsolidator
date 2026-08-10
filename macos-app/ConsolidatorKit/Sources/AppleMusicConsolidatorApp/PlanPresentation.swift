@@ -1,4 +1,6 @@
 // PlanPresentation.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // The pure presentation layer under the M7 review→approve screens: omission
 // classification, merge per-copy provenance, target-name suffixes, the
 // cli.py-parity hand-off command text, and display formatting. Everything

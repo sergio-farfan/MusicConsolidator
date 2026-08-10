@@ -1,4 +1,6 @@
 // MusicBridgeApplyTests.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // Ported fail-closed apply orchestration cases from tests/test_music_bridge.py:
 // PlanIntegrityBridgeTests, the source-drift-after-dispatch case,
 // WriterFailureDiagnosticsTests, and MusicBridgeTests' orchestration cases

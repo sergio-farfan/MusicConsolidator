@@ -1,4 +1,6 @@
 // CleanupScanner.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // B3 post-merge cleanup discovery: candidate groups come from EVIDENCE
 // (reports/ merge-plan artifacts loaded through the same fail-closed
 // loadMergePlan gate as apply), never guesswork. scan() applies candidacy

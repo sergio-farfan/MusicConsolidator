@@ -1,4 +1,6 @@
 // CleanupTabView.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // Wave B (B3) — the third browser tab: every live playlist, deletable and
 // renamable directly (Sergio, 2026-08-06). The evidence-discovered gate pane
 // is retired from this composition: Delete and Rename... on a row (or

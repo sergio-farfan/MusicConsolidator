@@ -1,4 +1,6 @@
 // ScriptRunner.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // The injectable command boundary for the M5 orchestration — the Swift port
 // of the Python reference implementation's `CommandRunner` protocol seam plus its three fixed
 // command shapes (music_bridge.py:15-16, 92: READ_ARGS, COMPILE_ARGS,

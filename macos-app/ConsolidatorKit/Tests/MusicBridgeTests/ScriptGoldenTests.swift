@@ -1,4 +1,6 @@
 // ScriptGoldenTests.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // Golden gate for M4: the Swift MusicScriptBuilder output must match the
 // Python reference implementation's generated script TEXT byte-for-byte, for every case
 // exported by macos-app/golden/generate_script_golden.py. Plans are rebuilt

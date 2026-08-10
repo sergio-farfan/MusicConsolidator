@@ -1,4 +1,6 @@
 // PersistenceTests.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // Port of the WRITER and LOADER cases from tests/test_audit.py (the
 // validate-only cases were ported in M2's PlanIntegrityTests and are not
 // duplicated), plus the M3 binding items:

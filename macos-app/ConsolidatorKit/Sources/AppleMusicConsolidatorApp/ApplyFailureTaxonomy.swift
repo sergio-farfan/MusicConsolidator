@@ -1,4 +1,6 @@
 // ApplyFailureTaxonomy.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // Wave C1 (spec C1.1/C1.2) — the five-class apply failure taxonomy: pure
 // classification over the failed stage plus the returned (unverified)
 // ApplyResult, and the pinned operator-facing label/guidance copy. This is

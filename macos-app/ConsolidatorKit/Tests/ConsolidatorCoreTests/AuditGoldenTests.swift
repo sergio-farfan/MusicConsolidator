@@ -1,4 +1,6 @@
 // AuditGoldenTests.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // Golden-fixture parity for the M3 artifact renderers: assert Swift
 // renderDetailCSV / renderSummaryMarkdown / renderPlanJSON (and the merge
 // variants) match the Python reference implementation's write_csv / write_markdown / write_json

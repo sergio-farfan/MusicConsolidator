@@ -1,4 +1,6 @@
 // ScalarExactnessTests.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // Fix round 1 regressions: the fail-closed builder validators must compare at
 // SCALAR level, not Swift String == (Unicode canonical equivalence). Feeding
 // canonically-equivalent-but-scalar-different (NFC vs NFD) inputs must be

@@ -1,4 +1,6 @@
 // AuditTestSupport.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // Shared M3 test helpers: unique temp directories (tests write ONLY under
 // FileManager.temporaryDirectory), an excel-dialect CSV parser for
 // column/row-level golden comparison, code-point rendering for mismatch

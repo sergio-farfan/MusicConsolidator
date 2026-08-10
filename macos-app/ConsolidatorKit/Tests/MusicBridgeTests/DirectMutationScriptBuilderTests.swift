@@ -1,3 +1,7 @@
+// DirectMutationScriptBuilderTests.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
+//
 // Tests/MusicBridgeTests/DirectMutationScriptBuilderTests.swift
 // Direct mutations (Sergio, 2026-08-06): minimal PID-pinned writers —
 // lookup + ONE mutation statement, deliberately NO revalidation guards.

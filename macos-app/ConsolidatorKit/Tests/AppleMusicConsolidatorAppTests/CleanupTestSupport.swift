@@ -1,4 +1,6 @@
 // CleanupTestSupport.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // Shared fixtures for the B3 cleanup scanner suites: a temp reports/
 // directory harness that writes REAL merge-plan artifacts through
 // writeMergeAudit (so loadMergePlan's integrity gate passes), plus builders

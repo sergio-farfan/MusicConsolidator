@@ -318,3 +318,16 @@ from every destination via a live status chip on the Activity row
 (running / paused / finished / idle), and disabled rows and stage chips
 carry their wait reason as a native tooltip. Every engine guard, gate,
 artifact convention, and mutation lockout is untouched by this change.
+
+## Packaging and distribution (2026-08-06)
+
+`bash macos-app/scripts/build-app.sh` builds and signs
+`macos-app/build/AppleMusicConsolidator.app` (v1.0.0);
+`bash macos-app/scripts/package-dmg.sh` then packages it into
+`macos-app/dist/AppleMusicConsolidator-<version>.dmg` — a compressed
+installer image with an /Applications drag-symlink, Finder icon layout,
+volume icon, and a `.sha256` checksum file beside it. The DMG is
+verified (`hdiutil verify`) before the checksum is written; `dist/` is
+git-ignored. All source files carry the project header naming
+Sergio Farfan <sergio.farfan@gmail.com> as the sole author
+(`scripts/add_source_headers.py`, idempotent).

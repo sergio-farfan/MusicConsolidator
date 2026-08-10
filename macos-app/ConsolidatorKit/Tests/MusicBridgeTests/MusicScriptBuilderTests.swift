@@ -1,4 +1,6 @@
 // MusicScriptBuilderTests.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // Ported string-shape and injection-defense tests for the pure script
 // builders, mirroring tests/test_music_bridge.py (WriterBoundaryTests,
 // MusicBridgeTests' pure builder cases, MergeWriterTests). Ordering asserts

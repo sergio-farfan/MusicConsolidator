@@ -1,4 +1,6 @@
 // SelectionModelTests.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // Wave A (spec A4) — the browser multi-selection model: per-tab select-all
 // eligibility, the shift-click anchor lifecycle (every direct click
 // re-anchors; rescan and mode switch clear it), and toggleChecked's range

@@ -1,4 +1,6 @@
 // NormalizeGoldenTests.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // Golden-fixture parity tests: assert the Swift port matches the Python reference implementation
 // (apple_music_consolidator.normalize) exactly, using fixtures exported by
 // macos-app/golden/generate_golden.py straight from the Python implementation.

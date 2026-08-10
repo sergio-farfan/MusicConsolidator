@@ -1,4 +1,6 @@
 // FixRound1Tests.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // Regression pins for the M5 fix round 1 findings. Every expected behavior
 // and message below was verified against the python3 reference first
 // (/tmp/m5/fix1_reference.py; outputs recorded in the M5 report, "Fix round 1"):

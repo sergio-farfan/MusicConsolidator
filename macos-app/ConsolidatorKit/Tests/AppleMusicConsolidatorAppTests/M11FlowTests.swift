@@ -1,4 +1,6 @@
 // M11FlowTests.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // M11 — the unattended batch state machine (the contract-amendment path),
 // the settings that govern it, the mandatory post-run report, and the
 // listing cache. All fakes; nothing executes any script or contacts Music.

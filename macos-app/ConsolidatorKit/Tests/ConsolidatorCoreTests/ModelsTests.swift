@@ -1,4 +1,6 @@
 // ModelsTests.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // Codable round-trip and strict-decode (reject unknown/missing keys) tests for
 // TrackSnapshot / PlaylistSnapshot, mirroring the guarantees Python's
 // `_require_exact_fields` enforces in apple_music_consolidator/models.py.

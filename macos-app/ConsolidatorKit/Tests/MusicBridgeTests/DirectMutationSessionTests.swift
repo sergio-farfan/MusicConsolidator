@@ -1,4 +1,6 @@
 // DirectMutationSessionTests.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // MusicBridgeSession direct execution (Sergio, 2026-08-06): deletePlaylistDirect
 // and renamePlaylistDirect are deliberately guard-free — one compile, one
 // execute, no baseline listing, no readback. These tests pin exactly that

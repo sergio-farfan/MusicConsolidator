@@ -1,4 +1,6 @@
 // StructuralViewTests.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // M8 fix round 2 — OFFSCREEN STRUCTURAL VIEW TESTS. Views are instantiated
 // via NSHostingView into an NSWindow object that is NEVER ordered onto the
 // screen (no makeKeyAndOrderFront/orderFront anywhere): nothing is shown,

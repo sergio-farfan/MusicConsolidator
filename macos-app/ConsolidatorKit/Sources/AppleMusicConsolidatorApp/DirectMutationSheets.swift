@@ -1,4 +1,6 @@
 // DirectMutationSheets.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // Task 4 (Sergio, 2026-08-06) — the presentation layer for direct playlist
 // mutations dispatched straight from the browser/cleanup UI (Task 3's
 // `AuditFlowModel.pendingDirectAction` / `directMutationError`). Renders the

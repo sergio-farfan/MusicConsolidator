@@ -1,4 +1,6 @@
 // ScalarEquality.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // Code-point-exact comparison helpers, internal to ConsolidatorCore.
 //
 // Python compares strings code-point-for-code-point (str ==, dataclass ==,

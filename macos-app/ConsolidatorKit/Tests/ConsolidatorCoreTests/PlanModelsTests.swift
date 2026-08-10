@@ -1,4 +1,6 @@
 // PlanModelsTests.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // Port of tests/test_models.py cases covering the M2 model types
 // (DuplicateDecision, ConsolidationPlan, MergePlan, AuditPaths, ApplyResult,
 // combineSourceTracks), plus strict-decode guarantees mirroring the reference's

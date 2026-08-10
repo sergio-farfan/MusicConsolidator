@@ -1,4 +1,6 @@
 // MutationPersistenceTests.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // B2 artifact-first coverage for the mutation (delete/rename) persistence
 // surface in Persistence.swift: the never-overwrite plan+summary artifact
 // pair, and the StrictJSONScanner-gated fail-closed loader.

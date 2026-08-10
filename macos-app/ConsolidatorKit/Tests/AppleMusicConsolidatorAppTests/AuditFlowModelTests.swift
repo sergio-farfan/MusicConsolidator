@@ -1,4 +1,6 @@
 // AuditFlowModelTests.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // Headless tests for the M7 review→approve flow's view model. All Music I/O
 // is driven through scripted ScriptRunner fakes (no OSAKit, no Apple events,
 // no live Music); persistence goes to per-test temp directories; UserDefaults

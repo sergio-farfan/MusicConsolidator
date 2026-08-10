@@ -1,4 +1,6 @@
 // SemanticKeyScalarTests.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // Regression for the BINDING finding carried from the M1 review (deferred
 // minor 3, docs/superpowers/sdd/2026-07-31-macos-app/m1-review-findings.md):
 // Python dicts group semantic keys by CODE-POINT equality, while Swift String

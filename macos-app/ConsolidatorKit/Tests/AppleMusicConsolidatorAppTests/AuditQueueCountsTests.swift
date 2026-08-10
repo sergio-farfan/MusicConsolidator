@@ -1,4 +1,6 @@
 // AuditQueueCountsTests.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // Wave A (A5) — AuditQueueItem.copyCounts: captured from the scan-time
 // listing when the queue is built (per-copy for merge groups in ascending
 // playlist-id order, a single count for consolidate items), refreshed with

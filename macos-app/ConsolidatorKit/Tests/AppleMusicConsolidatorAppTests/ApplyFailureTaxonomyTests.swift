@@ -1,4 +1,6 @@
 // ApplyFailureTaxonomyTests.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // Wave C1 Task 1 — the five-class apply failure taxonomy (spec C1.1/C1.2,
 // incl. rule 3b per the controller amendment 2026-08-04): pure
 // classification over (failedStage, result), the pinned label and guidance

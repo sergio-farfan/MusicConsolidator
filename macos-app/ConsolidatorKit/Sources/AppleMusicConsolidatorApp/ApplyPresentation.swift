@@ -1,4 +1,6 @@
 // ApplyPresentation.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // M9 — the pure presentation layer under the apply screens (4-6): stage
 // labels for the progress list, the cli.py post-apply output ported
 // byte-for-byte (the success sentence contract the CLI prints), and the

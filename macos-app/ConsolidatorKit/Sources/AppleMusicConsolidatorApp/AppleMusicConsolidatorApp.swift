@@ -1,4 +1,6 @@
 // AppleMusicConsolidatorApp.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // The app shell: the @main SwiftUI entry point. ONE main window hosts the
 // destination shell (Library / Activity / Settings — Wave C2; the Reports
 // destination and its in-app history browser were removed 2026-08-05, and

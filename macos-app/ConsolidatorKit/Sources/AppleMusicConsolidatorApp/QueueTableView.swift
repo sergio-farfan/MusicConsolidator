@@ -1,4 +1,6 @@
 // QueueTableView.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // Wave A (A2) — the shared two-column queue table used by BOTH queue
 // surfaces (QueueRailView on screen 1 and the queue list inside
 // UnattendedRunScreen): a hand-rolled eager Grid, NOT SwiftUI Table —

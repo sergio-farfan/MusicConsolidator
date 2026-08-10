@@ -1,4 +1,6 @@
 // ApplyPresentationTests.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // M9 — pure presentation layer under screens 4-6: the cli.py post-apply
 // output ported byte-for-byte (the success sentence contract), the apply
 // stage labels, and the failure classifier (distinct rendering per

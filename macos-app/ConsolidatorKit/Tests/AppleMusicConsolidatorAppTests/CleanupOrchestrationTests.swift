@@ -1,4 +1,6 @@
 // CleanupOrchestrationTests.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // Wave B (B3 execution) — the group-gate orchestration in AuditFlowModel:
 // refresh -> discovery+candidacy over live fakes, gate-arm re-check, then
 // strictly sequential per-copy deletes with baseline chaining, abort on the

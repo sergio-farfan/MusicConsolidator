@@ -1,4 +1,6 @@
 // AppearancePresentation.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // UI rework Part 2 — the Settings "Appearance" preference's pure value
 // layer: the three modes the user can pick and their mapping onto
 // NSAppearance. No Music, no I/O — headlessly testable, the same posture

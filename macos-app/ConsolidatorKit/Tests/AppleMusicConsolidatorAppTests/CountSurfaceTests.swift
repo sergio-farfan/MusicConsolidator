@@ -1,4 +1,6 @@
 // CountSurfaceTests.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // Wave A (A5) — track counts on the confirm gate, plan review, and apply
 // success surfaces. Unit tests pin the per-source count derivation
 // (CompletedAudit.liveCopyCounts); structural tests pin that each surface

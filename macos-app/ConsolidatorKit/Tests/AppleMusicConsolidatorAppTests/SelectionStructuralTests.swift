@@ -1,4 +1,6 @@
 // SelectionStructuralTests.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // Wave A (spec A4) — offscreen structural pins for the browser selection
 // controls: Select all / Clear render on the MERGEABLE GROUPS header
 // (merge tab) and the ALL PLAYLISTS header (consolidate tab) ONLY, carry

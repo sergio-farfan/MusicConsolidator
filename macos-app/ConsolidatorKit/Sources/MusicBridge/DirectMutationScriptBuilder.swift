@@ -1,3 +1,7 @@
+// DirectMutationScriptBuilder.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
+//
 // Sources/MusicBridge/DirectMutationScriptBuilder.swift
 // Direct user-responsible mutations (Sergio, 2026-08-06, superseding the
 // 2026-08-03 guarded amendment): PID-pinned lookup + exactly one mutation

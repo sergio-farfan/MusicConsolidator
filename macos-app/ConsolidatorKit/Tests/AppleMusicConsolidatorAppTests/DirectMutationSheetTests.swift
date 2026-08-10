@@ -1,4 +1,6 @@
 // DirectMutationSheetTests.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // Task 4 (Sergio, 2026-08-06) — offscreen structural tests for
 // DirectMutationSheets: the batch-delete confirm anatomy (count title,
 // folder-cascade line, both buttons), the rename sheet's pre-filled token

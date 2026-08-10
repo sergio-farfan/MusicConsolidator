@@ -1,4 +1,6 @@
 // PlanIntegrity.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // Swift port of the VALIDATION half of apple_music_consolidator/audit.py:
 // validate_plan_integrity / validate_merge_plan_integrity. Artifact writers
 // and loaders (.plan.json/.detail.csv/.summary.md, atomic reservation,

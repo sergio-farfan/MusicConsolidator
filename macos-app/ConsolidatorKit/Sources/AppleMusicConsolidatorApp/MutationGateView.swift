@@ -1,4 +1,6 @@
 // MutationGateView.swift
+// Apple Music Consolidator
+// Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // Wave B (B2/B4/B5/B6) — the shared delete/rename mutation gate surface.
 // Renders AuditFlowModel.mutationGatePhase end to end: the fresh-snapshot
 // facts, the evidence panel (cleanup plans carry MutationEvidence), the
