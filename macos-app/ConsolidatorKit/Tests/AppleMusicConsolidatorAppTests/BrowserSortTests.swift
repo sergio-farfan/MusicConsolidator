@@ -144,4 +144,41 @@ struct CleanupAllPlaylistsTests {
         #expect(model.browserSortKey == .count)
         #expect(model.browserSortAscending)
     }
+
+    @Test("cleanup rows are name-sorted and complete: every same-name copy, not scan order")
+    func cleanupRowsNameSortedAndComplete() throws {
+        // Sergio, 2026-08-06: the Cleanup list fed raw loaded.listings (scan
+        // = creation order) into the .name sort, which is a no-op that
+        // ASSUMES pre-sorted input — the list looked like it was missing
+        // playlists. The rows must come from sections.allPlaylists: every
+        // copy, alphabetical.
+        let listings = [
+            gateFixtureListing(id: 10, name: "Solo List", pid: "S-A", count: 4),
+            gateFixtureListing(id: 20, name: "Twin", pid: "T-A", count: 3),
+            gateFixtureListing(id: 30, name: "Twin", pid: "T-B", count: 5),
+            gateFixtureListing(id: 40, name: "Kdrama", pid: "K-A", count: 7),
+        ]
+        let loaded = buildPlaylistBrowseSections(from: listings)
+        let rows = cleanupRows(
+            allPlaylists: loaded.allPlaylists, needle: "",
+            key: .name, ascending: true
+        )
+        #expect(rows.map(\.persistentId) == ["K-A", "S-A", "T-A", "T-B"])
+        #expect(rows.count == 4, "every same-name copy is a row")
+        // The filter still narrows by name, keeping both copies.
+        let twins = cleanupRows(
+            allPlaylists: loaded.allPlaylists, needle: "twin",
+            key: .name, ascending: true
+        )
+        #expect(twins.map(\.persistentId) == ["T-A", "T-B"])
+    }
+}
+
+private func gateFixtureListing(
+    id: Double, name: String, pid: String, count: Int
+) -> PlaylistListing {
+    PlaylistListing(
+        playlistId: id, name: name, persistentId: pid,
+        trackCount: count, isSmart: false, specialKind: "none"
+    )
 }
