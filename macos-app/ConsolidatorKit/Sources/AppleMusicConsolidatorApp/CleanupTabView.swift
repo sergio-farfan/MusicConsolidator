@@ -57,13 +57,11 @@ struct CleanupTabView: View {
         .padding(.vertical, 8)
         if let loaded = model.loadedListing {
             let needle = model.searchText.lowercased()
-            let rows = applyBrowserSort(
-                loaded.listings.filter {
-                    needle.isEmpty || $0.name.lowercased().contains(needle)
-                },
+            let rows = cleanupRows(
+                allPlaylists: loaded.sections.allPlaylists,
+                needle: needle,
                 key: model.browserSortKey,
-                ascending: model.browserSortAscending,
-                count: { $0.trackCount }
+                ascending: model.browserSortAscending
             )
             List {
                 ForEach(rows, id: \.persistentId) { listing in
@@ -119,4 +117,23 @@ struct CleanupTabView: View {
                 .padding(12)
         }
     }
+}
+
+/// Cleanup row derivation (Sergio, 2026-08-06): rows come from
+/// `sections.allPlaylists` — every copy, ALPHABETICAL — because the .name
+/// branch of `applyBrowserSort` is a no-op that assumes pre-sorted input.
+/// Feeding it raw scan-order listings made the list look like it dropped
+/// playlists. Pure and testable; display-only.
+func cleanupRows(
+    allPlaylists: [PlaylistListing],
+    needle: String,
+    key: BrowserSortKey,
+    ascending: Bool
+) -> [PlaylistListing] {
+    let filtered = allPlaylists.filter {
+        needle.isEmpty || $0.name.lowercased().contains(needle)
+    }
+    return applyBrowserSort(
+        filtered, key: key, ascending: ascending, count: { $0.trackCount }
+    )
 }
