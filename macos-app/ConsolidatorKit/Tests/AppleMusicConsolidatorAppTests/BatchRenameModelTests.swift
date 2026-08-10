@@ -66,6 +66,32 @@ struct BatchRenameModelTests {
         await model.scanTask?.value
     }
 
+    // Task 1 fix review: `Dictionary(uniqueKeysWithValues:)` traps on a
+    // duplicated key, so a caller passing the same PID twice (e.g. a
+    // double-click race in the selection UI) must not crash. Mirrors
+    // `requestDirectDelete`'s graceful degrade: the duplicate collapses to
+    // its first occurrence, one target, one draft, one dispatch.
+    @Test("a duplicated persistent ID in the request degrades to one target, no crash")
+    func duplicatePersistentIDDegradesGracefully() async throws {
+        let runner = ScriptedRunner(outputs: [gateListingWire()])
+        let harness = try MutationGateHarness(runner: runner)
+        defer { harness.cleanUp() }
+        let model = harness.model
+        model.rescanLibrary()
+        await model.scanTask?.value
+
+        model.requestDirectBatchRename(persistentIDs: [
+            "SOLO000000000001", "SOLO000000000001", "TRAIL00000000001",
+        ])
+        guard case .batchRename(let targets)? = model.pendingDirectAction else {
+            Issue.record("expected pending batch rename"); return
+        }
+        #expect(targets.map(\.persistentId) == ["SOLO000000000001", "TRAIL00000000001"])
+        #expect(model.batchRenameDrafts.count == 2)
+        #expect(model.batchRenameDrafts["SOLO000000000001"] == "Solo List")
+        #expect(model.batchRenameDrafts["TRAIL00000000001"] == "Kdrama ")
+    }
+
     @Test("applyBatchRenameReplacement is literal and composes on the result; empty find is a no-op")
     func fillHelperIsLiteralAndComposes() async throws {
         let runner = ScriptedRunner(outputs: [mergedSuffixWire()])
