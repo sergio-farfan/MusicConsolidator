@@ -576,13 +576,23 @@ final class AuditFlowModel {
     /// batch-rename confirmation, seeding `batchRenameDrafts` with each
     /// target's current name. Same busy/no-op guards and unknown-PID
     /// handling as `requestDirectDelete`; targets are kept in the caller's
-    /// selection order, not the listing's.
+    /// selection order, not the listing's. A duplicated PID in the input
+    /// resolves to its FIRST occurrence only — degrades gracefully (a
+    /// redundant selection, not a crash from `Dictionary(uniqueKeysWithValues:)`,
+    /// and not a double-dispatch of the same rename).
     func requestDirectBatchRename(persistentIDs: [String]) {
         guard !isMutationBusy, !isRunning, !isScanning, !isApplying,
               !isUnattendedRunActive else { return }
         guard let loaded = loadedListing else { return }
-        let targets = persistentIDs.compactMap { pid in
-            loaded.listings.first { scalarExact($0.persistentId, pid) }
+        var seenPersistentIDs: Set<String> = []
+        var targets: [PlaylistListing] = []
+        for pid in persistentIDs {
+            guard let target = loaded.listings.first(
+                where: { scalarExact($0.persistentId, pid) }
+            ) else { continue }
+            guard !seenPersistentIDs.contains(target.persistentId) else { continue }
+            seenPersistentIDs.insert(target.persistentId)
+            targets.append(target)
         }
         guard !targets.isEmpty else { return }
         batchRenameDrafts = Dictionary(
