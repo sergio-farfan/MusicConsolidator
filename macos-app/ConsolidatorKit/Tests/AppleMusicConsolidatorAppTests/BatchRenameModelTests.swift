@@ -30,7 +30,7 @@ private func mergedSuffixWire() -> String {
 @Suite("Batch rename model", .serialized)
 struct BatchRenameModelTests {
 
-    @Test("requestDirectBatchRename seeds drafts with current names in selection order; busy state no-ops")
+    @Test("requestDirectBatchRename seeds drafts with current names in alphabetical (name, then PID) order; busy state no-ops")
     func requestSeedsDraftsAndBusyNoOps() async throws {
         let runner = StagedBlockingRunner(
             outputs: [gateListingWire(), gateListingWire()], blockAt: [1]
@@ -41,12 +41,15 @@ struct BatchRenameModelTests {
         model.rescanLibrary()
         await model.scanTask?.value
 
-        // Selection order deliberately reversed vs. the listing's own order.
+        // Finding 1 (final review): PIDs deliberately passed in
+        // reversed-alphabetical order ("Twin" before "Solo List") — the
+        // resolved targets must come out sorted by (name, persistent ID),
+        // NOT in this caller order.
         model.requestDirectBatchRename(persistentIDs: ["TWIN00000000BBBB", "SOLO000000000001"])
         guard case .batchRename(let targets)? = model.pendingDirectAction else {
             Issue.record("expected pending batch rename"); return
         }
-        #expect(targets.map(\.persistentId) == ["TWIN00000000BBBB", "SOLO000000000001"])
+        #expect(targets.map(\.persistentId) == ["SOLO000000000001", "TWIN00000000BBBB"])
         #expect(model.batchRenameDrafts["TWIN00000000BBBB"] == "Twin")
         #expect(model.batchRenameDrafts["SOLO000000000001"] == "Solo List")
         model.cancelPendingDirectAction()
@@ -86,7 +89,10 @@ struct BatchRenameModelTests {
         guard case .batchRename(let targets)? = model.pendingDirectAction else {
             Issue.record("expected pending batch rename"); return
         }
-        #expect(targets.map(\.persistentId) == ["SOLO000000000001", "TRAIL00000000001"])
+        // De-duplication happens first, sorting second: "Kdrama " sorts
+        // before "Solo List", so the surviving TRAIL target leads despite
+        // arriving last in the input.
+        #expect(targets.map(\.persistentId) == ["TRAIL00000000001", "SOLO000000000001"])
         #expect(model.batchRenameDrafts.count == 2)
         #expect(model.batchRenameDrafts["SOLO000000000001"] == "Solo List")
         #expect(model.batchRenameDrafts["TRAIL00000000001"] == "Kdrama ")
@@ -215,5 +221,49 @@ struct BatchRenameModelTests {
             scalarExact($0.persistentId, "TWIN00000000AAAA") && scalarExact($0.name, "Twin")
         })
         #expect(!model.isDirectMutationRunning)
+    }
+
+    // Finding 4 (final review, minor): the busy guard and the empty-targets
+    // guard both returned WITHOUT clearing `batchRenameDrafts`, stranding a
+    // prior batch's drafts behind a refusal the caller reads as a clean
+    // no-op. Unreachable from the UI (the footer button is disabled while
+    // busy, and PIDs offered to it always resolve), but callable directly
+    // at the model layer, so pin it here.
+    @Test("busy and empty-targets refusals clear any stale batchRenameDrafts")
+    func refusalPathsClearStaleDrafts() async throws {
+        let runner = ScriptedRunner(outputs: [
+            gateListingWire(),
+            "", "ok", // compile + execute, the one rename that gets confirmed
+        ])
+        let harness = try MutationGateHarness(runner: runner)
+        defer { harness.cleanUp() }
+        let model = harness.model
+        model.rescanLibrary()
+        await model.scanTask?.value
+
+        // Empty-targets refusal: a real batch is already staged, then a
+        // second call resolves to zero targets (every PID unknown) — the
+        // refusal must not leave the first batch's drafts stranded.
+        model.requestDirectBatchRename(persistentIDs: ["SOLO000000000001"])
+        #expect(!model.batchRenameDrafts.isEmpty)
+        model.requestDirectBatchRename(persistentIDs: ["NOSUCHPID00000001"])
+        #expect(model.batchRenameDrafts.isEmpty)
+        model.cancelPendingDirectAction()
+
+        // Busy refusal: stage and confirm a batch, then — with NO
+        // intervening `await`, so there is no race against the dispatch's
+        // own drafts-clearing `defer` — request another batch while the
+        // first is still in flight. `isDirectMutationRunning` (folded into
+        // `isMutationBusy`) is set synchronously by `confirmPendingDirectAction`
+        // before its dispatch `Task` is even created.
+        model.requestDirectBatchRename(persistentIDs: ["SOLO000000000001"])
+        model.setBatchRenameDraft("Solo List Renamed", for: "SOLO000000000001")
+        model.confirmPendingDirectAction()
+        #expect(model.isDirectMutationRunning)
+        model.requestDirectBatchRename(persistentIDs: ["TWIN00000000AAAA"])
+        #expect(model.batchRenameDrafts.isEmpty)
+
+        await model.directMutationTask?.value
+        #expect(runner.remainingOutputs == 0)
     }
 }
