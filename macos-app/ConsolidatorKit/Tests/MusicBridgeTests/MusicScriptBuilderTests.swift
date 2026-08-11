@@ -465,7 +465,11 @@ const playlists = matches.map(function (playlist) {
     const fileTrackRefs = playlist.fileTracks;
     const expectedFileTrackCount = fileTrackRefs.length;
 
-    const fileTrackDatabaseIdColumn = fileTrackRefs.databaseID();
+    // Live -1728 fix (2026-08-11): a columnar get against an EMPTY
+    // element collection resolves no object and errors. Cloud
+    // playlists have zero FILE tracks; skip the fetch entirely.
+    const fileTrackDatabaseIdColumn =
+        expectedFileTrackCount === 0 ? [] : fileTrackRefs.databaseID();
     if (!Array.isArray(fileTrackDatabaseIdColumn)) {
         throw new Error("column type mismatch: file_track_database_id");
     }
@@ -476,6 +480,17 @@ const playlists = matches.map(function (playlist) {
 
     const trackRefs = playlist.tracks;
     const expectedTrackCount = trackRefs.length;
+
+    // Live -1728 fix (2026-08-11): same empty-collection rule for a
+    // zero-track playlist — return its record before any column get.
+    if (expectedTrackCount === 0) {
+        return {
+            id: playlist.id(),
+            name: playlist.name(),
+            persistent_id: playlist.persistentID(),
+            tracks: []
+        };
+    }
 
     const databaseIds = trackRefs.databaseID();
     if (!Array.isArray(databaseIds)) {
@@ -884,6 +899,51 @@ const playlists = matches.map(function (playlist) {
 JSON.stringify({playlists: playlists});
 
 """
+
+@Suite("Empty-collection guards (live -1728 fix, 2026-08-11)")
+struct EmptyCollectionGuardTests {
+
+    // Sergio's live pilot, 2026-08-11: "JXA execution failed: error -1728:
+    // Can't get object." A columnar property get against an EMPTY element
+    // collection (a cloud playlist has zero FILE tracks; an empty playlist
+    // has zero tracks) resolves no object and throws before any guard runs.
+    // The legacy readers were immune (evaluating an empty collection yields
+    // []). Both columnar snapshot builders must skip the column fetches
+    // when the count read says the collection is empty.
+
+    @Test("both columnar readers guard the empty file-track collection")
+    func fileTrackColumnGuarded() {
+        for script in [
+            buildReadJXA(name: "any"),
+            buildReadByPersistentIdsJXA(persistentIds: ["A"]),
+        ] {
+            #expect(script.contains(
+                "expectedFileTrackCount === 0 ? [] : fileTrackRefs.databaseID()"
+            ))
+            #expect(!script.contains(
+                "const fileTrackDatabaseIdColumn = fileTrackRefs.databaseID();"
+            ))
+        }
+    }
+
+    @Test("both columnar readers short-circuit a zero-track playlist before any column fetch")
+    func zeroTrackShortCircuit() {
+        for script in [
+            buildReadJXA(name: "any"),
+            buildReadByPersistentIdsJXA(persistentIds: ["A"]),
+        ] {
+            #expect(script.contains("if (expectedTrackCount === 0) {"))
+            // The short-circuit precedes the first track column fetch.
+            let guardOffset = script.range(of: "if (expectedTrackCount === 0)")
+            let firstColumn = script.range(of: "trackRefs.databaseID()")
+            if let guardOffset, let firstColumn {
+                #expect(guardOffset.lowerBound < firstColumn.lowerBound)
+            } else {
+                Issue.record("expected both the guard and the column fetch")
+            }
+        }
+    }
+}
 
 @Suite("Legacy read JXA builder (Task 3 Diagnostics cross-check only)")
 struct LegacyReadJXABuilderTests {
