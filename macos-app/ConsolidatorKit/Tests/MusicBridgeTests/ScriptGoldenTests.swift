@@ -11,7 +11,7 @@
 // diagnosable byte offset.
 //
 // The `read_jxa` cases from that same fixture are deliberately NOT
-// byte-compared here as of 2026-08-06 — see the removal note inside
+// byte-compared here as of 2026-08-11 — see the removal note inside
 // ScriptGoldenTests below.
 
 import Foundation
@@ -22,7 +22,7 @@ import ConsolidatorCore
 @Suite("Script golden byte parity (reference is ground truth)")
 struct ScriptGoldenTests {
 
-    // The `read_jxa` byte-parity cases lived here and were removed 2026-08-06:
+    // The `read_jxa` byte-parity cases lived here and were removed 2026-08-11:
     // the read scripts diverged deliberately (columnar bulk reads, Sergio's
     // decision — see docs/superpowers/specs/2026-08-06-bulk-read-speedup-design.md).
     // `buildReadJXA` no longer matches `build_read_jxa`'s script TEXT, on

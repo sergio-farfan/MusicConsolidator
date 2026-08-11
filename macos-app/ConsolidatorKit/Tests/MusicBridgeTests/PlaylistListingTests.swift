@@ -33,17 +33,26 @@ const playlistRefs = Music.userPlaylists;
 const expectedCount = playlistRefs.length;
 
 const ids = playlistRefs.id();
-if (!Array.isArray(ids) || ids.length !== expectedCount) {
+if (!Array.isArray(ids)) {
+    throw new Error("column type mismatch: id");
+}
+if (ids.length !== expectedCount) {
     throw new Error("column length mismatch: id");
 }
 
 const names = playlistRefs.name();
-if (!Array.isArray(names) || names.length !== expectedCount) {
+if (!Array.isArray(names)) {
+    throw new Error("column type mismatch: name");
+}
+if (names.length !== expectedCount) {
     throw new Error("column length mismatch: name");
 }
 
 const persistentIds = playlistRefs.persistentID();
-if (!Array.isArray(persistentIds) || persistentIds.length !== expectedCount) {
+if (!Array.isArray(persistentIds)) {
+    throw new Error("column type mismatch: persistent_id");
+}
+if (persistentIds.length !== expectedCount) {
     throw new Error("column length mismatch: persistent_id");
 }
 
@@ -51,21 +60,29 @@ const trackCounts = [];
 for (let index = 0; index < expectedCount; index++) {
     trackCounts.push(playlistRefs[index].tracks.length);
 }
-if (
-    !Array.isArray(trackCounts) ||
-    trackCounts.length !== expectedCount ||
-    !trackCounts.every(function (value) { return typeof value === "number"; })
-) {
+if (!Array.isArray(trackCounts)) {
+    throw new Error("column type mismatch: track_count");
+}
+if (trackCounts.length !== expectedCount) {
     throw new Error("column length mismatch: track_count");
+}
+if (!trackCounts.every(function (value) { return typeof value === "number"; })) {
+    throw new Error("column type mismatch: track_count");
 }
 
 const smartFlags = playlistRefs.smart();
-if (!Array.isArray(smartFlags) || smartFlags.length !== expectedCount) {
+if (!Array.isArray(smartFlags)) {
+    throw new Error("column type mismatch: smart");
+}
+if (smartFlags.length !== expectedCount) {
     throw new Error("column length mismatch: smart");
 }
 
 const specialKinds = playlistRefs.specialKind();
-if (!Array.isArray(specialKinds) || specialKinds.length !== expectedCount) {
+if (!Array.isArray(specialKinds)) {
+    throw new Error("column type mismatch: special_kind");
+}
+if (specialKinds.length !== expectedCount) {
     throw new Error("column length mismatch: special_kind");
 }
 
@@ -231,18 +248,17 @@ struct ListPlaylistsBuilderTests {
         }
     }
 
-    @Test("alignment guard names the mismatched column, verbatim, for every field")
+    // M2 (review fix, bulk-read-speedup Task 2): the TYPE branch
+    // (`!Array.isArray(...)`) and the LENGTH branch (`.length !==
+    // expectedCount`) are separate `if` statements with their own accurate,
+    // verbatim message per column — closes the deferred Task 1 minor
+    // ("type-branch guard message says 'length mismatch' inaccurately").
+    @Test("alignment guard names the mismatched column, verbatim, for every field's type and length")
     func alignmentGuardNamesEveryColumn() {
         let listing = ByteText(buildListPlaylistsJXA())
-        for message in [
-            "column length mismatch: id",
-            "column length mismatch: name",
-            "column length mismatch: persistent_id",
-            "column length mismatch: track_count",
-            "column length mismatch: smart",
-            "column length mismatch: special_kind",
-        ] {
-            #expect(listing.contains(message), "missing mismatch message: \(message)")
+        for field in ["id", "name", "persistent_id", "track_count", "smart", "special_kind"] {
+            #expect(listing.contains("column type mismatch: \(field)"), "missing type mismatch message: \(field)")
+            #expect(listing.contains("column length mismatch: \(field)"), "missing length mismatch message: \(field)")
         }
     }
 
