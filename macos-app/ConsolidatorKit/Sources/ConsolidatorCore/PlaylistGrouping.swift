@@ -12,16 +12,20 @@
 // Python-strip parity table — and duplicating that table in the app layer
 // would recreate the M4 ScalarSupport drift risk.
 //
-// Contract guarantees (fixed, see AGENTS.md "Same-name playlist merge"):
+// Contract guarantees (fixed, see AGENTS.md "Same-name playlist merge" and
+// its 2026-08-06 free-form amendment):
 // - `groups` contains ONLY exact-scalar same-name classes with N >= 2
-//   copies. The browser arms merges exclusively from `groups`, so arbitrary
-//   cross-name merging is impossible by construction.
+//   copies. The SAME-NAME merge path arms exclusively from `groups`. (The
+//   2026-08-06 free-form path arms from an explicit user selection of any
+//   groups and singletons instead — a separate, PID-pinned plan variant; it
+//   does not widen what `groups` means here.)
 // - `nearMatches` is ADVISORY: names that collide after the sweep
 //   normalization (strip Cf format scalars, then collapse python-whitespace
 //   runs and trim — " ".join(name.split()), the controller's 2026-08-02
 //   library-sweep semantics that found the 7 trailing-space twin pairs) but
-//   differ exactly. Near matches are never mergeable; the UI shows a rename
-//   hint instead.
+//   differ exactly. A near match is never a same-name GROUP — the UI shows a
+//   rename hint — though its variants, being singletons, can be picked
+//   individually for a free-form merge.
 // - Name classes are keyed SCALAR-exactly (never Swift String ==):
 //   canonically-equivalent-but-scalar-different names stay distinct classes,
 //   exactly as the audit's exact-name filter treats them.
@@ -97,7 +101,8 @@ public struct PlaylistNearMatchVariant: Equatable, Sendable {
 
 /// Names that collide after the sweep normalization but differ exactly —
 /// the rename-to-merge class (trailing space / ZWSP / NBSP twins). Always
-/// >= 2 variants; never mergeable.
+/// >= 2 variants; never a same-name GROUP (the variants can still be picked
+/// individually as singletons for a 2026-08-06 free-form merge).
 public struct PlaylistNearMatchCluster: Equatable, Sendable {
     /// The shared normalized form (`nearMatchNormalizedName` of every
     /// variant) — also the natural rename target.

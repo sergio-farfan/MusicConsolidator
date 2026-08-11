@@ -5,9 +5,12 @@
 // round 2. Merge tab: an eligibility-sectioned list (MERGEABLE GROUPS /
 // NEAR MATCHES / SINGLETONS) where a tap highlights ONE row for the
 // inspector, and — since M10 — GROUP rows carry native checkboxes building
-// the merge batch queue (near matches and singletons stay non-checkable,
-// their checkboxes disabled with an explanation, exactly like consolidate's
-// blocked rows). Consolidate tab: the flat alphabetical ALL PLAYLISTS list
+// the merge batch queue. Since the 2026-08-06 free-form design SINGLETON rows
+// carry live checkboxes too (they contribute to "Merge selected as one…");
+// near-match CLUSTER rows stay non-checkable, their checkboxes disabled with
+// an explanation, exactly like consolidate's blocked rows — a near match is
+// not a same-name group, though its variants are individually checkable as
+// singletons. Consolidate tab: the flat alphabetical ALL PLAYLISTS list
 // with native checkboxes building the consolidate batch queue (group
 // members disabled — the engine fails closed on ambiguous names). A
 // trailing inspector explains the selected row; selection for inspection is
@@ -82,7 +85,23 @@ extension View {
 struct MergeBrowserList: View {
     @Bindable var model: AuditFlowModel
     let sections: PlaylistBrowseSections
-    @State private var singletonsShown = false
+    @State private var singletonsShown: Bool
+
+    /// `singletonsShown` seeds the SINGLETONS disclosure state. The app always
+    /// uses the default (collapsed, as shipped); the offscreen structural
+    /// tests pass `true` because SwiftUI never materializes a COLLAPSED
+    /// DisclosureGroup's content, and the singleton row's checkbox — the only
+    /// entry point to a free-form merge from a singleton (2026-08-06 design)
+    /// — has to be reachable in the view tree to be pinned (F5).
+    init(
+        model: AuditFlowModel,
+        sections: PlaylistBrowseSections,
+        singletonsShown: Bool = false
+    ) {
+        _model = Bindable(model)
+        self.sections = sections
+        _singletonsShown = State(initialValue: singletonsShown)
+    }
 
     var body: some View {
         List {
@@ -172,9 +191,11 @@ struct MergeBrowserList: View {
                             AppKitCheckbox(
                                 identifier: M10ControlID.blockedCheckbox(cluster.normalizedName),
                                 isOn: false,
-                                help: "Not mergeable \u{2014} these names differ by "
-                                    + "invisible characters. Rename in Music first, "
-                                    + "then rescan."
+                                help: "Not a same-name group \u{2014} these names differ "
+                                    + "by invisible characters, so they cannot be merged "
+                                    + "as a group. Rename in Music and rescan, or check "
+                                    + "them individually under SINGLETONS and use "
+                                    + "\u{201C}Merge selected as one\u{2026}\u{201D}."
                             ) {}
                             .disabled(true)
                             Image(systemName: "exclamationmark.triangle.fill")
@@ -185,7 +206,7 @@ struct MergeBrowserList: View {
                                 }
                             }
                             Spacer()
-                            Text("not mergeable \u{2014} rename first")
+                            Text("not a same-name group \u{2014} rename to group")
                                 .font(.caption)
                                 .foregroundStyle(.orange)
                         }

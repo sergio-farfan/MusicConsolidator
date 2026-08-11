@@ -177,8 +177,11 @@ struct SourceSelectionView: View {
                 + "time, or check any mix of groups and singletons and use "
                 + "\u{201C}Merge selected as one\u{2026}\u{201D} to combine them into a "
                 + "single new playlist. Every item still gets its own plan review, "
-                + "confirm gate, and apply. Near matches are never mergeable \u{2014} "
-                + "rename them in Music first."
+                // F4: the claim is scoped to the SAME-NAME path now — a
+                // near-match variant is a singleton, so it IS free-form
+                // mergeable. Kept terse: this caption is `.lineLimit(2)`.
+                + "confirm gate, and apply. Near matches are not a same-name group "
+                + "\u{2014} rename in Music, or check them as singletons."
         }
     }
 
@@ -369,7 +372,10 @@ struct SourceSelectionView: View {
             HStack(spacing: 12) {
                 // Sergio, 2026-08-06: same noun as the consolidate footer —
                 // each queued group produces exactly one merged playlist.
-                Text("Queued: \(model.checkedGroupNames.count) playlists")
+                // Counts checked GROUPS plus checked free-form SINGLETONS
+                // (`mergeCheckedCount`) — a singleton pick is a real merge
+                // source and must not be invisible here (F3).
+                Text("Queued: \(model.mergeCheckedCount) playlists")
                     .bold()
                 Spacer()
                 // 2026-08-06 free-form design: combines the WHOLE current

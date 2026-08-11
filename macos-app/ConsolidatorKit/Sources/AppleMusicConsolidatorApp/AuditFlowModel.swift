@@ -1292,6 +1292,20 @@ final class AuditFlowModel {
         return freeFormSelectionSources(sections: sections)
     }
 
+    /// The merge footer's "Queued: N playlists" count (2026-08-06 free-form
+    /// design; Task 2 review finding F3): checked same-name GROUPS plus
+    /// checked free-form SINGLETONS — everything the merge tab currently has
+    /// checked. Before the free-form design the merge tab had group
+    /// checkboxes only, so this was `checkedGroupNames.count`; leaving it
+    /// there made a singleton pick invisible in the footer even while it was
+    /// what enabled "Merge selected as one…". Deliberately NOT
+    /// `freeFormMergeSelection.count` (which expands each group into its
+    /// copies): the footer counts PICKS, and Start Queue still runs one merge
+    /// per checked group.
+    var mergeCheckedCount: Int {
+        checkedGroupNames.count + checkedFreeFormSingletonPersistentIds.count
+    }
+
     // MARK: step navigation (fix round 4, item 3)
 
     /// Step legality — the single source of truth shared by the sidebar
