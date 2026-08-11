@@ -236,8 +236,7 @@ let mergeApplyScriptLocals: [String] = [
 /// parse/orchestration suites); the writer golden cases (`buildApplyScript`,
 /// `buildMergeApplyScript`) keep full byte parity, untouched. See
 /// `legacyReadJXAScript` immediately below for the retained pre-columnar
-/// text (Task 3 Diagnostics reader cross-check only; nothing routes to it
-/// yet).
+/// text (Diagnostics "Compare readers" cross-check only, Task 3).
 public func buildReadJXA(name: String) -> String {
     let encodedAppPath = appleScriptString(musicAppPath)
     let encodedName = appleScriptString(name)
@@ -386,15 +385,15 @@ public func buildReadJXA(name: String) -> String {
 }
 
 /// The PRE-columnar exact-playlist read JXA (bulk-read-speedup Task 2),
-/// kept ONLY for Task 3's Diagnostics reader cross-check — it will read the
-/// same library with this legacy per-track-loop script and the new columnar
-/// `buildReadJXA(name:)` script back-to-back and diff the parsed results.
-/// Nothing routes to it yet (Task 3 wires it up); this builder exists for
-/// that one release and is removed after the columnar reader has been
-/// validated against it — do not add new callers. Body and output are
-/// byte-identical to the pre-2026-08-11 `buildReadJXA` (pinned verbatim in
-/// `LegacyReadJXABuilderTests`) — this is a pure copy under a new name, not
-/// a behavior change.
+/// kept ONLY for Diagnostics' "Compare readers" cross-check (Task 3,
+/// `ReadWorker.compareReaders` in DiagnosticsView.swift): it reads the same
+/// library with this legacy per-track-loop script and the new columnar
+/// `buildReadJXA(name:)` script back-to-back and diffs the parsed results.
+/// This builder exists for that one release and is removed after the
+/// columnar reader has been validated against it live — do not add new
+/// callers. Body and output are byte-identical to the pre-2026-08-11
+/// `buildReadJXA` (pinned verbatim in `LegacyReadJXABuilderTests`) — this is
+/// a pure copy under a new name, not a behavior change.
 public func legacyReadJXAScript(name: String) -> String {
     let encodedAppPath = appleScriptString(musicAppPath)
     let encodedName = appleScriptString(name)
@@ -610,13 +609,14 @@ public func buildListPlaylistsJXA() -> String {
     return lines.joined(separator: "\n")
 }
 
-/// The PRE-columnar playlist-enumeration JXA (M8), kept ONLY for Task 3's
-/// Diagnostics "Compare listing readers" cross-check — it reads the same
-/// library with this legacy per-playlist-loop script and the new columnar
-/// `buildListPlaylistsJXA()` script back-to-back and diffs the parsed
-/// results. This builder exists for that one release and is removed after
-/// the columnar reader has been validated against it; do not add new
-/// callers. Body and output are byte-identical to the pre-2026-08-06 script
+/// The PRE-columnar playlist-enumeration JXA (M8), kept ONLY for Diagnostics'
+/// "Compare readers" cross-check (Task 3, `ReadWorker.compareReaders` in
+/// DiagnosticsView.swift) — it reads the same library with this legacy
+/// per-playlist-loop script and the new columnar `buildListPlaylistsJXA()`
+/// script back-to-back and diffs the parsed results. This builder exists for
+/// that one release and is removed after the columnar reader has been
+/// validated against it live; do not add new callers. Body and output are
+/// byte-identical to the pre-2026-08-06 script
 /// (pinned verbatim in `LegacyListPlaylistsBuilderTests`) — this is a pure
 /// rename, not a behavior change.
 public func legacyListPlaylistsScript() -> String {

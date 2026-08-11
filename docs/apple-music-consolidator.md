@@ -350,3 +350,36 @@ verified (`hdiutil verify`) before the checksum is written; `dist/` is
 git-ignored. All source files carry the project header naming
 Sergio Farfan <sergio.farfan@gmail.com> as the sole author
 (`scripts/add_source_headers.py`, idempotent).
+
+## Read performance (2026-08-06)
+
+The library listing (source browser) and playlist snapshot reads (audit,
+merge, Diagnostics) are now COLUMNAR: each track/playlist property is
+fetched as one whole-column Apple Event off an un-called specifier
+collection, instead of one Apple Event per property per row. Every column's
+length and type is checked against that same collection's count-first read,
+fail-closed — a mid-scan mutation (a playlist or track added or removed
+while the read is in flight) surfaces as a verbatim `column length
+mismatch: <field>` or `column type mismatch: <field>` error, never as
+misaligned or wrong data. The wire JSON contract
+(`parsePlaylistListing`, `parseExactPlaylistSnapshot`, `parseAllCopies`) is
+unchanged — every consumer downstream of a read is untouched.
+
+The pre-columnar per-row builders (`legacyListPlaylistsScript`,
+`legacyReadJXAScript`) are retained for ONE release, for Diagnostics'
+"Compare readers" action only (Cmd-Shift-D): it runs legacy vs columnar for
+both the library listing and one playlist's snapshot, diffs the PARSED
+results, and reports `identical` or the first difference, with elapsed time
+per reader so the speedup is visible. Nothing else calls the legacy
+builders; they are removed once the columnar readers are validated against
+them live.
+
+Before trusting the new readers, Sergio should exercise: a normal Rescan
+(compare its elapsed before and after this change), the Diagnostics
+"Compare readers" action, and three playlists that exercise the edge cases
+where Apple Events can return a bare scalar or an empty reply instead of a
+list — a 1-TRACK playlist, an EMPTY playlist, and a CLOUD-ONLY playlist (no
+file tracks). Every one of these fails closed with a named column error
+(`column type mismatch: <field>` / `column length mismatch: <field>`) if the
+columnar idiom is wrong for that shape — that error is a BUG REPORT, never
+data corruption.
