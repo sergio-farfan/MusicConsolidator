@@ -212,6 +212,39 @@ struct FreeFormMergeFlowTests {
         #expect(harness.model.queue.map(\.status) == [.audited])
     }
 
+    // 2026-08-06 final review, finding M6: a pinned PID that vanished from
+    // Music between selection and the free-form read (deleted, say) is
+    // live-library drift, not an artifact write failure — it must classify
+    // "Library state" like every other live-drift refusal (mirrors
+    // `FailureRenderingTests.missingPlaylist` in AuditFlowModelTests.swift).
+    @Test("a vanished pinned persistent ID during the free-form read is a library-state failure")
+    func vanishedPinnedPersistentIdIsLibraryStateFailure() async throws {
+        let runner = ScriptedRunner(outputs: [
+            twoSingletonsListingWire(),
+            // FF-B vanished from Music between selection and this read.
+            wireSnapshot(playlists: [
+                wirePlaylist(id: 1, name: "Alpha", persistentId: "FF-A", tracks: [
+                    wireTrack(sourceIndex: 0, databaseId: 1, persistentId: "TRK-A", title: "Song A"),
+                ]),
+            ]),
+        ])
+        let harness = try ModelHarness(runner: runner, mode: .merge, playlistName: "")
+        defer { harness.cleanUp() }
+        harness.model.rescanLibrary()
+        await harness.model.scanTask?.value
+        harness.model.toggleCheckedFreeFormSingleton(persistentId: "FF-A")
+        harness.model.toggleCheckedFreeFormSingleton(persistentId: "FF-B")
+        harness.model.startFreeFormMerge()
+        await harness.awaitAudit()
+
+        guard case .failed(let failure) = harness.model.runState else {
+            Issue.record("expected a failed run state, got \(harness.model.runState)")
+            return
+        }
+        #expect(failure.category == "Library state")
+        #expect(failure.message == "a selected playlist is no longer in Music; rescan and try again")
+    }
+
     @Test("an existing live playlist named like the computed target pre-skips, like the same-name courtesy pre-skip")
     func existingTargetPreSkips() async throws {
         let runner = ScriptedRunner(outputs: [
@@ -344,6 +377,11 @@ struct FreeFormMergeFlowTests {
         #expect(item.outcome.label == "applied")
         #expect(item.targetName == "Alpha \u{2014} Merged")
         #expect(item.targetName != "Alpha \u{2014} Merged \u{2014} Merged")
+        // 2026-08-06 final review, finding M5: the record's source names
+        // are wired straight from the item's FreeFormMergeSpec, so the
+        // persisted run report can render the "- Sources: A, B" line.
+        #expect(item.freeFormSourceNames == ["Alpha", "Beta"])
+        #expect(renderRunReportText(report).contains("- Sources: Alpha, Beta"))
     }
 
     /// Task 2 review finding F3: the merge footer's "Queued: N playlists"
@@ -521,5 +559,75 @@ struct FreeFormSingletonRowStructuralTests {
                 as? NSButton
         )
         #expect(!checkbox.isEnabled)
+    }
+}
+
+// MARK: - plan review header structural tests (2026-08-06 final review, I2)
+//
+// The plan review screen (screen 2) is what Sergio reads before approving a
+// write, so for a free-form plan it has to name every source beside its PID
+// (mirroring the summary artifact's shape) and show the exact description
+// text the guarded writer will set — same-name rendering stays untouched.
+
+@MainActor
+@Suite("Free-form merge — plan review header structural pins (I2)", .serialized)
+struct FreeFormMergeReviewStructuralTests {
+
+    @Test("names each copy beside its PID and shows the target description, free-form only")
+    func namesCopiesAndShowsDescription() async throws {
+        let runner = ScriptedRunner(outputs: [twoSingletonsListingWire(), twoSingletonsAuditWire()])
+        let harness = try ModelHarness(runner: runner, mode: .merge, playlistName: "")
+        defer { harness.cleanUp() }
+        harness.model.rescanLibrary()
+        await harness.model.scanTask?.value
+        harness.model.toggleCheckedFreeFormSingleton(persistentId: "FF-A")
+        harness.model.toggleCheckedFreeFormSingleton(persistentId: "FF-B")
+        harness.model.startFreeFormMerge()
+        await harness.awaitAudit()
+        guard case .merge(let mergePlan) = try #require(harness.model.result).plan else {
+            Issue.record("expected a merge plan")
+            return
+        }
+        #expect(mergePlan.isFreeForm)
+
+        let fixture = HostedFixture(PlanReviewView(model: harness.model))
+        defer { fixture.tearDown() }
+
+        let copy0Name = try #require(
+            view(under: fixture.hosting, axIdentifier: M8ControlID.freeFormCopyName(0)) as? NSTextField
+        )
+        #expect(copy0Name.stringValue == "\u{201C}Alpha\u{201D}")
+        let copy1Name = try #require(
+            view(under: fixture.hosting, axIdentifier: M8ControlID.freeFormCopyName(1)) as? NSTextField
+        )
+        #expect(copy1Name.stringValue == "\u{201C}Beta\u{201D}")
+
+        let description = try #require(
+            view(under: fixture.hosting, axIdentifier: M8ControlID.freeFormTargetDescription)
+                as? NSTextField
+        )
+        #expect(description.stringValue == mergePlan.targetDescription)
+    }
+
+    @Test("a same-name plan's review header renders no free-form rows")
+    func sameNamePlanOmitsFreeFormRows() async throws {
+        let runner = ScriptedRunner(outputs: [mergeFixtureWire()])
+        let harness = try ModelHarness(runner: runner, mode: .merge, playlistName: "Merge List")
+        defer { harness.cleanUp() }
+        harness.model.startAudit()
+        await harness.awaitAudit()
+        guard case .merge(let mergePlan) = try #require(harness.model.result).plan else {
+            Issue.record("expected a merge plan")
+            return
+        }
+        #expect(!mergePlan.isFreeForm)
+
+        let fixture = HostedFixture(PlanReviewView(model: harness.model))
+        defer { fixture.tearDown() }
+
+        #expect(view(under: fixture.hosting, axIdentifier: M8ControlID.freeFormCopyName(0)) == nil)
+        #expect(
+            view(under: fixture.hosting, axIdentifier: M8ControlID.freeFormTargetDescription) == nil
+        )
     }
 }

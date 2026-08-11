@@ -144,12 +144,14 @@ Every guard is unchanged: the copy set is pinned by PERSISTENT ID instead of by
 a shared name, so revalidation re-reads each pinned ID and refuses if any is
 missing, renamed, or drifted in count, order, identity, metadata, availability,
 or file-track status; the plan's integrity hash covers the new fields (source
-IDs, source names, description); an existing playlist with the computed target
-name refuses the item up front with the standard already-done advisory; and the
-apply is the same one guarded create-and-duplicate followed by readback of every
-source (unchanged) plus the target's name, description, and ordered database and
-persistent IDs. Dedup is the UNCHANGED strict key and winner preference over the
-concatenated copies. The artifact triple is the standard one, and the
+IDs, source names, description, target name); an existing playlist with the
+computed target name refuses the item up front with the standard already-done
+advisory; and the apply is the same one guarded create-and-duplicate followed
+by readback of every source (unchanged) plus the target's name and ordered
+database and persistent IDs — the description is set AND its own readback
+verified inside that same writer execution (above), not by this separate
+post-write reread. Dedup is the UNCHANGED strict key and winner preference
+over the concatenated copies. The artifact triple is the standard one, and the
 `.summary.md` for a free-form plan names every source playlist beside its
 persistent ID and lists the exact `Target description:` the writer will set.
 Cleanup's merge-group discovery SKIPS free-form plans: its model is "a group of
@@ -157,8 +159,10 @@ same-name copies", which a free-form plan is not, so source cleanup after a
 free-form merge stays manual. Free-form merge is app-only — the CLI keeps
 same-name `merge-audit` / `merge-apply`.
 
-First live run (checklist): pick TWO SMALL unrelated singletons, check both,
-click `Merge selected as one…`, review the named plan artifacts, then apply. In
+First live run (checklist): expand the SINGLETONS section to see its
+checkboxes (collapsed by default), then pick TWO SMALL unrelated singletons —
+plain playlists, not smart playlists or folders — check both, click `Merge
+selected as one…`, review the named plan artifacts, then apply. In
 Music, verify the new playlist's NAME is `<first source> — Merged` and its
 DESCRIPTION reads `Merged on <timestamp> from: <both names>`; verify both source
 playlists are untouched (same names, same track counts); and verify the

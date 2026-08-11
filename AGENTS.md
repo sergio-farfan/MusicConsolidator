@@ -188,6 +188,10 @@ occurrence in a later copy still wins and is placed at its group's earliest
 position. Do not broaden this beyond the existing contract without a fresh
 design, audit, and explicit approval.
 
+See the 2026-08-06 free-form merge amendment above (Data protection) for the
+app-only variant that combines any user-selected set of playlists — no
+same-name requirement — reusing this same strict key and winner preference.
+
 ### Audit
 
 ```bash

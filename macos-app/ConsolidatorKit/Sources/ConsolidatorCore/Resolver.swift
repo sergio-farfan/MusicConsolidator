@@ -219,20 +219,31 @@ public func mergeFingerprint(_ copies: [PlaylistSnapshot]) -> String {
 /// without recomputing the fingerprint to match no longer agrees with
 /// itself, and load refuses. Same-name plans never call this; their
 /// fingerprint input is untouched (see `mergeFingerprint(_:)` above).
+///
+/// `targetName` (2026-08-06 final review, finding I1) closes the one gap
+/// that left: `mergedPlaylistSourceName` — the computed target name — was
+/// otherwise the only persisted free-form field NOT covered by this hash,
+/// so a hand-edited target name (with the fingerprint left as-is) would
+/// have passed the recompute-and-diff the exact same way the description
+/// did before this hash existed. No free-form plan has ever been persisted
+/// to disk yet, so widening the hash here changes no existing artifact.
 private struct FreeFormFingerprintInput: Encodable {
     let copies: [PlaylistSnapshot]
     let targetDescription: String
     let sourceNames: [String]
+    let targetName: String
 }
 
 public func freeFormMergeFingerprint(
     copies: [PlaylistSnapshot],
     targetDescription: String,
-    sourceNames: [String]
+    sourceNames: [String],
+    targetName: String
 ) -> String {
     sha256Hex(
         FreeFormFingerprintInput(
-            copies: copies, targetDescription: targetDescription, sourceNames: sourceNames
+            copies: copies, targetDescription: targetDescription, sourceNames: sourceNames,
+            targetName: targetName
         )
     )
 }
@@ -290,7 +301,8 @@ public func buildFreeFormMergePlan(
         mergedPlaylistSourceName: targetName,
         copies: copies,
         mergeFingerprint: freeFormMergeFingerprint(
-            copies: copies, targetDescription: targetDescription, sourceNames: sourceNames
+            copies: copies, targetDescription: targetDescription, sourceNames: sourceNames,
+            targetName: targetName
         ),
         winnerSourceIndexes: consolidation.winnerSourceIndexes,
         decisions: consolidation.decisions,

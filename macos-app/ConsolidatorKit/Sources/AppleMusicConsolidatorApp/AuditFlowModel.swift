@@ -1959,6 +1959,9 @@ final class AuditFlowModel {
             planFileName = artifactBasename(audit.paths.planJson)
             itemTargetName = resolvedTargetName(for: audit)
         }
+        // 2026-08-06 final review, finding M5: nil for every consolidate
+        // and same-name item, like `AuditQueueItem.freeForm` itself.
+        let freeFormSourceNames = queue.first(where: { scalarExact($0.name, name) })?.freeForm?.sourceNames
         runRecords.removeAll { scalarExact($0.name, name) }
         runRecords.append(
             RunItemRecord(
@@ -1973,7 +1976,8 @@ final class AuditFlowModel {
                 targetName: itemTargetName,
                 planFileName: planFileName,
                 elapsedSeconds: elapsed,
-                note: note
+                note: note,
+                freeFormSourceNames: freeFormSourceNames
             )
         )
     }
@@ -2536,7 +2540,12 @@ final class AuditFlowModel {
             return try spec.persistentIds.map { persistentId in
                 guard let match = live.first(where: { scalarExact($0.persistentId, persistentId) })
                 else {
-                    throw AuditPipelineError(
+                    // 2026-08-06 final review, finding M6: a vanished pinned
+                    // PID is live-library drift, not an artifact write
+                    // failure — MusicBridgeError classifies it "Library
+                    // state" (classifyFailure below), matching every other
+                    // live-drift refusal in this file.
+                    throw MusicBridgeError(
                         "a selected playlist is no longer in Music; rescan and try again"
                     )
                 }
