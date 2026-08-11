@@ -235,61 +235,96 @@ public func buildReadJXA(name: String) -> String {
 /// like the read JXA's playlist block: a null/undefined anomaly surfaces as
 /// a strict-parse rejection, never a silent default.
 ///
-/// COLUMNAR (2026-08-06): every field is fetched as ONE array-specifier call
-/// over the SAME `playlists` specifier — `playlists.id()`, `.name()`,
-/// `.persistentID()`, `.smart()`, `.specialKind()` each return the whole
-/// column in one Apple Event, and `.tracks().length` similarly returns the
-/// whole per-playlist track-count column in one Apple Event (JXA's `.length`
-/// dispatches the `count` command, which — like `get` — distributes over an
-/// "every" container and returns one count per element, not a single total).
-/// There is deliberately no per-playlist loop that calls a Music property
-/// getter: every column is read off the SAME filtered `playlists` specifier
-/// (never a fresh/unfiltered `Music.userPlaylists()` call), so every column's
-/// index lines up with every other column's index by construction. The
-/// object count is read FIRST (`playlists.length`, its own Apple Event); each
-/// column's guard then rejects — fail-closed, no retry, no repair — a column
-/// whose length disagrees with it, throwing a LITERAL (not concatenated)
-/// message naming that column, e.g. `column length mismatch: name` (a
-/// playlist created or deleted mid-scan skews alignment between the count
-/// read and a later column read). The message is a source-text literal per
-/// column, not built via string concatenation, so it stays byte-pinnable.
-/// Records are assembled by index afterward in a plain in-memory loop that
-/// touches no Music object — only the six already-fetched arrays — so it
-/// sends no further Apple Events. The JSON shape (keys, key order,
-/// per-record field order) is byte-identical to the pre-columnar script.
+/// COLUMNAR (2026-08-06, corrected in review): `playlistRefs` is bound to
+/// `Music.userPlaylists` WITHOUT calling it — calling it (`()`) would
+/// immediately EVALUATE the specifier into a plain JavaScript Array, which
+/// has no `.id`/`.name`/… methods (every column read after that point would
+/// be `TypeError: not a function`). Left un-called, `playlistRefs` stays a
+/// chainable specifier COLLECTION: `.length` on it is the one property a
+/// specifier collection exposes directly and triggers ONE `count` Apple
+/// Event (the scalar count, read FIRST, before any column); property
+/// getters called WITH parens on it — `.id()`, `.name()`, `.persistentID()`,
+/// `.smart()`, `.specialKind()` — each trigger ONE `get` Apple Event and
+/// return the WHOLE column as an array, five events total. Every column is
+/// read off this SAME `playlistRefs` reference (never a second, freshly
+/// re-filtered `Music.userPlaylists` access), so every column's index lines
+/// up with every other column's index by construction.
+///
+/// `track_count` has no sdef counterpart to chain columnar: `playlist`/`user
+/// playlist` (com.apple.Music.sdef) expose no track-COUNT property, only the
+/// `tracks` ELEMENT collection, and a two-level "every track of every user
+/// playlist" specifier is not a supported idiom outside genuine
+/// Cocoa-Scriptable apps (Music is not one) — attempting it is unverified at
+/// best. The verified-cheap route is a per-playlist loop over the SAME
+/// `playlistRefs` collection: `playlistRefs[index].tracks.length` indexes to
+/// ONE playlist's specifier, then accesses `.tracks` WITHOUT calling it (the
+/// un-evaluated tracks-of-this-one-playlist specifier) so `.length` triggers
+/// ONE lean `count` Apple Event per playlist — no track specifiers are
+/// materialized. (Contrast the legacy script below, whose `playlist.tracks()`
+/// call, WITH parens, evaluates and materializes every track specifier of
+/// that playlist before JS reads its `.length` — one Apple Event, but one
+/// that returns O(track count) data, not a lean count.) This loop is the one
+/// deliberate per-playlist read in this script — every other column stays a
+/// single whole-column fetch. Total Apple Events: 6 (the count-first read
+/// plus the five columnar `get`s) + one lean count per playlist — e.g. ~399
+/// for 393 playlists, versus ~2,358 for the pre-columnar script's six
+/// per-playlist events each.
+///
+/// Every column's guard — including the loop-built `trackCounts` — rejects,
+/// fail-closed, no retry, no repair, a column that disagrees with the
+/// count-first read, throwing a LITERAL (not concatenated) message naming
+/// that column, e.g. `column length mismatch: name` (a playlist created or
+/// deleted mid-scan skews alignment between the count read and a later
+/// column read). The message is a source-text literal per column, not built
+/// via string concatenation, so it stays byte-pinnable. `trackCounts` is
+/// `expectedCount`-long by construction (the loop bound IS `expectedCount`),
+/// so its length check is a symmetry/defense-in-depth guard; its element-type
+/// check (`typeof value === "number"`) is the guard that actually earns its
+/// keep for that column. Records are assembled by index afterward in a plain
+/// in-memory loop that touches no Music object — only the six already-
+/// fetched arrays — so it sends no further Apple Events. The JSON shape
+/// (keys, key order, per-record field order) is byte-identical to the
+/// pre-columnar script.
 public func buildListPlaylistsJXA() -> String {
     let lines = [
         "const Music = Application(\"/System/Applications/Music.app\");",
         "",
-        "const playlists = Music.userPlaylists();",
-        "const expectedCount = playlists.length;",
+        "const playlistRefs = Music.userPlaylists;",
+        "const expectedCount = playlistRefs.length;",
         "",
-        "const ids = playlists.id();",
+        "const ids = playlistRefs.id();",
         "if (!Array.isArray(ids) || ids.length !== expectedCount) {",
         "    throw new Error(\"column length mismatch: id\");",
         "}",
         "",
-        "const names = playlists.name();",
+        "const names = playlistRefs.name();",
         "if (!Array.isArray(names) || names.length !== expectedCount) {",
         "    throw new Error(\"column length mismatch: name\");",
         "}",
         "",
-        "const persistentIds = playlists.persistentID();",
+        "const persistentIds = playlistRefs.persistentID();",
         "if (!Array.isArray(persistentIds) || persistentIds.length !== expectedCount) {",
         "    throw new Error(\"column length mismatch: persistent_id\");",
         "}",
         "",
-        "const trackCounts = playlists.tracks().length;",
-        "if (!Array.isArray(trackCounts) || trackCounts.length !== expectedCount) {",
+        "const trackCounts = [];",
+        "for (let index = 0; index < expectedCount; index++) {",
+        "    trackCounts.push(playlistRefs[index].tracks.length);",
+        "}",
+        "if (",
+        "    !Array.isArray(trackCounts) ||",
+        "    trackCounts.length !== expectedCount ||",
+        "    !trackCounts.every(function (value) { return typeof value === \"number\"; })",
+        ") {",
         "    throw new Error(\"column length mismatch: track_count\");",
         "}",
         "",
-        "const smartFlags = playlists.smart();",
+        "const smartFlags = playlistRefs.smart();",
         "if (!Array.isArray(smartFlags) || smartFlags.length !== expectedCount) {",
         "    throw new Error(\"column length mismatch: smart\");",
         "}",
         "",
-        "const specialKinds = playlists.specialKind();",
+        "const specialKinds = playlistRefs.specialKind();",
         "if (!Array.isArray(specialKinds) || specialKinds.length !== expectedCount) {",
         "    throw new Error(\"column length mismatch: special_kind\");",
         "}",
