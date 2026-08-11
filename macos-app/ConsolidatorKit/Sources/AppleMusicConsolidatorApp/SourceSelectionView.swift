@@ -173,10 +173,12 @@ struct SourceSelectionView: View {
                 + "Check playlists to build a batch queue \u{2014} every item still gets "
                 + "its own plan review, confirm gate, and apply."
         case .merge:
-            return "Merge operates on exact-same-name groups ONLY: check the groups "
-                + "to queue \u{2014} every group still gets its own plan review, confirm "
-                + "gate, and apply. Near matches are never mergeable \u{2014} rename "
-                + "them in Music first."
+            return "Check same-name groups and Start Queue to merge one group at a "
+                + "time, or check any mix of groups and singletons and use "
+                + "\u{201C}Merge selected as one\u{2026}\u{201D} to combine them into a "
+                + "single new playlist. Every item still gets its own plan review, "
+                + "confirm gate, and apply. Near matches are never mergeable \u{2014} "
+                + "rename them in Music first."
         }
     }
 
@@ -370,6 +372,26 @@ struct SourceSelectionView: View {
                 Text("Queued: \(model.checkedGroupNames.count) playlists")
                     .bold()
                 Spacer()
+                // 2026-08-06 free-form design: combines the WHOLE current
+                // selection (every checked group's copies + every checked
+                // singleton) into ONE new playlist, named and described
+                // automatically — Start Queue keeps its own meaning (one
+                // merge per checked group).
+                AppKitActionButton(
+                    identifier: M10ControlID.mergeAsOne,
+                    title: "Merge selected as one\u{2026}",
+                    help: "Combine every checked group and singleton into ONE new "
+                        + "playlist, named \u{201C}<first source> \u{2014} Merged\u{201D}."
+                ) {
+                    model.startFreeFormMerge()
+                }
+                .disabled(
+                    model.freeFormMergeSelection.count < 2
+                        || model.loadedSections == nil
+                        || model.isRunning
+                        || model.isScanning
+                        || model.isApplying
+                )
                 AppKitActionButton(
                     identifier: M8ControlID.startQueue,
                     title: mergeStartQueueTitle,

@@ -972,6 +972,14 @@ final class AuditFlowModel {
     /// canonically-equivalent names, and two distinct exact-name groups can
     /// be canonically equivalent (the NFC/NFD twin class).
     private(set) var checkedGroupNames: [String] = []
+    /// Merge-tab SINGLETON checkbox picks (2026-08-06 free-form design), by
+    /// persistent ID. Deliberately DISTINCT from `checkedPersistentIds`
+    /// (the consolidate tab's own set) even though both key by persistent
+    /// ID: checking a singleton here must never leak into the consolidate
+    /// tab's own queue selection. A checked singleton contributes itself to
+    /// a free-form merge source list (spec Decision 1); it is never
+    /// independently mergeable/consolidatable through this set.
+    private(set) var checkedFreeFormSingletonPersistentIds: Set<String> = []
     /// The shift-click range anchor (spec A4): the id of the last directly
     /// clicked checkable row — a group name on the merge tab, a persistent
     /// ID on the consolidate tab. Cleared on rescan and on a mode (tab)
@@ -1180,7 +1188,21 @@ final class AuditFlowModel {
 
     /// The exact CLI target name for the completed audit's source.
     var targetName: String? {
-        result.map { defaultTargetName(mode: $0.mode, sourceName: $0.sourceName) }
+        result.map { resolvedTargetName(for: $0) }
+    }
+
+    /// The exact target name for a completed audit (2026-08-06 free-form
+    /// design): the automatic `<name> — Consolidated`/`<name> — Merged`
+    /// suffix for a same-name audit, or the free-form plan's OWN computed
+    /// target name VERBATIM. `defaultTargetName` would otherwise
+    /// double-suffix a free-form audit: its `sourceName` (the plan's
+    /// `mergedPlaylistSourceName`) is already the final target name
+    /// (`buildFreeFormMergePlan`'s `targetName`), not a bare source name.
+    private func resolvedTargetName(for audit: CompletedAudit) -> String {
+        if case .merge(let plan) = audit.plan, plan.isFreeForm {
+            return audit.sourceName
+        }
+        return defaultTargetName(mode: audit.mode, sourceName: audit.sourceName)
     }
 
     /// Gate (c): the typed re-entry must match the target name scalar-exactly
@@ -1232,6 +1254,42 @@ final class AuditFlowModel {
     /// Scalar-exact membership for the merge-tab group checks (M10).
     func isGroupChecked(_ name: String) -> Bool {
         checkedGroupNames.contains { scalarExact($0, name) }
+    }
+
+    /// Membership for a merge-tab singleton check (2026-08-06 free-form
+    /// design). Persistent IDs are ASCII hex — a plain Set lookup is exact
+    /// already, mirroring `checkedPersistentIds`' own discipline.
+    func isFreeFormSingletonChecked(persistentId: String) -> Bool {
+        checkedFreeFormSingletonPersistentIds.contains(persistentId)
+    }
+
+    /// Resolve the CURRENT merge-tab selection into one ascending-
+    /// playlist-ID-ordered source list (2026-08-06 free-form design, spec
+    /// Decisions 1 + 5): every CHECKED group contributes all its copies;
+    /// every CHECKED singleton contributes itself. `sections.groups`/
+    /// `sections.singletons` are each alphabetically ordered on their own
+    /// (never by playlist id — see `PlaylistBrowseSections`'s own
+    /// contract), so the combined list is explicitly re-sorted by ascending
+    /// playlist id, the one deterministic copy order used everywhere.
+    private func freeFormSelectionSources(
+        sections: PlaylistBrowseSections
+    ) -> [PlaylistListing] {
+        let fromGroups = sections.groups
+            .filter { isGroupChecked($0.name) }
+            .flatMap(\.copies)
+        let fromSingletons = sections.singletons
+            .filter { checkedFreeFormSingletonPersistentIds.contains($0.persistentId) }
+        return (fromGroups + fromSingletons).sorted { $0.playlistId < $1.playlistId }
+    }
+
+    /// The current merge-tab free-form selection (2026-08-06 design):
+    /// checks hidden by the active filter still count, like every other
+    /// checkbox pick — this reads the FULL loaded listing, not the
+    /// filtered display. Feeds `startFreeFormMerge()` and the footer's
+    /// enablement threshold.
+    var freeFormMergeSelection: [PlaylistListing] {
+        guard let sections = loadedSections else { return [] }
+        return freeFormSelectionSources(sections: sections)
     }
 
     // MARK: step navigation (fix round 4, item 3)
@@ -1496,6 +1554,22 @@ final class AuditFlowModel {
         selectionAnchor = outcome.newAnchor
     }
 
+    /// Toggle one merge-tab SINGLETON checkbox (2026-08-06 free-form
+    /// design): a singleton cannot merge with itself, but it CAN contribute
+    /// to a free-form merge alongside other checked groups/singletons
+    /// (`startFreeFormMerge()`). Writes `checkedFreeFormSingletonPersistentIds`
+    /// only — never `checkedPersistentIds`, the consolidate tab's own set.
+    func toggleCheckedFreeFormSingleton(persistentId: String) {
+        guard let sections = displayedBrowserSections,
+              sections.singletons.contains(where: { scalarExact($0.persistentId, persistentId) })
+        else { return }
+        if checkedFreeFormSingletonPersistentIds.contains(persistentId) {
+            checkedFreeFormSingletonPersistentIds.remove(persistentId)
+        } else {
+            checkedFreeFormSingletonPersistentIds.insert(persistentId)
+        }
+    }
+
     /// Cmd+A / the section-header "Select all" (spec A4). Merge tab: every
     /// DISPLAYED mergeable group — near matches and singletons are not
     /// checkable there. Consolidate tab: every displayed checkable row —
@@ -1538,6 +1612,7 @@ final class AuditFlowModel {
         switch mode {
         case .merge:
             checkedGroupNames = []
+            checkedFreeFormSingletonPersistentIds = []
         case .consolidate:
             checkedPersistentIds = []
         }
@@ -1564,7 +1639,8 @@ final class AuditFlowModel {
                 .filter { checkedPersistentIds.contains($0.persistentId) }
                 .map {
                     AuditQueueItem(
-                        name: $0.name, status: .pending, copyCounts: [$0.trackCount]
+                        name: $0.name, status: .pending, copyCounts: [$0.trackCount],
+                        freeForm: nil
                     )
                 }
         case .merge:
@@ -1574,7 +1650,8 @@ final class AuditFlowModel {
                     AuditQueueItem(
                         name: $0.name,
                         status: .pending,
-                        copyCounts: $0.copies.map(\.trackCount)
+                        copyCounts: $0.copies.map(\.trackCount),
+                        freeForm: nil
                     )
                 }
         }
@@ -1621,6 +1698,74 @@ final class AuditFlowModel {
         startCurrentQueueItemAudit()
         // AFTER the audit start (whose discard resets the step): the
         // unattended run owns the apply surface for its whole duration.
+        if isRunUnattended { step = .apply }
+    }
+
+    /// The merge tab's "Merge selected as one…" footer action (2026-08-06
+    /// free-form design): resolve the CURRENT merge-tab selection — every
+    /// checked group's copies, plus every checked singleton — into one
+    /// ascending-playlist-id-ordered source list (spec Decisions 1 + 5),
+    /// compute the automatic target name (`<first source> — Merged`) and
+    /// description (spec Decision 4), and enqueue ONE queue item that runs
+    /// the standard audit -> plan -> (confirm gate) -> guarded apply
+    /// pipeline — the exact same lifecycle `startQueue()` gives a same-name
+    /// item, except the plan variant. Refused below the 2-source threshold
+    /// (the footer's own enablement rule); a courtesy pre-skip mirrors
+    /// `startQueue()`'s existing-target advisory verbatim.
+    func startFreeFormMerge() {
+        guard !isRunning, !isScanning, !isApplying, !isMutationBusy, !isQueueActive,
+              let sections = loadedSections else { return }
+        let sources = freeFormSelectionSources(sections: sections)
+        guard sources.count >= 2 else { return }
+
+        let sourceNames = sources.map(\.name)
+        let targetName = "\(sourceNames[0]) \u{2014} Merged"
+        let spec = FreeFormMergeSpec(
+            persistentIds: sources.map(\.persistentId),
+            sourceNames: sourceNames,
+            targetName: targetName,
+            targetDescription: freeFormMergeDescription(sourceNames: sourceNames, now: now())
+        )
+
+        queue = [
+            AuditQueueItem(
+                name: targetName,
+                status: .pending,
+                copyCounts: sources.map(\.trackCount),
+                freeForm: spec
+            )
+        ]
+        queueIndex = 0
+        isQueueActive = true
+        isRunUnattended = !confirmEachApply
+        runStartedAt = Date()
+        runRecords = []
+        finishedRunReport = nil
+        runReportPath = nil
+        runReportWriteFailure = nil
+        stopRequested = false
+        selectedDestination = .activity
+        // Pre-flight (mirrors startQueue()'s courtesy pre-skip verbatim): a
+        // target that already exists in the loaded listing means the item
+        // is ALREADY DONE — mark it skipped up front instead of burning a
+        // full audit into the existing-target refusal. Courtesy check
+        // only: the engine guard still protects everything that runs.
+        if sections.allPlaylists.contains(where: { scalarExact($0.name, targetName) }) {
+            queue[0].status = .skipped
+            recordRunItem(
+                named: targetName,
+                outcome: .skipped,
+                note: "already done: \u{201C}\(targetName)\u{201D} exists \u{2014} "
+                    + "review it, then clean up the sources; delete the target "
+                    + "first if you want to reprocess"
+            )
+        }
+        while currentQueueItem?.status == .skipped { queueIndex += 1 }
+        guard currentQueueItem != nil else {
+            finishRun()
+            return
+        }
+        startCurrentQueueItemAudit()
         if isRunUnattended { step = .apply }
     }
 
@@ -1696,6 +1841,10 @@ final class AuditFlowModel {
 
     private func startCurrentQueueItemAudit() {
         guard let current = currentQueueItem else { return }
+        if let freeForm = current.freeForm {
+            startFreeFormAudit(freeForm)
+            return
+        }
         playlistName = current.name
         startAudit()
     }
@@ -1794,7 +1943,7 @@ final class AuditFlowModel {
             inputCount = audit.inputCount
             outputCount = audit.outputCount
             planFileName = artifactBasename(audit.paths.planJson)
-            itemTargetName = defaultTargetName(mode: audit.mode, sourceName: audit.sourceName)
+            itemTargetName = resolvedTargetName(for: audit)
         }
         runRecords.removeAll { scalarExact($0.name, name) }
         runRecords.append(
@@ -1888,6 +2037,11 @@ final class AuditFlowModel {
         checkedGroupNames.removeAll { name in
             !sections.groups.contains { scalarExact($0.name, name) }
         }
+        // 2026-08-06 free-form design: the same intersection rule for the
+        // merge-tab singleton picks.
+        checkedFreeFormSingletonPersistentIds.formIntersection(
+            sections.singletons.map(\.persistentId)
+        )
     }
 
     /// Start one read-only audit run (single-flight; also refused while a
@@ -1914,6 +2068,33 @@ final class AuditFlowModel {
                 generation: generation,
                 mode: mode,
                 name: name,
+                outputDirectoryPath: outputDirectoryPath,
+                make: make
+            )
+        }
+    }
+
+    /// The free-form merge item's audit start (2026-08-06 free-form
+    /// design): the same single-flight guards and stale-state discard as
+    /// `startAudit()`, dispatching into `runFreeFormPipeline` instead of
+    /// `runPipeline` — the PID-pinned read/plan-build seam; the write stage
+    /// is the UNCHANGED, fully shared `writeStage(plan:mode:outputDirectoryPath:)`.
+    private func startFreeFormAudit(_ spec: FreeFormMergeSpec) {
+        guard !isRunning, !isScanning, !isApplying, !isMutationBusy else { return }
+        activeAuditName = spec.targetName
+        selectedDestination = .activity
+
+        discardCompletedAudit()
+        runGeneration += 1
+        let generation = runGeneration
+        let outputDirectoryPath = self.outputDirectoryPath
+        let make = makeRunner
+
+        runState = .running(.reading(started: Date()))
+        auditTask = Task { [weak self] in
+            await self?.runFreeFormPipeline(
+                generation: generation,
+                spec: spec,
                 outputDirectoryPath: outputDirectoryPath,
                 make: make
             )
@@ -2103,7 +2284,15 @@ final class AuditFlowModel {
                 return try session.applyPlan(plan: plan, targetName: targetName)
             case .merge:
                 let plan = try loadMergePlan(from: url)
-                return try session.applyMergePlan(plan: plan, targetName: targetName)
+                // 2026-08-06 free-form design: the loaded plan's OWN variant
+                // routes the apply — a free-form plan's PID-pinned
+                // revalidation (`applyFreeFormMergePlan`) in place of the
+                // same-name path's "every copy of this name"
+                // (`applyMergePlan`). Every other stage here — the artifact
+                // load, the writer dispatch, and the readback — is shared.
+                return plan.isFreeForm
+                    ? try session.applyFreeFormMergePlan(plan: plan, targetName: targetName)
+                    : try session.applyMergePlan(plan: plan, targetName: targetName)
             }
         }.value
     }
@@ -2261,6 +2450,99 @@ final class AuditFlowModel {
         } catch {
             applyFailure(error, generation: generation)
         }
+    }
+
+    /// The free-form merge item's pipeline (2026-08-06 free-form design):
+    /// the SAME three-stage shape as `runPipeline` — live read, pure plan
+    /// build, persist the artifact triple — with a PID-pinned read/plan
+    /// seam (`freeFormReadStage`/`freeFormPlanStage`) in place of
+    /// `readStage`/`planStage`'s name-keyed lookup. `writeStage` and
+    /// `applySuccess`/`applyCancelled`/`applyFailure` are the UNCHANGED,
+    /// fully shared functions every other audit uses — `CompletedAudit`'s
+    /// own `.merge` case is already variant-agnostic (`mergedPlaylistSourceName`,
+    /// `copies`, etc. read straight through either plan shape).
+    private func runFreeFormPipeline(
+        generation: Int,
+        spec: FreeFormMergeSpec,
+        outputDirectoryPath: String,
+        make: @escaping @Sendable () -> any ScriptRunner
+    ) async {
+        let clock = ContinuousClock()
+        let overallStart = clock.now
+        do {
+            let readStart = clock.now
+            let copies = try await Self.freeFormReadStage(spec: spec, make: make)
+            let readSeconds = Self.seconds(readStart.duration(to: clock.now))
+            try Self.checkCancelled()
+            guard applyPhase(.buildingPlan(started: Date()), generation: generation) else { return }
+
+            let plan = try await Self.freeFormPlanStage(copies: copies, spec: spec)
+            try Self.checkCancelled()
+            guard applyPhase(.writingArtifacts(started: Date()), generation: generation) else { return }
+
+            let paths = try await Self.writeStage(
+                plan: .merge(plan),
+                mode: .merge,
+                outputDirectoryPath: outputDirectoryPath
+            )
+            try Self.checkCancelled()
+
+            let totalSeconds = Self.seconds(overallStart.duration(to: clock.now))
+            applySuccess(
+                CompletedAudit(
+                    mode: .merge,
+                    plan: .merge(plan),
+                    paths: paths,
+                    completedAt: Date(),
+                    readSeconds: readSeconds,
+                    totalSeconds: totalSeconds
+                ),
+                generation: generation
+            )
+        } catch is CancellationError {
+            applyCancelled(generation: generation)
+        } catch {
+            applyFailure(error, generation: generation)
+        }
+    }
+
+    /// Read every pinned source by persistent ID (`snapshotCopiesByPersistentIds`
+    /// — the same session read path `ensureFreeFormCopiesMatch` reuses at
+    /// apply time), then reorder the wire-order result into `spec`'s
+    /// ascending-playlist-id order — the concatenation order
+    /// `buildFreeFormMergePlan` requires. Fails closed if a pinned PID is
+    /// no longer live (deleted between selection and this read).
+    private nonisolated static func freeFormReadStage(
+        spec: FreeFormMergeSpec,
+        make: @escaping @Sendable () -> any ScriptRunner
+    ) async throws -> [PlaylistSnapshot] {
+        try await Task.detached(priority: .userInitiated) {
+            let session = MusicBridgeSession(runner: make())
+            let live = try session.snapshotCopiesByPersistentIds(spec.persistentIds)
+            return try spec.persistentIds.map { persistentId in
+                guard let match = live.first(where: { scalarExact($0.persistentId, persistentId) })
+                else {
+                    throw AuditPipelineError(
+                        "a selected playlist is no longer in Music; rescan and try again"
+                    )
+                }
+                return match
+            }
+        }.value
+    }
+
+    private nonisolated static func freeFormPlanStage(
+        copies: [PlaylistSnapshot],
+        spec: FreeFormMergeSpec
+    ) async throws -> MergePlan {
+        try await Task.detached(priority: .userInitiated) {
+            try buildFreeFormMergePlan(
+                copies: copies,
+                targetName: spec.targetName,
+                targetDescription: spec.targetDescription,
+                sourceNames: spec.sourceNames
+            )
+        }.value
     }
 
     private nonisolated static func readStage(

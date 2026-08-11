@@ -421,6 +421,7 @@ struct ModelHarness {
         mode: ConsolidatorMode = .consolidate,
         playlistName: String = "Fixture List",
         confirmEachApply: Bool = true,
+        now: @escaping @Sendable () -> Date = { Date() },
         playFinishSound: @escaping @Sendable () -> Void = { NSSound(named: "Glass")?.play() }
     ) throws {
         let directory = FileManager.default.temporaryDirectory
@@ -445,6 +446,7 @@ struct ModelHarness {
             defaults: suite,
             defaultOutputDirectoryPath: directory.path,
             cacheDirectoryPath: cacheDirectory.path,
+            now: now,
             playFinishSound: playFinishSound
         )
         model.setMode(mode)

@@ -198,13 +198,23 @@ struct MergeBrowserList: View {
                 DisclosureGroup(isExpanded: $singletonsShown) {
                     ForEach(sections.singletons, id: \.persistentId) { listing in
                         HStack(spacing: 8) {
+                            // 2026-08-06 free-form design: a singleton
+                            // cannot merge with itself, but it CAN
+                            // contribute to a free-form merge alongside
+                            // other checked groups/singletons.
                             AppKitCheckbox(
-                                identifier: M10ControlID.blockedCheckbox(listing.persistentId),
-                                isOn: false,
-                                help: "Nothing to merge \u{2014} only one playlist "
-                                    + "has this exact name."
-                            ) {}
-                            .disabled(true)
+                                identifier: M10ControlID.singletonCheckbox(listing.persistentId),
+                                isOn: model.isFreeFormSingletonChecked(
+                                    persistentId: listing.persistentId
+                                ),
+                                help: "Check to include \u{201C}\(listing.name)\u{201D} as a "
+                                    + "source in \u{201C}Merge selected as one\u{2026}\u{201D}."
+                            ) {
+                                model.toggleCheckedFreeFormSingleton(
+                                    persistentId: listing.persistentId
+                                )
+                            }
+                            .disabled(model.isQueueActive)
                             BrowserNameText(name: listing.name)
                             listingBadges(listing)
                             Spacer()
