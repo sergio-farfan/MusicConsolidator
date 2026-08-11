@@ -227,6 +227,21 @@ final class CleanupScanner {
     /// B3 discovery: strict-loaded merge plans, grouped by their copies'
     /// persistent-ID set, newest plan per group, resolved target name.
     /// Disk-only — the live closures are never invoked here.
+    ///
+    /// FREE-FORM PLANS ARE SKIPPED (2026-08-06 review finding I4): this
+    /// discovery's whole model is "a group of same-name copies" —
+    /// `groupName` becomes `plan.mergedPlaylistSourceName`, which for a
+    /// same-name plan IS that shared name, but for a free-form plan is the
+    /// COMPUTED TARGET name instead (there is no shared source name; see
+    /// `MergePlan.isFreeForm`'s doc). Treating a free-form plan as a
+    /// same-name group would scan the TARGET name as if it were "the group
+    /// every copy shares" — a live playlist that happens to be named the
+    /// target would wrongly trip the "bears the group name but is not in
+    /// the plan" disqualification, and `resolvedTargetName`'s
+    /// `defaultTargetName(mode: .merge, sourceName: groupName)` fallback
+    /// would double the "— Merged" suffix. Cleanup discovery for free-form
+    /// merges is out of scope for now — skip explicitly rather than
+    /// produce a candidate built on a category error.
     func discoverGroups() -> [DiscoveredMergeGroup] {
         var decoded: [(fileName: String, plan: MergePlan)] = []
         for fileName in reportFileNames where fileName.hasSuffix(".plan.json") {
@@ -235,6 +250,9 @@ final class CleanupScanner {
             // pre-pass, exact-key decode, integrity recompute. ANY failure
             // means "not usable merge evidence" -> skipped silently.
             guard let plan = try? loadMergePlan(from: URL(fileURLWithPath: path)) else {
+                continue
+            }
+            guard !plan.isFreeForm else {
                 continue
             }
             decoded.append((fileName, plan))

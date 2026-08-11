@@ -75,7 +75,13 @@ struct BuildFreeFormMergePlanTests {
         #expect(plan.sourceNames == freeFormSourceNames)
         #expect(plan.targetDescription == freeFormDescription)
         #expect(plan.copies.map(\.persistentId) == ["PID-A", "PID-B"])
-        #expect(plan.mergeFingerprint == mergeFingerprint(copies))
+        // 2026-08-06 review finding I1: the free-form fingerprint covers
+        // targetDescription/sourceNames too, so it is NOT the plain
+        // copies-only mergeFingerprint(_:) same-name plans use.
+        #expect(plan.mergeFingerprint == freeFormMergeFingerprint(
+            copies: copies, targetDescription: freeFormDescription, sourceNames: freeFormSourceNames
+        ))
+        #expect(plan.mergeFingerprint != mergeFingerprint(copies))
     }
 
     @Test("dedup is identical to a same-name merge of the same snapshots")
@@ -210,22 +216,16 @@ struct FreeFormMergePlanIntegrityTests {
         expectRejection(tampered, messageContains: "source names do not match the copies")
     }
 
-    // KNOWN, DELIBERATE BOUNDARY (matches the Task 1 brief's own framing:
-    // "the engine treats it as an opaque escaped string"): `targetDescription`
-    // is caller-supplied free text with no independent data in the plan to
-    // cross-check it against (unlike `sourcePersistentIDs`/`sourceNames`,
-    // which are validated against `plan.copies`). The canonical recompute
-    // necessarily ECHOES the persisted description straight back as its own
-    // input, so a plan with ONLY its description tampered still validates —
-    // exactly as a same-name plan's `mergedPlaylistSourceName` is echoed
-    // back by `buildMergePlan`'s `name` parameter today. This is not a gap
-    // introduced here: the description is cosmetic (never selects which
-    // tracks merge — that stays fully covered by `mergeFingerprint` +
-    // `winnerSourceIndexes`/`decisions` canonical recompute) and is escaped
-    // safely regardless of content. Documented so the boundary is a
-    // decision, not a surprise.
-    @Test("a tampered target description alone is NOT caught (opaque field; documented boundary)")
-    func tamperedDescriptionAloneIsNotCaught() throws {
+    // 2026-08-06 review finding I1 (write-path review, controller ruling):
+    // the free-form fingerprint input now covers `targetDescription` and
+    // `sourceNames` (see `freeFormMergeFingerprint` in Resolver.swift), so
+    // editing the description WITHOUT recomputing the persisted
+    // `merge_fingerprint` to match no longer validates — this in-memory
+    // case constructs exactly that: everything else untouched, only
+    // `targetDescription` differs from what `plan.mergeFingerprint` was
+    // actually computed over.
+    @Test("rejects a tampered target description (in-memory construction)")
+    func rejectsTamperedDescriptionInMemory() throws {
         let plan = try plan()
         let tampered = MergePlan(
             mergedPlaylistSourceName: plan.mergedPlaylistSourceName,
@@ -238,9 +238,34 @@ struct FreeFormMergePlanIntegrityTests {
             targetDescription: "Tampered description",
             sourceNames: plan.sourceNames
         )
-        // Does not throw: the tracks that will be duplicated are entirely
-        // determined by `copies`/`winnerSourceIndexes`, both still canonical.
-        try validateMergePlanIntegrity(tampered)
+        expectRejection(tampered, messageContains: "merge fingerprint does not match the persisted copies")
+    }
+
+    // The controller's exact tamper scenario: flip ONLY target_description
+    // in a SERIALIZED free-form plan.json (leaving merge_fingerprint as
+    // originally computed) → load refuses. Exercises the full
+    // Codable-decode + validate path (loadMergePlan's decodeAndValidate
+    // shape), not just an in-memory MergePlan construction.
+    @Test("a hand-edited target_description in a serialized plan.json fails closed")
+    func serializedDescriptionTamperFailsClosed() throws {
+        let plan = try plan()
+        var object = try jsonObject(plan)
+        object["target_description"] = "Hand-edited description"
+        // merge_fingerprint is left exactly as the untampered plan produced.
+        let data = try JSONSerialization.data(withJSONObject: object)
+        let decoded = try JSONDecoder().decode(MergePlan.self, from: data)
+        // Codable's own all-or-none check does not fire (all three fields
+        // are still present) — the fingerprint recheck is what must catch
+        // this.
+        #expect(decoded.targetDescription == "Hand-edited description")
+        do {
+            try validateMergePlanIntegrity(decoded)
+            Issue.record("expected the hand-edited description to be refused")
+        } catch let error as PlanIntegrityError {
+            #expect(error.message.contains("merge fingerprint does not match the persisted copies"))
+        } catch {
+            Issue.record("expected PlanIntegrityError, got \(error)")
+        }
     }
 
     @Test("rejects a same-name plan carrying free-form fields")

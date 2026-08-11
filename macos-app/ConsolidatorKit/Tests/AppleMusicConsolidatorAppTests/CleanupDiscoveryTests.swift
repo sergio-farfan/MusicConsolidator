@@ -158,4 +158,68 @@ struct CleanupDiscoveryTests {
 
         #expect(fixture.scanner().discoverGroups().isEmpty)
     }
+
+    // 2026-08-06 review finding I4: `discoverGroups()` used to treat
+    // `plan.mergedPlaylistSourceName` as "the name every copy shares" for
+    // ANY loadable merge plan — for a free-form plan that field is the
+    // COMPUTED TARGET name instead (there is no shared source name), so a
+    // free-form plan.json in reports/ would scan the target name as if it
+    // were a same-name group: a live playlist happening to bear that
+    // target name would wrongly trip the "bears the group name but is not
+    // in the plan" disqualification, and the Merged-convention fallback
+    // would double the "\u{2014} Merged" suffix. Fixed by skipping
+    // free-form plans explicitly in discovery. This test proves BOTH
+    // halves: no group at all, AND no disqualification noise even when a
+    // live playlist bears the free-form plan's target name.
+    @Test("a free-form plan artifact yields no group and no disqualification noise")
+    func freeFormPlanArtifactIsSkipped() async throws {
+        let fixture = try CleanupFixture()
+        defer { fixture.cleanUp() }
+        let sourceNames = ["DJ Set A", "DJ Set B"]
+        let targetName = "DJ Set A \u{2014} Merged"
+        let copies = [
+            PlaylistSnapshot(
+                name: sourceNames[0],
+                persistentId: "CPYAAAA000000001",
+                tracks: [
+                    presentationTrack(
+                        sourceIndex: 0, databaseId: 1, persistentId: "T0000001", title: "Alpha"
+                    )
+                ]
+            ),
+            PlaylistSnapshot(
+                name: sourceNames[1],
+                persistentId: "CPYBBBB000000002",
+                tracks: [
+                    presentationTrack(
+                        sourceIndex: 0, databaseId: 2, persistentId: "T0000002", title: "Beta"
+                    )
+                ]
+            ),
+        ]
+        let freeFormPlan = try buildFreeFormMergePlan(
+            copies: copies,
+            targetName: targetName,
+            targetDescription: "Merged on 2026-08-06 12:00 from: DJ Set A, DJ Set B",
+            sourceNames: sourceNames
+        )
+        try fixture.writePlan(freeFormPlan, at: Date(timeIntervalSince1970: 1_754_000_000))
+
+        #expect(fixture.scanner().discoverGroups().isEmpty)
+
+        // Even with a LIVE playlist bearing the exact target name (the
+        // shape that would have tripped the old "bears the group name but
+        // is not in the plan" disqualification), scan() must produce zero
+        // candidates — not one disqualified candidate.
+        let liveTargetListing = PlaylistListing(
+            playlistId: 1,
+            name: targetName,
+            persistentId: "LIVE0000000000001",
+            trackCount: 1,
+            isSmart: false,
+            specialKind: "none"
+        )
+        let candidates = try fixture.scanner(listPlaylists: { [liveTargetListing] }).scan()
+        #expect(candidates.isEmpty)
+    }
 }

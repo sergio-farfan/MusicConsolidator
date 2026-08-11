@@ -473,10 +473,28 @@ public struct MergePlan: Equatable, Hashable, Codable, Sendable {
     public let sourceNames: [String]?
 
     /// True for a free-form plan (copy set pinned by persistent ID, no
-    /// shared name); false for a same-name plan. The three free-form fields
-    /// are all-or-none, so any one of them is representative.
+    /// shared name); false for a same-name plan. Reads `sourcePersistentIDs`
+    /// alone — callers that also trust `targetDescription`/`sourceNames`
+    /// together with this flag should check `freeFormFieldsAreConsistent`
+    /// first (2026-08-06 review finding m1): `init(from:)` and
+    /// `validateMergePlanIntegrity` both reject a partial free-form field
+    /// set on the LOAD path, but a plan assembled in-memory (tests, or any
+    /// future caller) bypasses both, so the write-path routing seams
+    /// (`ensureFreeFormCopiesMatch`, `applyFreeFormMergePlan`,
+    /// `buildMergeApplyScript`) assert it themselves before trusting this
+    /// flag to mean what it says.
     public var isFreeForm: Bool {
         sourcePersistentIDs != nil
+    }
+
+    /// All-or-none check for the three free-form fields (2026-08-06 review
+    /// finding m1): true when all three are nil (same-name) or all three
+    /// are non-nil (free-form); false for a mixed/partial set that must
+    /// never reach a write-path seam. See `isFreeForm`'s doc for which
+    /// seams assert this and why.
+    public var freeFormFieldsAreConsistent: Bool {
+        let presence = [sourcePersistentIDs != nil, targetDescription != nil, sourceNames != nil]
+        return Set(presence).count == 1
     }
 
     public var combinedTracks: [TrackSnapshot] {

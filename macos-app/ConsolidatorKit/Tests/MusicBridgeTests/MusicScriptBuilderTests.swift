@@ -780,6 +780,53 @@ struct ReadJXAPortTests {
         )
         #expect(result.status == 0, "\(result.stderr)")
     }
+
+    // 2026-08-06 review finding I2: `buildReadByPersistentIdsJXA` (the
+    // free-form design's PID-pinned read JXA) had no osacompile gate at
+    // all — cloned from `columnarStaticScriptCompiles` immediately above
+    // (plain) and `MutationScriptBuilderCompileTests.hostileDeleteScriptCompiles`
+    // (hostile variant), the same M4 discipline as every other osacompile
+    // gate in this suite: compile-only, never executed.
+    @Test(
+        "read-by-persistent-ids script compiles (osacompile -l JavaScript; never executed)",
+        .enabled(if: appleScriptCompilerAndMusicAvailable)
+    )
+    func readByPersistentIdsScriptCompiles() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("free-form-read-by-pid-compile-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let output = directory.appendingPathComponent("read-by-pid.scpt")
+        let result = try runTool(
+            osacompilePath,
+            arguments: ["-l", "JavaScript", "-o", output.path],
+            stdinText: buildReadByPersistentIdsJXA(persistentIds: ["PID-A", "PID-B"])
+        )
+        #expect(result.status == 0, "\(result.stderr)")
+    }
+
+    @Test(
+        "read-by-persistent-ids script with a hostile persistent ID compiles (osacompile -l JavaScript; never executed)",
+        .enabled(if: appleScriptCompilerAndMusicAvailable)
+    )
+    func readByPersistentIdsScriptWithHostilePersistentIdCompiles() throws {
+        // Double quote, backslash, a PUA scalar, and a non-BMP scalar (built
+        // from its code point — no literal emoji in source), mirroring
+        // MutationScriptBuilderTests.hostileName's construction.
+        let hostilePersistentId =
+            "PID \"X\" \\ mix " + scalarString(0xE001) + scalarString(0x1F3B5)
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("free-form-read-by-pid-hostile-compile-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let output = directory.appendingPathComponent("read-by-pid-hostile.scpt")
+        let result = try runTool(
+            osacompilePath,
+            arguments: ["-l", "JavaScript", "-o", output.path],
+            stdinText: buildReadByPersistentIdsJXA(persistentIds: ["PID-A", hostilePersistentId])
+        )
+        #expect(result.status == 0, "\(result.stderr)")
+    }
 }
 
 // bulk-read-speedup Task 2 (I3, controller decision): the pre-columnar

@@ -195,8 +195,46 @@ public func buildPlan(_ source: PlaylistSnapshot) throws -> ConsolidationPlan {
 
 /// Hash every copy's identity and ordered tracks so any drift invalidates.
 /// Reference contract: resolver.py:110-121 (Swift-canonical bytes; see header).
+/// UNCHANGED for same-name plans — this is the exact function
+/// `buildMergePlan` has always called; the free-form variant below is a
+/// SEPARATE function precisely so this one, and every same-name plan's
+/// `mergeFingerprint` value, stays byte-for-byte what it always was (the
+/// Python-parity golden is the tripwire for that).
 public func mergeFingerprint(_ copies: [PlaylistSnapshot]) -> String {
     sha256Hex(copies)
+}
+
+/// Canonical hash input for a FREE-FORM merge plan only (2026-08-06 review
+/// finding I1): `mergeFingerprint(_:)` alone hashes just the copies, which
+/// means a hand-edited `target_description` or `source_names` in a
+/// persisted free-form plan.json passes every existing check — the
+/// canonical-recompute-and-diff in `validateMergePlanIntegrity` otherwise
+/// just ECHOES the persisted description straight back as its own
+/// recompute input (there is nothing else in the plan to check it
+/// against). Folding `targetDescription` and `sourceNames` into the hash
+/// that gets PERSISTED alongside the plan turns that echo into a real
+/// consistency check: `validateMergePlanIntegrity` recomputes this same
+/// hash from the plan's own persisted fields and compares it to the
+/// persisted `mergeFingerprint` — a plan whose description was edited
+/// without recomputing the fingerprint to match no longer agrees with
+/// itself, and load refuses. Same-name plans never call this; their
+/// fingerprint input is untouched (see `mergeFingerprint(_:)` above).
+private struct FreeFormFingerprintInput: Encodable {
+    let copies: [PlaylistSnapshot]
+    let targetDescription: String
+    let sourceNames: [String]
+}
+
+public func freeFormMergeFingerprint(
+    copies: [PlaylistSnapshot],
+    targetDescription: String,
+    sourceNames: [String]
+) -> String {
+    sha256Hex(
+        FreeFormFingerprintInput(
+            copies: copies, targetDescription: targetDescription, sourceNames: sourceNames
+        )
+    )
 }
 
 /// Build a stable merge plan by deduping the ordered copy concatenation.
@@ -251,7 +289,9 @@ public func buildFreeFormMergePlan(
     return MergePlan(
         mergedPlaylistSourceName: targetName,
         copies: copies,
-        mergeFingerprint: mergeFingerprint(copies),
+        mergeFingerprint: freeFormMergeFingerprint(
+            copies: copies, targetDescription: targetDescription, sourceNames: sourceNames
+        ),
         winnerSourceIndexes: consolidation.winnerSourceIndexes,
         decisions: consolidation.decisions,
         nonEligibleSourceIndexes: consolidation.nonEligibleSourceIndexes,
