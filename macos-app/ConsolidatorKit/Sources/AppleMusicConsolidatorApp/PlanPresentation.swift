@@ -229,6 +229,27 @@ nonisolated func defaultTargetName(mode: ConsolidatorMode, sourceName: String) -
     }
 }
 
+/// The free-form merge target's `description` text (2026-08-06 design,
+/// Decision 4): `Merged on <YYYY-MM-DD HH:MM> from: <source names,
+/// comma-separated, playlist-ID order>`. `now` is the model's own injected
+/// `now()` seam value — NEVER `Date()` computed here — so tests pin the
+/// exact string against a fixed clock. `timeZone` defaults to `.current`,
+/// the same "local time" convention the audit-artifact timestamps already
+/// use (`RunReport.swift`'s `runReportBaseName`); a test that needs a
+/// machine-independent string passes an explicit fixed zone.
+nonisolated func freeFormMergeDescription(
+    sourceNames: [String],
+    now: Date,
+    timeZone: TimeZone = .current
+) -> String {
+    let formatter = DateFormatter()
+    formatter.locale = Locale(identifier: "en_US_POSIX")
+    formatter.calendar = Calendar(identifier: .gregorian)
+    formatter.timeZone = timeZone
+    formatter.dateFormat = "yyyy-MM-dd HH:mm"
+    return "Merged on \(formatter.string(from: now)) from: \(sourceNames.joined(separator: ", "))"
+}
+
 /// Python `shlex.quote` ported at the Unicode-scalar level: unchanged when
 /// every scalar is in the ASCII-safe set `[A-Za-z0-9_@%+=:,./-]` (shlex's
 /// `_find_unsafe` under `re.ASCII` — any non-ASCII scalar is unsafe), else

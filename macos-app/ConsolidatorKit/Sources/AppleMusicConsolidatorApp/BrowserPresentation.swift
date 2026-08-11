@@ -268,6 +268,19 @@ nonisolated enum AuditQueueStatus: Equatable, Sendable {
     }
 }
 
+/// One resolved free-form merge queue item's plan-build inputs (2026-08-06
+/// free-form design): every source playlist pinned by persistent ID, in
+/// ascending playlist-ID order — the exact order the copies are read,
+/// deduped, and concatenated in (spec Decision 5). `targetName`/
+/// `targetDescription` are computed once, at enqueue time
+/// (`AuditFlowModel.startFreeFormMerge()`), from this exact ordering.
+nonisolated struct FreeFormMergeSpec: Equatable, Sendable {
+    let persistentIds: [String]
+    let sourceNames: [String]
+    let targetName: String
+    let targetDescription: String
+}
+
 nonisolated struct AuditQueueItem: Equatable, Sendable, Identifiable {
     let name: String
     var status: AuditQueueStatus
@@ -278,6 +291,12 @@ nonisolated struct AuditQueueItem: Equatable, Sendable, Identifiable {
     /// completes (spec A5). Display-only — never a guard input. No default
     /// value on purpose: the compiler must surface every construction site.
     var copyCounts: [Int]
+    /// nil for every consolidate item and every same-name merge item
+    /// (`startQueue()`); non-nil for the ONE free-form merge item
+    /// `startFreeFormMerge()` ever enqueues. No default value on purpose,
+    /// like `copyCounts` above: the compiler must surface every
+    /// construction site.
+    let freeForm: FreeFormMergeSpec?
 
     var id: String { name }
 }
