@@ -324,6 +324,20 @@ struct SourceSelectionView: View {
             }
             .disabled(model.checkedCleanupPIDs.isEmpty)
             AppKitActionButton(
+                identifier: DirectControlID.renameSelected,
+                title: "Rename selected (\(model.checkedCleanupPIDs.count))\u{2026}",
+                help: "One sheet renames the whole selection, each with its own name."
+            ) {
+                model.requestDirectBatchRename(
+                    persistentIDs: Array(model.checkedCleanupPIDs)
+                )
+            }
+            .disabled(
+                model.checkedCleanupPIDs.isEmpty || model.isMutationBusy
+                    || model.isRunning || model.isScanning || model.isApplying
+                    || model.isUnattendedRunActive
+            )
+            AppKitActionButton(
                 identifier: WaveBControlID.cleanupDeleteSelected,
                 title: "Delete selected (\(model.checkedCleanupPIDs.count))",
                 prominent: true,

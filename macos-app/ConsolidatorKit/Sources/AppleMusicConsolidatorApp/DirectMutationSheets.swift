@@ -50,10 +50,8 @@ struct DirectMutationSheets: View {
                     deleteConfirmPanel(targets: targets)
                 case .rename(let target):
                     renamePanel(target: target)
-                case .batchRename:
-                    // Task 2 (model-only so far) replaces this with the real
-                    // batch-rename panel — editable rows, find/replace helper.
-                    EmptyView()
+                case .batchRename(let targets):
+                    BatchRenamePanel(model: model, targets: targets)
                 }
             } else {
                 EmptyView()
@@ -199,6 +197,108 @@ struct DirectMutationSheets: View {
         }
         .frame(maxWidth: 460, alignment: .leading)
         .padding(20)
+    }
+}
+
+// MARK: - batch rename (Task 2, Sergio 2026-08-06)
+
+/// The batch-rename sheet: a find/replace fill helper up top (literal,
+/// applied to every row's CURRENT draft), one scrolling row per selected
+/// playlist (current name -> editable draft, pre-filled), a caption, and
+/// Cancel / commit. Its own `View` (rather than a `DirectMutationSheets`
+/// method like the other panels) because the find/replace text lives ONLY
+/// in this sheet's UI — the model never sees it, only the drafts it
+/// produces via `applyBatchRenameReplacement`.
+///
+/// Copy is verbatim from the plan's Global Constraints: title
+/// `Rename <N> playlists`; caption `Unchanged names are skipped. Duplicates
+/// allowed.`; commit `Rename <N> playlists` where N is
+/// `batchRenameChangedCount`, disabled at 0. Content is bounded to
+/// `maxWidth: 560`; rows scroll inside `maxHeight: 420` (M8 rules: this
+/// panel is wider than the other 460pt sheets because it carries a
+/// find/replace row plus per-row editable fields).
+@MainActor
+private struct BatchRenamePanel: View {
+    @Bindable var model: AuditFlowModel
+    let targets: [PlaylistListing]
+
+    @State private var findText = ""
+    @State private var replaceText = ""
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Rename \(targets.count) playlists")
+                .font(.headline)
+                .lineLimit(1)
+            helperRow
+            ScrollView {
+                VStack(alignment: .leading, spacing: 8) {
+                    ForEach(targets, id: \.persistentId) { target in
+                        row(for: target)
+                    }
+                }
+            }
+            .frame(maxHeight: 420)
+            Text("Unchanged names are skipped. Duplicates allowed.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(2)
+            HStack(spacing: 12) {
+                Spacer()
+                AppKitActionButton(
+                    identifier: DirectControlID.confirmCancel,
+                    title: "Cancel"
+                ) {
+                    model.cancelPendingDirectAction()
+                }
+                AppKitActionButton(
+                    identifier: DirectControlID.confirmExecute,
+                    title: "Rename \(model.batchRenameChangedCount) playlists",
+                    prominent: true
+                ) {
+                    model.confirmPendingDirectAction()
+                }
+                .disabled(model.batchRenameChangedCount == 0)
+            }
+        }
+        .frame(maxWidth: 560, alignment: .leading)
+        .padding(20)
+    }
+
+    private var helperRow: some View {
+        HStack(spacing: 8) {
+            Text("Find")
+                .font(.callout)
+            AppKitTokenField(identifier: DirectControlID.batchRenameFind, text: $findText)
+                .frame(minWidth: 80, idealWidth: 120, maxWidth: 160)
+            Text("Replace with")
+                .font(.callout)
+            AppKitTokenField(identifier: DirectControlID.batchRenameReplace, text: $replaceText)
+                .frame(minWidth: 80, idealWidth: 120, maxWidth: 160)
+            AppKitActionButton(
+                identifier: DirectControlID.batchRenameApplyAll,
+                title: "Apply to all"
+            ) {
+                model.applyBatchRenameReplacement(find: findText, replaceWith: replaceText)
+            }
+        }
+    }
+
+    private func row(for target: PlaylistListing) -> some View {
+        let persistentId = target.persistentId
+        let draft = Binding<String>(
+            get: { model.batchRenameDrafts[persistentId] ?? "" },
+            set: { model.setBatchRenameDraft($0, for: persistentId) }
+        )
+        return HStack(spacing: 8) {
+            BrowserNameText(name: target.name)
+                .frame(minWidth: 120, maxWidth: 200, alignment: .leading)
+            AppKitTokenField(
+                identifier: DirectControlID.batchRenameField(persistentId),
+                text: draft
+            )
+            .frame(maxWidth: .infinity)
+        }
     }
 }
 
