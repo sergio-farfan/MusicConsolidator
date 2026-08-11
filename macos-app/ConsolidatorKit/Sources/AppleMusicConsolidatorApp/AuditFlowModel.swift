@@ -981,8 +981,9 @@ final class AuditFlowModel {
     /// independently mergeable/consolidatable through this set.
     private(set) var checkedFreeFormSingletonPersistentIds: Set<String> = []
     /// The shift-click range anchor (spec A4): the id of the last directly
-    /// clicked checkable row — a group name on the merge tab, a persistent
-    /// ID on the consolidate tab. Cleared on rescan and on a mode (tab)
+    /// clicked checkable row — on the merge tab a unified-row id of EITHER
+    /// kind (a group name or a singleton persistent ID; finding I4), on the
+    /// consolidate tab a persistent ID. Cleared on rescan and on a mode (tab)
     /// switch so a range can never span two listings or two tabs.
     private(set) var selectionAnchor: String?
     private(set) var queue: [AuditQueueItem] = []
@@ -1548,27 +1549,19 @@ final class AuditFlowModel {
     /// stays impossible by construction. The checked container stays an
     /// ARRAY with scalar-exact membership (never Set<String>: String
     /// hashing merges canonically-equivalent names); the range outcome is
-    /// reconciled back into it in section order, and checked groups hidden
+    /// reconciled back into it in display order, and checked groups hidden
     /// by the active filter survive untouched.
+    ///
+    /// Finding I4: `rangeSelect` walks the DISPLAYED UNIFIED ROWS
+    /// (`mergeRows`), not the group section alone — the sections were retired
+    /// as a browser surface on 2026-08-11, and a range over "groups only" was
+    /// invisible (it silently skipped every singleton row the user shift-
+    /// clicked across) and entirely dead on a library with 0 groups.
     func toggleChecked(name: String, rangeSelect: Bool) {
         guard let sections = displayedBrowserSections,
               sections.groups.contains(where: { scalarExact($0.name, name) })
         else { return }
-        let orderedIDs = sections.groups.map(\.name)
-        let outcome = applyRangeToggle(
-            anchor: rangeSelect ? selectionAnchor : nil,
-            clicked: name,
-            orderedIDs: orderedIDs,
-            current: Set(checkedGroupNames)
-        )
-        let hidden = checkedGroupNames.filter { checked in
-            !orderedIDs.contains { scalarExact($0, checked) }
-        }
-        let displayedChecked = orderedIDs.filter { candidate in
-            outcome.selection.contains { scalarExact($0, candidate) }
-        }
-        checkedGroupNames = hidden + displayedChecked
-        selectionAnchor = outcome.newAnchor
+        applyMergeRange(clicked: name, rangeSelect: rangeSelect, sections: sections)
     }
 
     /// Toggle one merge-tab SINGLETON checkbox (2026-08-06 free-form
@@ -1576,15 +1569,39 @@ final class AuditFlowModel {
     /// to a free-form merge alongside other checked groups/singletons
     /// (`startFreeFormMerge()`). Writes `checkedFreeFormSingletonPersistentIds`
     /// only — never `checkedPersistentIds`, the consolidate tab's own set.
-    func toggleCheckedFreeFormSingleton(persistentId: String) {
+    ///
+    /// Finding I4: range-capable now, over the same displayed unified rows as
+    /// the group toggle, and re-anchoring the same shared `selectionAnchor` —
+    /// so a shift-range spans BOTH kinds and the anchor is the last directly
+    /// clicked row of either kind.
+    func toggleCheckedFreeFormSingleton(persistentId: String, rangeSelect: Bool = false) {
         guard let sections = displayedBrowserSections,
               sections.singletons.contains(where: { scalarExact($0.persistentId, persistentId) })
         else { return }
-        if checkedFreeFormSingletonPersistentIds.contains(persistentId) {
-            checkedFreeFormSingletonPersistentIds.remove(persistentId)
-        } else {
-            checkedFreeFormSingletonPersistentIds.insert(persistentId)
-        }
+        applyMergeRange(clicked: persistentId, rangeSelect: rangeSelect, sections: sections)
+    }
+
+    /// The ONE merge-tab check writer behind both row kinds (finding I4):
+    /// resolves the DISPLAYED unified rows exactly as `MergeBrowserList`
+    /// renders them (already-filtered sections, the active sort), then applies
+    /// the pure range toggle and stores both containers plus the shared anchor.
+    private func applyMergeRange(
+        clicked: String, rangeSelect: Bool, sections: PlaylistBrowseSections
+    ) {
+        let rows = mergeRows(
+            sections: sections, needle: "",
+            key: browserSortKey, ascending: browserSortAscending
+        )
+        let outcome = applyMergeRangeToggle(
+            anchor: rangeSelect ? selectionAnchor : nil,
+            clicked: clicked,
+            rows: rows,
+            checkedGroupNames: checkedGroupNames,
+            checkedSingletonIds: checkedFreeFormSingletonPersistentIds
+        )
+        checkedGroupNames = outcome.groupNames
+        checkedFreeFormSingletonPersistentIds = outcome.singletonIds
+        selectionAnchor = outcome.newAnchor
     }
 
     /// True when this source already has its mode target in the loaded

@@ -8,10 +8,13 @@
 // contract-excluded pilot all included) — the confirm/rename sheet
 // (`DirectMutationSheets`, pinned separately) is the only thing standing
 // between a click and the guarded AppleScript writer. This suite pins the
-// NEAR MATCHES "Align names..." entry point and the AlignNamesSheet content
-// (pick list + N-1 rename rows), which are unchanged. Same offscreen
-// discipline as the M8-M11 suites; Music is never contacted (ScriptedRunner
-// only).
+// near-match INSPECTOR's "Align names..." entry point — reached since the
+// 2026-08-11 unification by selecting a badged row, singleton or group; the
+// standalone NEAR MATCHES section it used to sit in is retired (minor c) — its
+// per-variant-listing Delete/Rename... actions (finding I3), and the
+// AlignNamesSheet content (pick list + N-1 rename rows), which is unchanged.
+// Same offscreen discipline as the M8-M11 suites; Music is never contacted
+// (ScriptedRunner only).
 
 import AppKit
 import SwiftUI
@@ -217,6 +220,73 @@ struct BrowserMutationStructuralTests {
         )
         let frame = open.convert(open.bounds, to: fixture.hosting)
         #expect(browserBox.contains(frame))
+    }
+
+    // Finding I3: the near-match inspector is the ONLY inspector a badged row
+    // reaches (2026-08-11 routing, extended to group rows by finding I2), so
+    // without row actions the one class of row whose fix IS a rename had no
+    // Delete/Rename... at all. One pair per variant LISTING, pinned by
+    // persistent ID like every other row action.
+    @Test("a near-match cluster exposes Delete/Rename... per variant listing")
+    func nearMatchPerListingActions() async throws {
+        let (harness, fixture) = try await inspectorFixture(selecting: .nearMatch("Kdrama"))
+        defer { harness.cleanUp(); fixture.tearDown() }
+        // "Kdrama" (S-C) and "Kdrama " (S-D) — one listing per variant.
+        for pid in ["S-C", "S-D"] {
+            let deleteButton = try #require(
+                view(under: fixture.hosting, axIdentifier: WaveBControlID.rowDelete(pid))
+                    as? NSButton,
+                "no Delete for \(pid)"
+            )
+            #expect(deleteButton.isEnabled, "\(pid)")
+            #expect(
+                view(under: fixture.hosting, axIdentifier: WaveBControlID.rowRename(pid)) != nil,
+                "no Rename... for \(pid)"
+            )
+        }
+        // The click reaches the same direct-mutation staging every other row
+        // action uses (no gate, no plan artifact).
+        let delete = try #require(
+            view(under: fixture.hosting, axIdentifier: WaveBControlID.rowDelete("S-D")) as? NSButton
+        )
+        delete.performClick(nil)
+        guard case .delete(let targets) = harness.model.pendingDirectAction else {
+            Issue.record("the Delete click never reached requestDirectDelete")
+            return
+        }
+        #expect(targets.map(\.persistentId) == ["S-D"])
+    }
+
+    /// Same defect class as `groupCopyRowsCompactAtPaneWidth`: new per-row
+    /// actions in this pane have blown the ~220pt inspector's layout before.
+    @Test("the near-match inspector's per-listing actions stay contained at the real pane width")
+    func nearMatchActionsContainedAtPaneWidth() async throws {
+        let harness = try MutationGateHarness(
+            runner: ScriptedRunner(outputs: [browserFixtureListingWire()])
+        )
+        defer { harness.cleanUp() }
+        harness.model.rescanLibrary()
+        await harness.model.scanTask?.value
+        harness.model.browserSelection = .nearMatch("Kdrama")
+        let fixture = HostedFixture(
+            BrowserInspector(model: harness.model, sections: browserFixtureSections()),
+            width: 220, height: 800
+        )
+        defer { fixture.tearDown() }
+        let paneBox = NSRect(x: 0, y: 0, width: 220, height: 800)
+        for pid in ["S-C", "S-D"] {
+            let button = try #require(
+                view(under: fixture.hosting, axIdentifier: WaveBControlID.rowDelete(pid))
+                    as? NSButton
+            )
+            let frame = button.convert(button.bounds, to: fixture.hosting)
+            #expect(paneBox.contains(frame), "\(pid) Delete at \(frame)")
+        }
+        let open = try #require(
+            view(under: fixture.hosting, axIdentifier: WaveBControlID.alignOpen) as? NSButton
+        )
+        let openFrame = open.convert(open.bounds, to: fixture.hosting)
+        #expect(paneBox.contains(openFrame), "Align names\u{2026} at \(openFrame)")
     }
 
     @Test("the align sheet auto-selects a clear winner and lists the N-1 rename rows")

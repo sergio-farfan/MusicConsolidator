@@ -118,27 +118,43 @@ operation — keep it out of routine waves.
 ### Free-form merge (AGENTS.md amendment, 2026-08-06; unified list, 2026-08-11)
 
 The native app can also merge ANY user-selected set of playlists, with no
-same-name requirement. The Merge tab is ONE alphabetical ALL PLAYLISTS
-checklist: every same-name group is one row (its `xN` badge and per-copy
-counts unchanged) interleaved with every singleton, every row checkable —
-there is no separate MERGEABLE GROUPS / NEAR MATCHES / SINGLETONS anatomy to
-navigate. A checked group contributes all its copies, a checked singleton
-contributes itself, and the footer's second action, `Merge selected as
-one…`, enqueues ONE item for the whole selection; the footer's `Selected: N
-playlists` count is the total SOURCE playlist count behind the current
-selection (checked groups' copies summed, plus one per checked singleton),
-and `Merge selected as one…` enables at two or more source playlists.
-`Merge each group separately` (the renamed `Start Queue`; one merge per
-checked group) enables ONLY for a groups-only selection — checking even one
-singleton disables it, so a mixed pick cannot silently drop that singleton;
-its tooltip explains the trade-off. The tab's caption states the general
-shape: “Pick any playlists to combine — same-name groups merge as one
-unit.” A near match is still not a same-name group: its row carries a `near
-match` badge instead (tooltip: differs from its twin only by invisible
-characters or edge whitespace), and selecting the row still opens the
-inspector's rename hint and `Align names…` entry point — rename its variants
-in Music to merge them as a group, or check them individually as
-singletons.
+same-name requirement. The Merge tab is ONE ALPHABETICAL ALL PLAYLISTS
+checklist — it follows the active Name/Tracks sort like every other browser
+list, so “alphabetical” is its default, not a fixed order: every same-name
+group is one row (its `xN` badge and per-copy counts unchanged) interleaved
+with every singleton, and every GROUP row that has not already been merged is
+checkable (singleton rows are ALWAYS checkable — see below) — there is no
+separate MERGEABLE GROUPS / NEAR MATCHES / SINGLETONS anatomy to navigate. The
+header's `ALL PLAYLISTS (N)` counts SOURCE playlists (group copies plus
+singletons), the same noun the footer counts. A checked group contributes all
+its copies, a checked singleton contributes itself, and the footer's first
+action, `Merge selected as one…`, enqueues ONE item for the whole selection;
+the footer's `Selected: N playlists` count is the total SOURCE playlist count
+behind the current selection (checked groups' copies summed, plus one per
+checked singleton), and `Merge selected as one…` enables at two or more source
+playlists and carries the Return key. `Merge each group separately` (the
+renamed `Start Queue`; one merge per checked group) enables ONLY for a
+groups-only selection — checking even one singleton disables it, so a mixed
+pick cannot silently drop that singleton; its tooltip explains the trade-off.
+Shift-click ranges over the DISPLAYED rows regardless of kind: one range may
+span group and singleton rows, and each row it crosses is checked into its own
+selection (group names, singleton persistent IDs), off one shared anchor. The
+tab's caption states the general shape: “Pick any playlists to combine —
+same-name groups merge as one unit.”
+
+An `already merged` chip marks a row whose `<name> — Merged` playlist already
+exists. On a GROUP row that is the group's own merge target, so the row's
+checkbox is disabled until the target is deleted; on a SINGLETON row it is
+purely informational — a free-form merge's target is named after its FIRST
+source, so an existing `<own name> — Merged` sibling is no collision and the
+singleton stays checkable for future merges.
+
+A near match is still not a same-name group: its row carries a `near match`
+badge instead (tooltip: differs from its twin only by invisible characters or
+edge whitespace), on group and singleton rows alike, and selecting the row
+opens the inspector's rename hint, its per-listing `Delete` / `Rename…`
+actions, and its `Align names…` entry point — rename its variants in Music to
+merge them as a group, or check them individually as sources.
 
 The target name is automatic — `<first source> — Merged`, where "first" is the
 first source in ascending Apple Music playlist-ID order (the same copy order
@@ -205,7 +221,10 @@ three-column Step | Status | Elapsed table that shows all seven guarded
 steps up front. The source browser supports shift-click range selection
 plus Cmd+A / Cmd+D, scoped per tab (the Merge tab's unified list selects
 every eligible group AND singleton, skipping already-processed sources of
-either kind; the Consolidate tab selects every checkable row). Every surface that
+either kind; the Consolidate tab selects every checkable row). A range walks
+the rows as DISPLAYED: on the Merge tab that is the unified list, so one range
+can cross group and singleton rows and each crossed row joins its own
+selection. Every surface that
 names a playlist shows its track count in one shared wording: "551 tracks"
 for a single playlist, per-copy counts joined with " + " for merge groups
 ("9 + 10 tracks"). Run surfaces show the freshest audit-derived count when
@@ -284,12 +303,15 @@ direct-mutation sheet. Like every direct action, batch rename writes no
 The Library and Cleanup lists still order by clickable
 Name/Tracks headers — display-only; ordering never feeds a mutation.
 Browser rows (Merge/Consolidate tabs) carry the same Delete and Rename…
-actions. A near match's inspector (reached by selecting its badged row on
-the Merge tab, or its warning icon's row on the Consolidate tab) carries
-"Align names…": the canonical name is the variant equal to its own NFC form
-with no leading/trailing whitespace and no invisible scalars (Sergio picks
-when none or several qualify), and each deviant copy in the cluster opens
-the same pre-filled rename sheet — one confirm per rename, no typed gate.
+actions. A near match's inspector — reached by selecting its badged row on the
+MERGE tab; the Consolidate tab only flags such a row with a warning icon and
+points at the Merge tab, since selecting it there opens the ordinary
+single-copy or group inspector — carries "Align names…" plus one
+Delete / Rename… pair per listing of every variant. The canonical name is the
+variant equal to its own NFC form with no leading/trailing whitespace and no
+invisible scalars (Sergio picks when none or several qualify), and each deviant
+copy in the cluster opens the same pre-filled rename sheet — one confirm per
+rename, no typed gate.
 
 As the pilot section above records, deleting a playlist removes the
 playlist, not its songs from the library. Source playlists of merges and

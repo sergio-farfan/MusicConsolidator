@@ -359,27 +359,35 @@ struct SourceSelectionView: View {
     /// same underlying selection two different ways: `Merge each group
     /// separately` (Start Queue's new title; same control id) runs one
     /// merge per checked group and so only makes sense for a groups-only
-    /// selection; `Merge selected as one…` is unchanged. The Start Queue
-    /// control shares its id with the consolidate footer's (exactly one
-    /// renders at a time).
+    /// selection; `Merge selected as one…` is unchanged, and carries the
+    /// Return key equivalent (`prominent`) as the de facto primary action
+    /// (final review minor a). The Start Queue control shares its id with the
+    /// consolidate footer's (exactly one renders at a time), where it keeps
+    /// its own prominence — only the merge footer moved it.
+    /// Every verbatim string here comes from `MergeSurfaceCopy`, pinned by
+    /// `MergeSurfaceCopyTests`.
     @ViewBuilder
     private var mergeFooter: some View {
         if model.isQueueActive {
             QueueRailView(model: model)
         } else {
             HStack(spacing: 12) {
-                Text("Selected: \(model.mergeSelectedSourceCount) playlists")
+                Text(MergeSurfaceCopy.selectedSources(count: model.mergeSelectedSourceCount))
                     .bold()
                 Spacer()
                 // 2026-08-06 free-form design: combines the WHOLE current
                 // selection (every checked group's copies + every checked
                 // singleton) into ONE new playlist, named and described
-                // automatically.
+                // automatically. Final review minor (a): this is the de facto
+                // primary action of the unified list (it accepts ANY
+                // selection, groups-only included), so Return — the
+                // `prominent` key equivalent — belongs here, not on the
+                // groups-only action.
                 AppKitActionButton(
                     identifier: M10ControlID.mergeAsOne,
-                    title: "Merge selected as one\u{2026}",
-                    help: "Combine every checked group and singleton into ONE new "
-                        + "playlist, named \u{201C}<first source> \u{2014} Merged\u{201D}."
+                    title: MergeSurfaceCopy.mergeAsOneTitle,
+                    prominent: true,
+                    help: MergeSurfaceCopy.mergeAsOneHelp
                 ) {
                     model.startFreeFormMerge()
                 }
@@ -397,10 +405,8 @@ struct SourceSelectionView: View {
                 // "Merge selected as one…" instead.
                 AppKitActionButton(
                     identifier: M8ControlID.startQueue,
-                    title: "Merge each group separately",
-                    prominent: true,
-                    help: "Runs one merge per checked group. Uncheck singletons to "
-                        + "use this, or use Merge selected as one."
+                    title: MergeSurfaceCopy.mergeEachGroupTitle,
+                    help: MergeSurfaceCopy.mergeEachGroupHelp
                 ) {
                     model.startQueue()
                 }

@@ -4,15 +4,17 @@
 // M8 — the sectioned source browser (design Option B), recomposed in fix
 // round 2 and unified in the 2026-08-11 merge-list redesign. Merge tab: ONE
 // alphabetical ALL PLAYLISTS checklist (`mergeRows`) — a same-name group is
-// one row (all copies), interleaved with every singleton, every row
-// checkable — where a tap highlights ONE row for the inspector, GROUP rows
-// carry native checkboxes building the merge batch queue
-// (`toggleChecked(name:)`, M10), and SINGLETON rows carry live checkboxes
-// too (2026-08-06 free-form design: they contribute to "Merge selected as
-// one…"). A near-match singleton carries a badge and selects its cluster
-// (not itself) so the inspector's rename hint + Align names… stay reachable
-// without a separate non-checkable cluster row — the old MERGEABLE GROUPS /
-// NEAR MATCHES / SINGLETONS three-section anatomy and its collapsed-
+// one row (all copies), interleaved with every singleton — where a tap
+// highlights ONE row for the inspector, GROUP rows carry native checkboxes
+// building the merge batch queue (`toggleChecked(name:)`, M10; disabled once
+// that group's own "<name> — Merged" target exists), and SINGLETON rows carry
+// live checkboxes too (2026-08-06 free-form design: they contribute to "Merge
+// selected as one…", and stay live even with a "<own name> — Merged" sibling —
+// final review finding C1). A near-match row of EITHER kind carries a badge
+// and selects its cluster (not itself) so the inspector's rename hint,
+// per-listing Delete/Rename…, and Align names… stay reachable without a
+// separate non-checkable cluster row (findings I2/I3) — the old MERGEABLE
+// GROUPS / NEAR MATCHES / SINGLETONS three-section anatomy and its collapsed-
 // singletons disclosure are retired. Consolidate tab: the flat alphabetical
 // ALL PLAYLISTS list with native checkboxes building the consolidate batch
 // queue (group members disabled — the engine fails closed on ambiguous
@@ -89,8 +91,17 @@ extension View {
 func nearMatchClusterName(
     for listing: PlaylistListing, in sections: PlaylistBrowseSections
 ) -> String? {
+    nearMatchClusterName(forName: listing.name, in: sections)
+}
+
+/// The near-match cluster an exact NAME belongs to (the class-level lookup
+/// behind both row kinds' routing — near-match variants ARE exact-name
+/// classes, and a class with >= 2 copies is a group).
+func nearMatchClusterName(
+    forName name: String, in sections: PlaylistBrowseSections
+) -> String? {
     sections.nearMatches.first { cluster in
-        cluster.variants.contains { scalarExact($0.name, listing.name) }
+        cluster.variants.contains { scalarExact($0.name, name) }
     }?.normalizedName
 }
 
@@ -114,20 +125,34 @@ func mergeSingletonRowSelection(
     return .nearMatch(clusterName)
 }
 
-/// One "already merged" advisory chip, shared by group and singleton rows.
-private func alreadyMergedHelp(sourceName: String, plural: Bool) -> String {
-    "Already merged: \u{201C}\(sourceName) \u{2014} Merged\u{201D} exists. Review "
-        + "it, then clean up the \(plural ? "sources" : "source"); delete it "
-        + "first to reprocess."
+/// The row-tap selection target for a merge-tab GROUP row (final review
+/// finding I2), mirroring `mergeSingletonRowSelection`: a group whose exact
+/// name is one variant of a near-match cluster selects the CLUSTER, so an
+/// ALL-GROUP cluster ("Trance 2022" x2 vs "Trance 2022 " x2) still reaches the
+/// near-match inspector's rename hint and Align names… entry point — before
+/// this, only singleton variants could, and an all-group cluster had no route
+/// to Align names… at all. An unbadged group selects itself.
+func mergeGroupRowSelection(
+    for group: PlaylistNameGroup,
+    nearMatchTwin: String?,
+    in sections: PlaylistBrowseSections
+) -> BrowserSelection {
+    guard nearMatchTwin != nil,
+          let clusterName = nearMatchClusterName(forName: group.name, in: sections)
+    else {
+        return .group(group.name)
+    }
+    return .nearMatch(clusterName)
 }
 
 /// The merge tab's unified ALL PLAYLISTS checklist (2026-08-11 design): one
 /// alphabetical `List` of `mergeRows` — a same-name group (one row, all
-/// copies) interleaved with every singleton, every row checkable. Replaces
-/// the old MERGEABLE GROUPS / NEAR MATCHES / SINGLETONS three-section
-/// anatomy and its collapsed-singletons disclosure entirely: a near match's
-/// rename hint now surfaces as a badge on its (still checkable) singleton
-/// row instead of a separate non-checkable cluster row.
+/// copies) interleaved with every singleton; every singleton row is
+/// checkable, and a group row is checkable until its own merge target
+/// exists. Replaces the old MERGEABLE GROUPS / NEAR MATCHES / SINGLETONS
+/// three-section anatomy and its collapsed-singletons disclosure entirely: a
+/// near match's rename hint now surfaces as a badge on its (still checkable)
+/// row — singleton or group — instead of a separate non-checkable cluster row.
 struct MergeBrowserList: View {
     @Bindable var model: AuditFlowModel
     let sections: PlaylistBrowseSections
@@ -144,15 +169,20 @@ struct MergeBrowserList: View {
             Section {
                 ForEach(rows) { row in
                     switch row {
-                    case .group(let group):
-                        groupRow(group)
+                    case .group(let group, let nearMatchTwin):
+                        groupRow(group, nearMatchTwin: nearMatchTwin)
                     case .singleton(let listing, let nearMatchTwin):
                         singletonRow(listing, nearMatchTwin: nearMatchTwin)
                     }
                 }
             } header: {
                 HStack(spacing: 8) {
-                    Text("ALL PLAYLISTS (\(rows.count))")
+                    // Minor (b): the header counts SOURCE playlists (group
+                    // copies + singletons), the same noun the consolidate
+                    // header and this tab's own footer count — not rows.
+                    Text(MergeSurfaceCopy.allPlaylistsHeader(
+                        sourceCount: mergeSourceCount(rows: rows)
+                    ))
                     BrowserSortHeader(model: model)
                     Spacer()
                     AppKitActionButton(
@@ -185,10 +215,14 @@ struct MergeBrowserList: View {
     // MARK: rows
 
     /// A same-name group row: name, `xN` badge, per-copy counts, checkbox ->
-    /// `toggleChecked(name:)`, already-merged chip — unchanged from the old
-    /// MERGEABLE GROUPS section row.
+    /// `toggleChecked(name:)`, already-merged chip, PLUS a near match badge
+    /// when this group's exact name is one variant of a cluster (finding I2 —
+    /// an all-group cluster is possible and had no route to Align names…).
+    /// A group row's per-group merge target IS "<name> — Merged", so an
+    /// existing target genuinely blocks a re-run and the checkbox stays
+    /// disabled here (unlike a singleton row's — finding C1).
     @ViewBuilder
-    private func groupRow(_ group: PlaylistNameGroup) -> some View {
+    private func groupRow(_ group: PlaylistNameGroup, nearMatchTwin: String?) -> some View {
         let alreadyDone = model.isAlreadyProcessed(name: group.name)
         HStack(spacing: 8) {
             // M10: check a group to queue its merge. Checking is
@@ -198,7 +232,7 @@ struct MergeBrowserList: View {
                 identifier: M10ControlID.groupCheckbox(group.name),
                 isOn: model.isGroupChecked(group.name),
                 help: alreadyDone
-                    ? alreadyMergedHelp(sourceName: group.name, plural: true)
+                    ? MergeSurfaceCopy.alreadyMergedGroupHelp(sourceName: group.name)
                     : "Queue \u{201C}\(group.name)\u{201D} "
                         + "(\(group.copies.count) copies) for merging."
             ) {
@@ -210,15 +244,25 @@ struct MergeBrowserList: View {
             .disabled(alreadyDone || model.isQueueActive)
             if alreadyDone {
                 Chip(text: "already merged", tint: .green)
+                    .help(MergeSurfaceCopy.alreadyMergedGroupHelp(sourceName: group.name))
             }
             BrowserNameText(name: group.name)
             Chip(text: "x\(group.copies.count)", tint: .blue)
+            if let nearMatchTwin {
+                Chip(text: "near match", tint: .orange)
+                    .help(MergeSurfaceCopy.nearMatchChipHelp(twin: nearMatchTwin))
+            }
             Spacer()
             Text(trackCountText(copyCounts: group.copies.map(\.trackCount)))
                 .foregroundStyle(.secondary)
                 .monospacedDigit()
         }
-        .browserRow(model, selects: .group(group.name))
+        .browserRow(
+            model,
+            selects: mergeGroupRowSelection(
+                for: group, nearMatchTwin: nearMatchTwin, in: sections
+            )
+        )
     }
 
     /// A singleton row: checkbox -> `toggleCheckedFreeFormSingleton`,
@@ -228,6 +272,14 @@ struct MergeBrowserList: View {
     /// match badge when this row carries a twin. Selecting the row targets
     /// the near-match cluster instead of the plain singleton when a twin is
     /// present, keeping the rename hint reachable.
+    ///
+    /// Finding C1: the checkbox is NEVER disabled by `isAlreadyProcessed`.
+    /// A singleton's checkbox contributes a SOURCE to "Merge selected as
+    /// one…", whose target is named after the FIRST source in playlist-ID
+    /// order — an existing "<own name> — Merged" sibling is not a target
+    /// collision for that merge, so disabling the row would permanently
+    /// poison every free-form merge's first source for future merges. The
+    /// chip stays as a purely informational advisory.
     @ViewBuilder
     private func singletonRow(_ listing: PlaylistListing, nearMatchTwin: String?) -> some View {
         let alreadyDone = model.isAlreadyProcessed(name: listing.name)
@@ -238,26 +290,26 @@ struct MergeBrowserList: View {
             AppKitCheckbox(
                 identifier: M10ControlID.singletonCheckbox(listing.persistentId),
                 isOn: model.isFreeFormSingletonChecked(persistentId: listing.persistentId),
-                help: alreadyDone
-                    ? alreadyMergedHelp(sourceName: listing.name, plural: false)
-                    : "Check to include \u{201C}\(listing.name)\u{201D} as a "
-                        + "source in \u{201C}Merge selected as one\u{2026}\u{201D}."
+                help: "Check to include \u{201C}\(listing.name)\u{201D} as a "
+                    + "source in \u{201C}Merge selected as one\u{2026}\u{201D}."
             ) {
-                model.toggleCheckedFreeFormSingleton(persistentId: listing.persistentId)
+                model.toggleCheckedFreeFormSingleton(
+                    persistentId: listing.persistentId,
+                    rangeSelect: NSEvent.modifierFlags.contains(.shift)
+                )
             }
-            .disabled(alreadyDone || model.isQueueActive)
+            .disabled(model.isQueueActive)
             if alreadyDone {
                 Chip(text: "already merged", tint: .green)
+                    .help(MergeSurfaceCopy.alreadyMergedSingletonAdvisory(
+                        sourceName: listing.name
+                    ))
             }
             BrowserNameText(name: listing.name)
             listingBadges(listing)
             if let nearMatchTwin {
                 Chip(text: "near match", tint: .orange)
-                    .help(
-                        "Near match: differs from \u{201C}\(nearMatchTwin)\u{201D} only "
-                            + "by invisible characters or edge whitespace \u{2014} select "
-                            + "the row for the rename hint."
-                    )
+                    .help(MergeSurfaceCopy.nearMatchChipHelp(twin: nearMatchTwin))
             }
             Spacer()
             Text(trackCountText(copyCounts: [listing.trackCount]))
@@ -579,6 +631,17 @@ struct BrowserInspector: View {
                         .font(.caption)
                         .foregroundStyle(.primary)
                         .textSelection(.enabled)
+                    }
+                    // Finding I3: the same Delete/Rename… the singleton and
+                    // group inspectors carry, per LISTING of every variant.
+                    // This inspector is now the ONLY inspector a badged row
+                    // reaches (2026-08-11 routing, extended to group rows by
+                    // finding I2), so without these a near-match twin — the
+                    // one class of row whose fix IS a rename — was the only
+                    // row in the browser with no row actions at all.
+                    ForEach(variant.listings, id: \.persistentId) { listing in
+                        IdentifierText(text: listing.persistentId)
+                        mutationActions(for: listing)
                     }
                 }
             }

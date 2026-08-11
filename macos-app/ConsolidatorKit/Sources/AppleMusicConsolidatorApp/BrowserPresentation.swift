@@ -429,24 +429,55 @@ nonisolated func applyBrowserSort<T>(
 
 /// One row of the merge tab's unified ALL PLAYLISTS checklist (2026-08-11
 /// design): a same-name group (>= 2 copies, one row for the whole group) or
-/// a singleton, optionally carrying its near-match twin's display name.
-/// `id` is the group's exact name or the singleton's persistent ID — the
-/// same identities `checkedGroupNames`/`checkedFreeFormSingletonPersistentIds`
-/// already key by.
+/// a singleton, either one optionally carrying its near-match twin's display
+/// name. `id` is the group's exact name or the singleton's persistent ID —
+/// the same identities `checkedGroupNames`/
+/// `checkedFreeFormSingletonPersistentIds` already key by.
+///
+/// `nearMatchTwin` is the OTHER variant's exact display name when this row's
+/// own name is one of the (>= 2) variants of a `sections.nearMatches`
+/// cluster; `nil` for a row outside every cluster. It carries on BOTH kinds
+/// (final review finding I2): the near-match buckets are built over exact-name
+/// CLASSES, and a class with >= 2 copies is a GROUP — so an all-group cluster
+/// ("Trance 2022" x2 vs "Trance 2022 " x2) exists, and without the twin on
+/// group rows its badge, and with it the near-match inspector's rename hint
+/// and Align names… entry point, were unreachable.
 nonisolated enum MergeBrowserRow: Identifiable, Equatable, Sendable {
-    case group(PlaylistNameGroup)
-    /// `nearMatchTwin` is the OTHER variant's exact display name when this
-    /// singleton's own name is one of the (>= 2) variants of a
-    /// `sections.nearMatches` cluster; `nil` for a singleton outside every
-    /// cluster.
+    case group(PlaylistNameGroup, nearMatchTwin: String?)
     case singleton(PlaylistListing, nearMatchTwin: String?)
 
     var id: String {
         switch self {
-        case .group(let group): return group.name
+        case .group(let group, _): return group.name
         case .singleton(let listing, _): return listing.persistentId
         }
     }
+
+    /// The row's near-match twin, whatever its kind.
+    var nearMatchTwin: String? {
+        switch self {
+        case .group(_, let twin), .singleton(_, let twin): return twin
+        }
+    }
+
+    /// How many SOURCE playlists this row contributes to a merge: all of a
+    /// group's copies, or the one singleton.
+    var sourcePlaylistCount: Int {
+        switch self {
+        case .group(let group, _): return group.copies.count
+        case .singleton: return 1
+        }
+    }
+}
+
+/// The unified list header's count (2026-08-11 design, final review minor b):
+/// SOURCE playlists across the displayed rows — every group row's copies plus
+/// one per singleton row — so `ALL PLAYLISTS (N)` counts the same noun on the
+/// merge tab as it does on the consolidate tab (which counts
+/// `sections.allPlaylists`), and matches the footer's own
+/// `Selected: N playlists` noun.
+nonisolated func mergeSourceCount(rows: [MergeBrowserRow]) -> Int {
+    rows.reduce(0) { $0 + $1.sourcePlaylistCount }
 }
 
 /// Build the unified merge-tab checklist: every eligible same-name group
@@ -485,26 +516,33 @@ nonisolated func mergeRows(
         } ?? Int.max
     }
 
-    func nearMatchTwin(for listing: PlaylistListing) -> String? {
+    // Keyed by the row's exact NAME, not by kind: a near-match cluster's
+    // variants are exact-name classes, and a class with >= 2 copies is a
+    // group — so this resolves the twin for group rows and singleton rows
+    // alike (finding I2).
+    func nearMatchTwin(forName name: String) -> String? {
         for cluster in sections.nearMatches {
-            guard cluster.variants.contains(where: { scalarExact($0.name, listing.name) })
+            guard cluster.variants.contains(where: { scalarExact($0.name, name) })
             else { continue }
             // The first OTHER variant, in the cluster's own (alphabetical)
             // variant order — deterministic; a cluster with more than two
             // variants simply keeps the first one that is not this row's
             // own name (documented simplification, brief 2026-08-11).
-            return cluster.variants.first { !scalarExact($0.name, listing.name) }?.name
+            return cluster.variants.first { !scalarExact($0.name, name) }?.name
         }
         return nil
     }
 
     var ranked: [(position: Int, row: MergeBrowserRow)] = groups.map { group in
-        (position(ofPersistentId: group.copies[0].persistentId), .group(group))
+        (
+            position(ofPersistentId: group.copies[0].persistentId),
+            .group(group, nearMatchTwin: nearMatchTwin(forName: group.name))
+        )
     }
     ranked += singletons.map { listing in
         (
             position(ofPersistentId: listing.persistentId),
-            .singleton(listing, nearMatchTwin: nearMatchTwin(for: listing))
+            .singleton(listing, nearMatchTwin: nearMatchTwin(forName: listing.name))
         )
     }
     ranked.sort { $0.position < $1.position }
@@ -512,8 +550,148 @@ nonisolated func mergeRows(
 
     return applyBrowserSort(rows, key: key, ascending: ascending) { row in
         switch row {
-        case .group(let group): return group.combinedTrackCount
+        case .group(let group, _): return group.combinedTrackCount
         case .singleton(let listing, _): return listing.trackCount
         }
+    }
+}
+
+// MARK: - shift-click range over the unified merge rows (finding I4)
+
+/// Pure shift-click range toggle over the merge tab's DISPLAYED unified rows.
+/// `applyRangeToggle` (above) walks ONE checkable id space; the unified list
+/// mixes two — group names in `checkedGroupNames` and singleton persistent IDs
+/// in `checkedFreeFormSingletonPersistentIds` — so a range that crosses both
+/// kinds must write each crossed row into ITS OWN container. Semantics mirror
+/// `applyRangeToggle` exactly: the clicked row's NEW state applies to the
+/// inclusive [anchor, clicked] span of DISPLAY order in either direction; no
+/// usable anchor (nil, or absent from `rows`) degrades to a plain toggle of the
+/// clicked row; the returned anchor is ALWAYS `clicked` (the anchor is the last
+/// directly clicked row, of EITHER kind).
+///
+/// Both containers come in whole and go out whole: checked group names hidden
+/// by the active filter keep their relative order ahead of the displayed ones
+/// (the pre-unification reconciliation, preserved), and hidden singleton checks
+/// survive untouched because only displayed persistent IDs are written. Group
+/// membership is SCALAR-exact throughout — never `Set<String>`, whose hashing
+/// merges canonically-equivalent names.
+///
+/// A `clicked` id absent from `rows` leaves both containers untouched and still
+/// re-anchors (a bare id carries no row kind, so there is nothing to toggle);
+/// the model's own guards make that unreachable in practice.
+nonisolated func applyMergeRangeToggle(
+    anchor: String?,
+    clicked: String,
+    rows: [MergeBrowserRow],
+    checkedGroupNames: [String],
+    checkedSingletonIds: Set<String>
+) -> (groupNames: [String], singletonIds: Set<String>, newAnchor: String) {
+    func isChecked(_ row: MergeBrowserRow) -> Bool {
+        switch row {
+        case .group(let group, _):
+            return checkedGroupNames.contains { scalarExact($0, group.name) }
+        case .singleton(let listing, _):
+            return checkedSingletonIds.contains(listing.persistentId)
+        }
+    }
+
+    let orderedIDs = rows.map(\.id)
+    guard let clickedIndex = orderedIDs.firstIndex(where: { scalarExact($0, clicked) }) else {
+        return (checkedGroupNames, checkedSingletonIds, clicked)
+    }
+    let newState = !isChecked(rows[clickedIndex])
+    let anchorIndex = anchor.flatMap { candidate in
+        orderedIDs.firstIndex { scalarExact($0, candidate) }
+    }
+    let otherEnd = anchorIndex ?? clickedIndex
+    let span = min(otherEnd, clickedIndex)...max(otherEnd, clickedIndex)
+
+    var singletonIds = checkedSingletonIds
+    var crossedGroupNames: [String] = []
+    for row in rows[span] {
+        switch row {
+        case .group(let group, _):
+            crossedGroupNames.append(group.name)
+        case .singleton(let listing, _):
+            if newState {
+                singletonIds.insert(listing.persistentId)
+            } else {
+                singletonIds.remove(listing.persistentId)
+            }
+        }
+    }
+
+    let displayedGroupNames: [String] = rows.compactMap { row in
+        guard case .group(let group, _) = row else { return nil }
+        return group.name
+    }
+    let hidden = checkedGroupNames.filter { checked in
+        !displayedGroupNames.contains { scalarExact($0, checked) }
+    }
+    let displayedChecked = displayedGroupNames.filter { name in
+        if crossedGroupNames.contains(where: { scalarExact($0, name) }) { return newState }
+        return checkedGroupNames.contains { scalarExact($0, name) }
+    }
+    return (hidden + displayedChecked, singletonIds, clicked)
+}
+
+// MARK: - unified merge surface copy (final review minor d)
+
+/// Every verbatim string the unified merge surface shows outside a plan
+/// artifact — header, footer count, both footer actions with their help text,
+/// and the two row advisories. Centralized so `MergeSurfaceCopyTests` can pin
+/// the exact wording: these strings are the surface's contract with Sergio
+/// (the spec quotes several of them verbatim), and a silent copy edit is
+/// exactly the class of change that shipped an imperative "delete it first to
+/// reprocess" advisory onto a row that no longer needs deleting (finding C1).
+nonisolated enum MergeSurfaceCopy {
+    /// The unified list's section header. `sourceCount` is
+    /// `mergeSourceCount(rows:)` — group copies plus singletons, the same
+    /// noun the footer counts.
+    static func allPlaylistsHeader(sourceCount: Int) -> String {
+        "ALL PLAYLISTS (\(sourceCount))"
+    }
+
+    /// The footer's selection readout (`mergeSelectedSourceCount`).
+    static func selectedSources(count: Int) -> String {
+        "Selected: \(count) playlists"
+    }
+
+    static let mergeAsOneTitle = "Merge selected as one\u{2026}"
+
+    static let mergeAsOneHelp =
+        "Combine every checked group and singleton into ONE new playlist, "
+        + "named \u{201C}<first source> \u{2014} Merged\u{201D}."
+
+    static let mergeEachGroupTitle = "Merge each group separately"
+
+    static let mergeEachGroupHelp =
+        "Runs one merge per checked group. Uncheck singletons to use this, "
+        + "or use Merge selected as one."
+
+    /// The `near match` chip's tooltip (both row kinds).
+    static func nearMatchChipHelp(twin: String) -> String {
+        "Near match: differs from \u{201C}\(twin)\u{201D} only by invisible "
+            + "characters or edge whitespace \u{2014} select the row for the "
+            + "rename hint."
+    }
+
+    /// The `already merged` chip's tooltip on a SINGLETON row — purely
+    /// informational (finding C1): a singleton's checkbox contributes a SOURCE
+    /// to "Merge selected as one…", whose target is named after the FIRST
+    /// source, so an existing "<own name> — Merged" sibling is not a collision
+    /// and nothing has to be deleted to use this row again.
+    static func alreadyMergedSingletonAdvisory(sourceName: String) -> String {
+        "A \u{201C}\(sourceName) \u{2014} Merged\u{201D} playlist exists "
+            + "\u{2014} created by an earlier merge."
+    }
+
+    /// The `already merged` chip/checkbox tooltip on a GROUP row, where the
+    /// per-group merge target IS "<name> — Merged": that target already
+    /// existing does block a re-run, so this one stays imperative.
+    static func alreadyMergedGroupHelp(sourceName: String) -> String {
+        "Already merged: \u{201C}\(sourceName) \u{2014} Merged\u{201D} exists. "
+            + "Review it, then clean up the sources; delete it first to "
+            + "reprocess."
     }
 }

@@ -53,7 +53,7 @@ struct MergeRowsTests {
 
         let rows = mergeRows(sections: sections, needle: "", key: .name, ascending: true)
         #expect(rows.map(\.id) == ["L-1", "M-Group", "N-1"])
-        guard case .group(let group) = rows[1] else {
+        guard case .group(let group, _) = rows[1] else {
             Issue.record("expected the middle row to be the M-Group group row")
             return
         }
@@ -107,6 +107,62 @@ struct MergeRowsTests {
         } else {
             Issue.record("expected F-1 to be a singleton row")
         }
+    }
+
+    // Finding I2: near-match clusters bucket exact-name CLASSES, and a class
+    // with >= 2 copies is a GROUP — so an all-group cluster exists, and its
+    // rows carried no twin (hence no badge, and no route to the near-match
+    // inspector's rename hint / Align names…) until the group case gained
+    // `nearMatchTwin`.
+    @Test("an ALL-GROUP near-match cluster puts the twin on both GROUP rows")
+    func nearMatchTwinOnGroupRows() {
+        let sections = buildPlaylistBrowseSections(from: [
+            rowListing(id: 10, name: "Trance 2022", pid: "T-A"),
+            rowListing(id: 11, name: "Trance 2022", pid: "T-B"),
+            rowListing(id: 20, name: "Trance 2022 ", pid: "T-C"),
+            rowListing(id: 21, name: "Trance 2022 ", pid: "T-D"),
+            rowListing(id: 30, name: "Foxtrot", pid: "F-1"),
+        ])
+        #expect(sections.singletons.map(\.persistentId) == ["F-1"], "both variants are GROUPS here")
+        #expect(sections.nearMatches.map(\.normalizedName) == ["Trance 2022"])
+
+        let rows = mergeRows(sections: sections, needle: "", key: .name, ascending: true)
+        guard let plainRow = rows.first(where: { $0.id == "Trance 2022" }),
+              case .group(let plain, let plainTwin) = plainRow else {
+            Issue.record("expected a group row for \u{201C}Trance 2022\u{201D}")
+            return
+        }
+        #expect(plain.copies.map(\.persistentId) == ["T-A", "T-B"])
+        #expect(plainTwin == "Trance 2022 ")
+        guard let spacedRow = rows.first(where: { $0.id == "Trance 2022 " }),
+              case .group(_, let spacedTwin) = spacedRow else {
+            Issue.record("expected a group row for the trailing-space twin")
+            return
+        }
+        #expect(spacedTwin == "Trance 2022")
+        // A group outside every cluster still carries nil, and the row's
+        // kind-agnostic accessor agrees with the payload.
+        #expect(rows.first { $0.id == "F-1" }?.nearMatchTwin == nil)
+        #expect(rows.first { $0.id == "Trance 2022" }?.nearMatchTwin == "Trance 2022 ")
+    }
+
+    // Final review minor (b): the header counts SOURCE playlists — group
+    // copies plus singletons — the same noun as the footer and as the
+    // consolidate tab's own header, not rows.
+    @Test("the header count is the row set's SOURCE playlist count, not its row count")
+    func headerCountsSourcePlaylists() {
+        let sections = buildPlaylistBrowseSections(from: [
+            rowListing(id: 10, name: "Trance 2022", pid: "T-LOW"),
+            rowListing(id: 20, name: "Trance 2022", pid: "T-HIGH"),
+            rowListing(id: 30, name: "Solo List", pid: "S-SOLO"),
+        ])
+        let rows = mergeRows(sections: sections, needle: "", key: .name, ascending: true)
+        #expect(rows.count == 2, "one group row plus one singleton row")
+        #expect(mergeSourceCount(rows: rows) == 3, "2 group copies + 1 singleton")
+        #expect(
+            MergeSurfaceCopy.allPlaylistsHeader(sourceCount: mergeSourceCount(rows: rows))
+                == "ALL PLAYLISTS (3)"
+        )
     }
 
     @Test("count-sort uses a group's SUMMED copy counts, not its number of copies")
@@ -272,6 +328,102 @@ struct MergeSingletonRowSelectionTests {
     }
 }
 
+// MARK: - mergeGroupRowSelection (pure, display-only; finding I2)
+
+/// A 2-copy group vs its trailing-space 2-copy twin plus one plain group —
+/// the ALL-GROUP near-match cluster the singleton-only routing could not
+/// reach.
+private func allGroupClusterSections() -> PlaylistBrowseSections {
+    buildPlaylistBrowseSections(from: [
+        rowListing(id: 10, name: "Trance 2022", pid: "T-A"),
+        rowListing(id: 11, name: "Trance 2022", pid: "T-B"),
+        rowListing(id: 20, name: "Trance 2022 ", pid: "T-C"),
+        rowListing(id: 21, name: "Trance 2022 ", pid: "T-D"),
+        rowListing(id: 30, name: "House Anthems", pid: "H-1"),
+        rowListing(id: 31, name: "House Anthems", pid: "H-2"),
+    ])
+}
+
+@Suite("mergeGroupRowSelection (pure, display-only)")
+struct MergeGroupRowSelectionTests {
+
+    @Test("a badged GROUP row selects its CLUSTER, not itself")
+    func badgedGroupSelectsCluster() throws {
+        let sections = allGroupClusterSections()
+        let plain = try #require(sections.groups.first { $0.name == "Trance 2022" })
+        #expect(
+            mergeGroupRowSelection(for: plain, nearMatchTwin: "Trance 2022 ", in: sections)
+                == .nearMatch("Trance 2022")
+        )
+        let spaced = try #require(sections.groups.first { scalarExact($0.name, "Trance 2022 ") })
+        #expect(
+            mergeGroupRowSelection(for: spaced, nearMatchTwin: "Trance 2022", in: sections)
+                == .nearMatch("Trance 2022"),
+            "either twin group's row resolves to the SAME cluster selection"
+        )
+    }
+
+    @Test("an unbadged GROUP row still selects the group")
+    func unbadgedGroupSelectsGroup() throws {
+        let sections = allGroupClusterSections()
+        let house = try #require(sections.groups.first { $0.name == "House Anthems" })
+        #expect(
+            mergeGroupRowSelection(for: house, nearMatchTwin: nil, in: sections)
+                == .group("House Anthems")
+        )
+    }
+}
+
+// MARK: - unified merge surface copy (final review minor d)
+
+/// The verbatim footer/caption strings of the unified merge surface. Pinning
+/// them here is the point of `MergeSurfaceCopy`: several are quoted verbatim
+/// in the 2026-08-11 spec and in `docs/apple-music-consolidator.md`, and the
+/// singleton advisory was WRONG for one whole release (it told Sergio to
+/// delete a playlist to reuse a row that never needed it — finding C1), which
+/// no test would have caught.
+@Suite("Unified merge surface copy (verbatim)")
+struct MergeSurfaceCopyTests {
+
+    @Test("every footer/caption string is exactly as designed")
+    func copyIsPinned() {
+        #expect(MergeSurfaceCopy.allPlaylistsHeader(sourceCount: 333) == "ALL PLAYLISTS (333)")
+        #expect(MergeSurfaceCopy.selectedSources(count: 3) == "Selected: 3 playlists")
+        #expect(MergeSurfaceCopy.mergeAsOneTitle == "Merge selected as one\u{2026}")
+        #expect(
+            MergeSurfaceCopy.mergeAsOneHelp
+                == "Combine every checked group and singleton into ONE new playlist, "
+                    + "named \u{201C}<first source> \u{2014} Merged\u{201D}."
+        )
+        #expect(MergeSurfaceCopy.mergeEachGroupTitle == "Merge each group separately")
+        #expect(
+            MergeSurfaceCopy.mergeEachGroupHelp
+                == "Runs one merge per checked group. Uncheck singletons to use this, "
+                    + "or use Merge selected as one."
+        )
+        #expect(
+            MergeSurfaceCopy.nearMatchChipHelp(twin: "Kdrama ")
+                == "Near match: differs from \u{201C}Kdrama \u{201D} only by invisible "
+                    + "characters or edge whitespace \u{2014} select the row for the "
+                    + "rename hint."
+        )
+        // Finding C1: informational, NOT imperative — nothing has to be
+        // deleted for this row to serve as a free-form merge source again.
+        #expect(
+            MergeSurfaceCopy.alreadyMergedSingletonAdvisory(sourceName: "Beta")
+                == "A \u{201C}Beta \u{2014} Merged\u{201D} playlist exists \u{2014} "
+                    + "created by an earlier merge."
+        )
+        // A GROUP's own merge target IS "<name> — Merged", so that one keeps
+        // the imperative wording it always had.
+        #expect(
+            MergeSurfaceCopy.alreadyMergedGroupHelp(sourceName: "Alpha")
+                == "Already merged: \u{201C}Alpha \u{2014} Merged\u{201D} exists. Review "
+                    + "it, then clean up the sources; delete it first to reprocess."
+        )
+    }
+}
+
 // MARK: - unified list structural pins (Task 2, spec Testing list)
 
 /// One 2-copy group ("Trance 2022") plus TWO singletons ("Alpha", "Beta") —
@@ -396,6 +548,117 @@ struct UnifiedMergeFooterEnableMatrixTests {
         defer { fixture.tearDown() }
         #expect(!mergeEachGroup.isEnabled)
         #expect(!mergeAsOne.isEnabled)
+    }
+
+    /// Final review minor (a): Return drives the action that accepts ANY
+    /// selection ("Merge selected as one…", the de facto primary), not the
+    /// groups-only one it was pinned to.
+    @Test("Return (the prominent key equivalent) belongs to Merge selected as one")
+    func returnDrivesMergeAsOne() async throws {
+        let harness = try await loadedUnifiedMergeHarness()
+        defer { harness.cleanUp() }
+        harness.model.toggleCheckedGroup(name: "Trance 2022")
+        let (mergeEachGroup, mergeAsOne, fixture) = try footerButtons(harness)
+        defer { fixture.tearDown() }
+        #expect(mergeAsOne.keyEquivalent == "\r")
+        #expect(
+            mergeEachGroup.keyEquivalent.isEmpty,
+            "the groups-only action must not answer Return"
+        )
+    }
+}
+
+@MainActor
+@Suite("Unified merge list — already-merged singletons stay usable (C1)", .serialized)
+struct AlreadyMergedSingletonUsableTests {
+
+    /// Finding C1: an "<own name> — Merged" sibling disabled the singleton's
+    /// checkbox by false analogy with group rows. A singleton's checkbox
+    /// contributes a SOURCE to "Merge selected as one…", whose target is named
+    /// after the FIRST source in playlist-ID order — so that sibling is not a
+    /// target collision, and disabling the row permanently poisoned every
+    /// free-form merge's first source for all future merges.
+    @Test("an already-processed singleton's checkbox is ENABLED and toggles the free-form set")
+    func alreadyProcessedSingletonStaysCheckable() async throws {
+        let harness = try await loadedUnifiedMergeHarness(wire: selectAllPlumbingListingWire())
+        defer { harness.cleanUp() }
+        let model = harness.model
+        #expect(model.isAlreadyProcessed(name: "Beta"), "\u{201C}Beta \u{2014} Merged\u{201D} exists")
+
+        let fixture = HostedFixture(
+            SourceSelectionView(model: model), width: 1200, height: 800
+        )
+        defer { fixture.tearDown() }
+
+        let singletonCheckbox = try #require(
+            view(under: fixture.hosting, axIdentifier: M10ControlID.singletonCheckbox("B-SRC"))
+                as? NSButton
+        )
+        #expect(singletonCheckbox.isEnabled)
+        singletonCheckbox.performClick(nil)
+        #expect(model.checkedFreeFormSingletonPersistentIds == Set(["B-SRC"]))
+        singletonCheckbox.performClick(nil)
+        #expect(model.checkedFreeFormSingletonPersistentIds.isEmpty)
+
+        // The GROUP row's checkbox keeps its disable: a group's per-group
+        // merge target IS "<name> — Merged", so an existing one blocks it.
+        let groupCheckbox = try #require(
+            view(under: fixture.hosting, axIdentifier: M10ControlID.groupCheckbox("Alpha"))
+                as? NSButton
+        )
+        #expect(!groupCheckbox.isEnabled)
+    }
+}
+
+@MainActor
+@Suite("Unified merge list — GROUP near-match parity (I2)", .serialized)
+struct GroupRowNearMatchParityStructuralTests {
+
+    private func allGroupClusterWire() -> String {
+        plumbingListingWire([
+            plumbingEntry(id: 10, name: "Trance 2022", pid: "T-A", count: 9),
+            plumbingEntry(id: 11, name: "Trance 2022", pid: "T-B", count: 10),
+            plumbingEntry(id: 20, name: "Trance 2022 ", pid: "T-C", count: 4),
+            plumbingEntry(id: 21, name: "Trance 2022 ", pid: "T-D", count: 5),
+        ])
+    }
+
+    /// Finding I2: an all-group cluster's rows are badged and route to the
+    /// near-match inspector, so Align names… — the ONLY in-app fix for a
+    /// twin — is reachable. Before this, `mergeSingletonRowSelection` was the
+    /// only near-match route and no singleton existed in this library shape.
+    @Test("an all-group cluster's rows carry the twin and reach the near-match inspector")
+    func allGroupClusterReachesAlignNames() async throws {
+        let harness = try await loadedUnifiedMergeHarness(wire: allGroupClusterWire())
+        defer { harness.cleanUp() }
+        let model = harness.model
+        let sections = try #require(model.loadedSections)
+        #expect(sections.singletons.isEmpty, "every row here is a GROUP row")
+
+        let rows = mergeRows(sections: sections, needle: "", key: .name, ascending: true)
+        #expect(rows.count == 2)
+        #expect(rows.allSatisfy { $0.nearMatchTwin != nil }, "both group rows are badged")
+
+        // Route the badged row's tap exactly as `groupRow` does...
+        guard let row = rows.first, case .group(let group, let twin) = row else {
+            Issue.record("expected a group row")
+            return
+        }
+        let selection = mergeGroupRowSelection(for: group, nearMatchTwin: twin, in: sections)
+        #expect(selection == .nearMatch("Trance 2022"))
+
+        // ...and confirm that selection renders the near-match inspector with
+        // its Align names… entry point contained in the real composition.
+        model.browserSelection = selection
+        let fixture = HostedFixture(
+            SourceSelectionView(model: model), width: 1200, height: 800
+        )
+        defer { fixture.tearDown() }
+        let open = try #require(
+            view(under: fixture.hosting, axIdentifier: WaveBControlID.alignOpen) as? NSButton
+        )
+        let frame = open.convert(open.bounds, to: fixture.hosting)
+        #expect(NSRect(x: 0, y: 0, width: 1200, height: 800).contains(frame), "Align names… at \(frame)")
     }
 }
 
