@@ -328,6 +328,17 @@ enum DirectControlID {
     /// is mid-dismissal).
     static let inProgressStatus = "direct.inProgressStatus"
     static let inProgressCaption = "direct.inProgressCaption"
+    /// Task 2 (Sergio, 2026-08-06): the Cleanup footer's batch-rename action,
+    /// and the batch-rename sheet's find/replace helper and per-row fields.
+    /// The helper's commit/cancel buttons reuse `confirmExecute`/
+    /// `confirmCancel` above (same as the single-row rename sheet).
+    static let renameSelected = "direct.renameSelected"
+    static let batchRenameFind = "direct.batchRenameFind"
+    static let batchRenameReplace = "direct.batchRenameReplace"
+    static let batchRenameApplyAll = "direct.batchRenameApplyAll"
+    static func batchRenameField(_ persistentId: String) -> String {
+        "direct.batchRenameField.\(persistentId)"
+    }
 }
 
 /// Stable accessibility identifiers for the Wave C1 failure-taxonomy
