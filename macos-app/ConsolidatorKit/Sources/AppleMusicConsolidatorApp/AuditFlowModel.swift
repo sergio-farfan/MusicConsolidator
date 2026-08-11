@@ -575,14 +575,23 @@ final class AuditFlowModel {
     /// Resolve PIDs against the live listing cache and stage a pending
     /// batch-rename confirmation, seeding `batchRenameDrafts` with each
     /// target's current name. Same busy/no-op guards and unknown-PID
-    /// handling as `requestDirectDelete`; targets are kept in the caller's
-    /// selection order, not the listing's. A duplicated PID in the input
-    /// resolves to its FIRST occurrence only — degrades gracefully (a
-    /// redundant selection, not a crash from `Dictionary(uniqueKeysWithValues:)`,
-    /// and not a double-dispatch of the same rename).
+    /// handling as `requestDirectDelete`; targets are sorted alphabetically
+    /// by (name, then persistent ID) — Finding 1 (final review): the caller
+    /// passes `Array(model.checkedCleanupPIDs)`, and `Set` has no stable
+    /// iteration order across launches, so the sheet's rows must not
+    /// inherit one either. This is close to, but not the same predicate as,
+    /// `sections.allPlaylists`' own casefolded alphabetical order — close
+    /// enough for row presentation, and no playlist is ever dropped by it.
+    /// A duplicated PID in the input resolves to its FIRST occurrence only
+    /// — degrades gracefully (a redundant selection, not a crash from
+    /// `Dictionary(uniqueKeysWithValues:)`, and not a double-dispatch of the
+    /// same rename).
     func requestDirectBatchRename(persistentIDs: [String]) {
         guard !isMutationBusy, !isRunning, !isScanning, !isApplying,
-              !isUnattendedRunActive else { return }
+              !isUnattendedRunActive else {
+            batchRenameDrafts = [:]
+            return
+        }
         guard let loaded = loadedListing else { return }
         var seenPersistentIDs: Set<String> = []
         var targets: [PlaylistListing] = []
@@ -594,7 +603,11 @@ final class AuditFlowModel {
             seenPersistentIDs.insert(target.persistentId)
             targets.append(target)
         }
-        guard !targets.isEmpty else { return }
+        guard !targets.isEmpty else {
+            batchRenameDrafts = [:]
+            return
+        }
+        targets.sort { ($0.name, $0.persistentId) < ($1.name, $1.persistentId) }
         batchRenameDrafts = Dictionary(
             uniqueKeysWithValues: targets.map { ($0.persistentId, $0.name) }
         )

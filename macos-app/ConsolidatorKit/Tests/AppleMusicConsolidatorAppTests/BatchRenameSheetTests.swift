@@ -92,6 +92,11 @@ struct BatchRenameSheetTests {
                 as? NSButton
         )
         #expect(!commit.isEnabled, "0 changed drafts -> disabled")
+        // Finding 2 (final review): the batch commit button must NOT be
+        // `prominent` — that maps to `keyEquivalent = "\r"`, which would let
+        // Return in a row's editable field dispatch the whole batch instead
+        // of staying in the field.
+        #expect(commit.keyEquivalent.isEmpty, "Return must stay in the row field, not commit the batch")
 
         model.setBatchRenameDraft("Solo Renamed", for: "SOLO000000000001")
         fixture.hosting.layoutSubtreeIfNeeded()
@@ -102,6 +107,7 @@ struct BatchRenameSheetTests {
         )
         #expect(commitAfter.isEnabled, "one changed draft -> enabled")
         #expect(commitAfter.title == "Rename 1 playlists")
+        #expect(commitAfter.keyEquivalent.isEmpty)
     }
 
     @Test("Apply to all drives the model: literal find/replace over every current draft")
@@ -140,6 +146,26 @@ struct BatchRenameSheetTests {
 
         #expect(model.batchRenameDrafts["SOLO000000000001"] == "Solo Catalog")
         #expect(model.batchRenameDrafts["TRAIL00000000001"] == "Kdrama ")
+
+        // Finding 3 (final review): the model updating is not the whole
+        // story — pin the drafts -> body -> field invalidation chain by
+        // reading back what the ROW FIELDS actually display after the
+        // layout pass, not just the model's own drafts dictionary.
+        fixture.hosting.layoutSubtreeIfNeeded()
+        let soloField = try #require(
+            view(
+                under: fixture.hosting,
+                axIdentifier: DirectControlID.batchRenameField("SOLO000000000001")
+            ) as? NSTextField
+        )
+        #expect(soloField.stringValue == "Solo Catalog")
+        let trailField = try #require(
+            view(
+                under: fixture.hosting,
+                axIdentifier: DirectControlID.batchRenameField("TRAIL00000000001")
+            ) as? NSTextField
+        )
+        #expect(trailField.stringValue == "Kdrama ")
     }
 
     @Test("footer: Rename selected sits between Clear and Delete selected, disabled at zero, drives the model")

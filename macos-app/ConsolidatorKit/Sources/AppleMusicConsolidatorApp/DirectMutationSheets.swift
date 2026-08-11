@@ -255,7 +255,16 @@ private struct BatchRenamePanel: View {
                 AppKitActionButton(
                     identifier: DirectControlID.confirmExecute,
                     title: "Rename \(model.batchRenameChangedCount) playlists",
-                    prominent: true
+                    // Finding 2 (final review): NOT prominent, unlike every
+                    // other confirm button in this file. `prominent: true`
+                    // maps to `keyEquivalent = "\r"` (AppKitControls.swift),
+                    // and `performKeyEquivalent:` traversal sees that BEFORE
+                    // a focused row field's own `doCommandBy:` handling — so
+                    // Return while editing a row would dispatch the whole
+                    // batch instead of just leaving the field. Keeping this
+                    // button non-prominent (position and title unchanged)
+                    // means Return stays in the field being edited.
+                    prominent: false
                 ) {
                     model.confirmPendingDirectAction()
                 }

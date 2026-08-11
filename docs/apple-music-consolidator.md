@@ -209,7 +209,9 @@ draft (not the original names), so a second use composes on the first. The
 caption reads `Unchanged names are skipped. Duplicates allowed.`; the commit
 button reads `Rename N playlists`, where N counts only drafts that are
 non-empty and differ from their original name, and stays disabled at zero.
-Confirming renames sequentially in selection order, skips any draft that is
+The sheet lists the selected playlists in that same alphabetical order, not
+the order they were checked in. Confirming renames sequentially in
+alphabetical (name, then persistent ID) order, skips any draft that is
 empty or unchanged, patches each row's display name live as its rename
 lands, and stops at the first verbatim script error, leaving the remaining
 rows untouched — the sheet stays up through dispatch, same as every other
