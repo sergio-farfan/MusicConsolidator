@@ -351,7 +351,7 @@ git-ignored. All source files carry the project header naming
 Sergio Farfan <sergio.farfan@gmail.com> as the sole author
 (`scripts/add_source_headers.py`, idempotent).
 
-## Read performance (2026-08-06)
+## Read performance (2026-08-11)
 
 The library listing (source browser) and playlist snapshot reads (audit,
 merge, Diagnostics) are now COLUMNAR: each track/playlist property is
@@ -372,7 +372,17 @@ both the library listing and one playlist's snapshot, diffs the PARSED
 results, and reports `identical` or the first difference, with elapsed time
 per reader so the speedup is visible. Nothing else calls the legacy
 builders; they are removed once the columnar readers are validated against
-them live.
+them live. Both carry `@available(*, deprecated, …)` as the removal reminder,
+so any new direct caller is flagged at compile time; the sanctioned callers
+(the cross-check and the byte pins) reach them through the two seam accessors
+described in `MusicScriptBuilder.swift`, and seam, pins and builders are
+deleted in one sweep.
+
+Pick a SMALL playlist before pressing "Compare readers": by construction half
+of what it runs is the pre-columnar reader, whose cost still grows with the
+track count (roughly one Apple Event per property per track), so on a large
+playlist the legacy half alone can take minutes — that is the old cost being
+measured on purpose, not a regression.
 
 Before trusting the new readers, Sergio should exercise: a normal Rescan
 (compare its elapsed before and after this change), the Diagnostics

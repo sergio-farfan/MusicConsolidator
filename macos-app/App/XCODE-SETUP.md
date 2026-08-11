@@ -196,6 +196,20 @@ occurs for senders outside the GUI/TCC session — see the appendix).
 
 ## 9. Cross-check against the Python CLI
 
+> **Status (2026-08-11): sections 9 and 10 are now the PRIMARY Swift↔Python
+> read-parity gate.** They used to be a belt-and-braces live confirmation of a
+> parity already proven offline: the Swift read builder emitted byte-identical
+> script text to the Python reference's, pinned case-by-case in
+> `ScriptGoldenTests`. That is no longer true. The Swift read scripts went
+> COLUMNAR on 2026-08-11 (Sergio's decision, for performance), so
+> `buildReadJXA`'s text deliberately diverges from `build_read_jxa`'s, and the
+> `read_jxa` golden byte-parity case now covers only the RETAINED pre-columnar
+> `legacyReadJXAScript` — not the reader the app actually uses. Two different
+> scripts must now be shown to return the same WIRE JSON, and these two
+> sections are where that is established against real library data. Treat a
+> divergence here as blocking, not informational, and re-run them after any
+> change to a read script.
+
 Run in your normal Terminal (project root; read-only against Music — it
 writes only new report artifacts):
 
@@ -235,10 +249,20 @@ divergence (stop and investigate before M7).
 This re-verifies, against real Music-sourced text, that the in-process
 OSAKit descriptor decode is scalar-identical to `osascript` output (the
 M6a finding: `NSAppleEventDescriptor.stringValue` strips a leading U+FEFF;
-the runner decodes raw UTF-16 instead).
+the runner decodes raw UTF-16 instead). Since 2026-08-11 it carries a second,
+now-primary job: it is the wire-level Swift↔Python READ parity gate (see the
+status note in section 9), because the two read scripts are no longer the same
+text.
 
-1. Produce the osascript raw output separately, with the reference's own read
-   script (identical text to the Swift builder — golden-pinned port). Run
+1. Produce the osascript raw output separately, with the REFERENCE's own read
+   script. Note what this step compares as of 2026-08-11: the reference's read
+   script is NOT the same text as the Swift app's any more. `build_read_jxa`
+   is the pre-columnar per-track form; the app's `buildReadJXA` fetches each
+   track property as one whole-column Apple Event. The divergence is
+   deliberate (a Swift-only performance change the Python CLI has no need for),
+   which is exactly why this diff matters: two DIFFERENT scripts must return
+   scalar-identical wire JSON for the same library, and that is the property
+   being tested here — not a same-text port, as this step used to claim. Run
    back-to-back with the app read from step 8; do not touch Music or quit
    it in between (playlist `id` values are stable within a Music session,
    not across relaunches):

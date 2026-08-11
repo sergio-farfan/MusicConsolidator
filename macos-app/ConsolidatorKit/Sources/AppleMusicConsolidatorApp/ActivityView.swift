@@ -184,7 +184,7 @@ struct ActivityView: View {
 ///
 /// - `.running(phase)` — the live audit progress: `startAudit`
 ///   auto-navigated the user here, and a "No run active" placeholder over a
-///   multi-minute read (~8-9 s + ~0.16 s/track) would be both false and a
+///   read that is in flight and uninterruptible would be both false and a
 ///   bare-spinner violation. ProgressPhaseView is reused verbatim from
 ///   screen 1's footer (spinner + bold phase label + ticking elapsed).
 /// - `.failed(failure)` — the verbatim failure (category + message) plus a

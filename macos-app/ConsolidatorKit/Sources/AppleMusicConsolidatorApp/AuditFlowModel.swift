@@ -95,8 +95,10 @@ final class AuditFlowModel {
     }
 
     /// The streaming-progress phases. Each carries its start instant so the
-    /// UI can tick elapsed time (a bare spinner is forbidden: reads cost
-    /// ~8-9 s + ~0.16 s/track — a 1,600-track playlist is 4-5 minutes).
+    /// UI can tick elapsed time (a bare spinner is forbidden: a columnar read
+    /// is normally a few seconds even for a large playlist, but it cannot be
+    /// interrupted once in flight and its duration is not something the app
+    /// can predict).
     enum Phase: Equatable, Sendable {
         case reading(started: Date)
         case buildingPlan(started: Date)
@@ -3159,6 +3161,12 @@ final class AuditFlowModel {
     private struct CleanupNameSnapshots: Sendable {
         let name: String
         let copies: [PlaylistSnapshot]
+        /// Verbatim description of the per-name snapshot READ's failure, when
+        /// the read itself failed (never set for a name that is simply absent
+        /// from the library). Non-nil here is a read fault, NOT evidence
+        /// drift — see `cleanupLiveSample` and the refusal in
+        /// `armCleanupGroup` (final-review finding I4, 2026-08-11).
+        let readFailure: String?
     }
 
     /// Disk-only lookup of the ONE discovered group matching `planFileName`,
@@ -3191,13 +3199,40 @@ final class AuditFlowModel {
             var snapshots: [CleanupNameSnapshots] = []
             for name in names {
                 // A name absent from Music is not an error — rule 1 (target
-                // absent) catches it in candidacy. Use best-effort here so
-                // the whole scan does not abort when a target has been
-                // renamed or deleted since the merge-plan was written.
-                snapshots.append(CleanupNameSnapshots(
-                    name: name,
-                    copies: (try? session.snapshotAllCopies(name: name)) ?? []
-                ))
+                // absent) catches it in candidacy — so an absent name must
+                // stay best-effort here: the whole gate-arm must not abort
+                // when a target has been renamed or deleted since the
+                // merge-plan was written.
+                //
+                // I4 (2026-08-11): absence is decided from the LISTING that
+                // was just read, NOT by swallowing every error from the
+                // snapshot read with `try?`. The columnar reader's fail-closed
+                // column guards ("column length mismatch: title", …), an
+                // Automation denial, and a strict-parse rejection all arrive
+                // here as thrown errors too; discarding them made
+                // `armCleanupGroup` see an EMPTY copy list and blame the
+                // library for drifted evidence ("merged target … was not
+                // found") when in truth the READ failed. The error is
+                // captured verbatim instead and refused under its own reason.
+                if !listing.contains(where: { scalarExact($0.name, name) }) {
+                    snapshots.append(CleanupNameSnapshots(
+                        name: name, copies: [], readFailure: nil
+                    ))
+                    continue
+                }
+                do {
+                    snapshots.append(CleanupNameSnapshots(
+                        name: name,
+                        copies: try session.snapshotAllCopies(name: name),
+                        readFailure: nil
+                    ))
+                } catch {
+                    // Fail-closed: no copies AND the reason, so the caller
+                    // can never mistake a failed read for a clean absence.
+                    snapshots.append(CleanupNameSnapshots(
+                        name: name, copies: [], readFailure: String(describing: error)
+                    ))
+                }
             }
             return CleanupLiveSample(listing: listing, snapshots: snapshots)
         }.value
@@ -3321,6 +3356,21 @@ final class AuditFlowModel {
             throw MutationGateRefusal(
                 "refused: cleanup group for \(planFileName) is no longer discovered; "
                     + "refresh the Cleanup tab and re-review"
+            )
+        }
+        // I4 (2026-08-11): a snapshot READ that failed is its OWN refusal
+        // reason, checked BEFORE armVerification consumes the (necessarily
+        // empty) copy lists. Without this, a fail-closed column-guard error —
+        // or any other read fault — reached the user as "merged target … was
+        // not found" / "copy … no longer bears the group name", i.e. the
+        // library was blamed for drift that was never observed. Same
+        // fail-closed posture either way (nothing is ever deleted), but the
+        // reason is now true, and it is the verbatim operator message.
+        if let failed = sample.snapshots.first(where: { $0.readFailure != nil }) {
+            throw MutationGateRefusal(
+                "refused: the live read of \u{201C}\(failed.name)\u{201D} failed, so the "
+                    + "evidence could not be re-checked (this is a read failure, not "
+                    + "drift): \(failed.readFailure ?? "")"
             )
         }
         let targetCopies = sample.snapshots.first {
