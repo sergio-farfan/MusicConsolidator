@@ -593,13 +593,37 @@ struct ReadJXAPortTests {
         let script = buildReadJXA(name: "Trance 2022")
         #expect(ByteText(script).contains("id: playlist.id()"))
     }
+
+    // Task 3 (bulk-read-speedup): a permanent osacompile pin for the LIVE
+    // columnar reader — ScriptCompileTests.swift covers only the writers
+    // (buildApplyScript, buildMergeApplyScript); this is the read-side
+    // counterpart, cloned from LegacyReadJXABuilderTests.legacyStaticScriptCompiles
+    // immediately below in this file. Compile-only, never executed: same M4
+    // discipline as every other osacompile gate in this suite.
+    @Test(
+        "columnar read script compiles (osacompile -l JavaScript; never executed)",
+        .enabled(if: appleScriptCompilerAndMusicAvailable)
+    )
+    func columnarStaticScriptCompiles() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("bulk-read-live-read-compile-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let output = directory.appendingPathComponent("read-live.scpt")
+        let result = try runTool(
+            osacompilePath,
+            arguments: ["-l", "JavaScript", "-o", output.path],
+            stdinText: buildReadJXA(name: "any")
+        )
+        #expect(result.status == 0, "\(result.stderr)")
+    }
 }
 
 // bulk-read-speedup Task 2 (I3, controller decision): the pre-columnar
 // `buildReadJXA` body, restored under a new name from git history (commit
 // ebd8854, the last commit before the columnar rewrite) — pinned VERBATIM so
-// it cannot drift before Task 3's Diagnostics reader cross-check exists to
-// use it. Nothing routes to `legacyReadJXAScript` yet.
+// it cannot drift. Task 3's Diagnostics "Compare readers" action
+// (`ReadWorker.compareReaders`) is the one and only caller.
 private let expectedLegacyReadJXA = """
 const Music = Application("/System/Applications/Music.app");
 const requestedName = "any";

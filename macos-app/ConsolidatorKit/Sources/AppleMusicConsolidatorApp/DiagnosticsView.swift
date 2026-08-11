@@ -2,14 +2,17 @@
 // Apple Music Consolidator
 // Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // The M6b read harness, retained as the app's DIAGNOSTICS surface (M7):
-// preflight, raw all-copies read, and raw-wire-JSON export — the fidelity-
-// probe surface for future checks (opened from the Window menu or with
-// Cmd-Shift-D). READ-ONLY: the only Music command it can issue is the
-// package's read JXA (buildReadJXA -> ScriptCommand.readJXA) executed
-// through OSAKitRunner. The guarded writers (buildApplyScript,
-// buildMergeApplyScript, applyPlan, applyMergePlan) are deliberately never
-// referenced here; adding any write path is out of scope until a later
-// milestone with Sergio's explicit approval.
+// preflight, raw all-copies read, raw-wire-JSON export, and (Task 3,
+// bulk-read-speedup) "Compare readers" — the fidelity-probe surface for
+// future checks (opened from the Window menu or with Cmd-Shift-D).
+// READ-ONLY: every Music command this view can issue is a `.readJXA`
+// ScriptCommand executed through OSAKitRunner — buildReadJXA for the raw
+// all-copies read; buildReadJXA/buildListPlaylistsJXA (live, columnar) and
+// legacyReadJXAScript/legacyListPlaylistsScript (retained ONE release,
+// Compare-readers-only) for the cross-check. The guarded writers
+// (buildApplyScript, buildMergeApplyScript, applyPlan, applyMergePlan) are
+// deliberately never referenced here; adding any write path is out of scope
+// until a later milestone with Sergio's explicit approval.
 //
 // Threading: all Music I/O runs off the main actor in a detached task.
 // OSAKitRunner is not thread-safe and not Sendable by design, so a FRESH
@@ -243,6 +246,208 @@ nonisolated enum ReadWorker {
     }
 }
 
+// MARK: - reader cross-check (Task 3, bulk-read-speedup: legacy vs columnar)
+//
+// "Compare readers" is the ONE-RELEASE Diagnostics harness that validates
+// the columnar readers (Task 1's buildListPlaylistsJXA, Task 2's buildReadJXA)
+// against the retained pre-columnar builders (legacyListPlaylistsScript,
+// legacyReadJXAScript) before those legacy builders are deleted. It covers
+// BOTH readers — the library listing and one playlist's snapshot — never
+// just one, and diffs the PARSED results (PlaylistListing / PlaylistSnapshot
+// equality), never the raw script text: the wire JSON CONTRACT is what must
+// agree, not the JXA source that produced it.
+
+/// One reader pair's elapsed time (run + parse, exactly like `ReadOutcome`),
+/// so the speedup between the legacy and live readers is visible side by
+/// side.
+nonisolated struct ReaderElapsed: Sendable {
+    let legacySeconds: Double
+    let liveSeconds: Double
+}
+
+/// The result of one "Compare readers" run: both cross-checks (listing, then
+/// one playlist's snapshot) always run — even when the first already
+/// differs — so every elapsed time is populated. `firstDifference` is nil
+/// only when EVERY parsed field of BOTH comparisons agrees; otherwise it
+/// names the earliest disagreement, checking the listing before the
+/// snapshot (the same order the two script pairs run in).
+nonisolated struct ReaderCompareOutcome: Sendable {
+    let listingElapsed: ReaderElapsed
+    let snapshotElapsed: ReaderElapsed
+    /// The playlist name actually snapshot-compared — either the caller's
+    /// (trimmed), or the first entry of the live listing when the caller's
+    /// was empty.
+    let snapshotPlaylistName: String
+    let firstDifference: String?
+    var isIdentical: Bool { firstDifference == nil }
+}
+
+/// Thrown when a script fails to run or its wire reply fails to parse.
+/// `stage` names exactly which of the four reads failed (legacy/live,
+/// listing/snapshot) — an idiom bug, surfaced verbatim, never silently
+/// swallowed or misattributed to Music.
+nonisolated struct ReaderCompareFailure: Error, Sendable {
+    let stage: String
+    let message: String
+}
+
+extension ReadWorker {
+    /// Cross-check the legacy and live readers against each other: the
+    /// library listing first, then one playlist's snapshot — diffed on
+    /// their PARSED results. `playlistName`, trimmed: when non-empty, that
+    /// exact name is snapshot-compared; when empty, the FIRST entry of the
+    /// live listing (ascending playlist id) is used instead — "the first
+    /// user playlist" the Task 3 brief calls for. An empty library (no user
+    /// playlists at all) is a hard failure: there is nothing to
+    /// snapshot-compare.
+    ///
+    /// `runner` is caller-supplied so tests can inject a fake; the real
+    /// call site (DiagnosticsView.startCompareReaders) passes a fresh
+    /// OSAKitRunner, created and consumed entirely within its own detached
+    /// task, exactly like `readAllCopies`.
+    static func compareReaders(
+        playlistName: String, runner: ScriptRunner
+    ) throws -> ReaderCompareOutcome {
+        let legacyListingRun: (output: String, seconds: Double)
+        do {
+            legacyListingRun = try timedRun {
+                try runner.run(.readJXA(script: legacyListPlaylistsScript()))
+            }
+        } catch {
+            throw ReaderCompareFailure(stage: "legacy listing", message: String(describing: error))
+        }
+        let liveListingRun: (output: String, seconds: Double)
+        do {
+            liveListingRun = try timedRun {
+                try runner.run(.readJXA(script: buildListPlaylistsJXA()))
+            }
+        } catch {
+            throw ReaderCompareFailure(stage: "live listing", message: String(describing: error))
+        }
+
+        let legacyListing: [PlaylistListing]
+        do {
+            legacyListing = try parsePlaylistListing(raw: legacyListingRun.output)
+        } catch {
+            throw ReaderCompareFailure(stage: "legacy listing", message: String(describing: error))
+        }
+        let liveListing: [PlaylistListing]
+        do {
+            liveListing = try parsePlaylistListing(raw: liveListingRun.output)
+        } catch {
+            throw ReaderCompareFailure(stage: "live listing", message: String(describing: error))
+        }
+
+        let trimmedName = playlistName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let targetName: String
+        if !trimmedName.isEmpty {
+            targetName = trimmedName
+        } else if let first = liveListing.first {
+            targetName = first.name
+        } else {
+            throw ReaderCompareFailure(
+                stage: "snapshot",
+                message: "the library has no user playlists to compare"
+            )
+        }
+
+        let legacyReadRun: (output: String, seconds: Double)
+        do {
+            legacyReadRun = try timedRun {
+                try runner.run(.readJXA(script: legacyReadJXAScript(name: targetName)))
+            }
+        } catch {
+            throw ReaderCompareFailure(stage: "legacy snapshot", message: String(describing: error))
+        }
+        let liveReadRun: (output: String, seconds: Double)
+        do {
+            liveReadRun = try timedRun {
+                try runner.run(.readJXA(script: buildReadJXA(name: targetName)))
+            }
+        } catch {
+            throw ReaderCompareFailure(stage: "live snapshot", message: String(describing: error))
+        }
+
+        let legacyCopies: [PlaylistSnapshot]
+        do {
+            legacyCopies = try parseAllCopies(raw: legacyReadRun.output, name: targetName)
+        } catch {
+            throw ReaderCompareFailure(stage: "legacy snapshot", message: String(describing: error))
+        }
+        let liveCopies: [PlaylistSnapshot]
+        do {
+            liveCopies = try parseAllCopies(raw: liveReadRun.output, name: targetName)
+        } catch {
+            throw ReaderCompareFailure(stage: "live snapshot", message: String(describing: error))
+        }
+
+        let difference = firstListingDifference(legacy: legacyListing, live: liveListing)
+            ?? firstSnapshotDifference(legacy: legacyCopies, live: liveCopies)
+
+        return ReaderCompareOutcome(
+            listingElapsed: ReaderElapsed(
+                legacySeconds: legacyListingRun.seconds, liveSeconds: liveListingRun.seconds
+            ),
+            snapshotElapsed: ReaderElapsed(
+                legacySeconds: legacyReadRun.seconds, liveSeconds: liveReadRun.seconds
+            ),
+            snapshotPlaylistName: targetName,
+            firstDifference: difference
+        )
+    }
+
+    private static func timedRun(
+        _ body: () throws -> String
+    ) throws -> (output: String, seconds: Double) {
+        let clock = ContinuousClock()
+        let start = clock.now
+        let output = try body()
+        let elapsed = start.duration(to: clock.now)
+        return (output, elapsedSecondsValue(of: elapsed))
+    }
+
+    private static func firstListingDifference(
+        legacy: [PlaylistListing], live: [PlaylistListing]
+    ) -> String? {
+        if legacy.count != live.count {
+            return "listing count differs: legacy \(legacy.count), live \(live.count)"
+        }
+        for (index, pair) in zip(legacy, live).enumerated() {
+            let (legacyEntry, liveEntry) = pair
+            if legacyEntry != liveEntry {
+                return "listing entry \(index + 1) differs: legacy \(legacyEntry), live \(liveEntry)"
+            }
+        }
+        return nil
+    }
+
+    private static func firstSnapshotDifference(
+        legacy: [PlaylistSnapshot], live: [PlaylistSnapshot]
+    ) -> String? {
+        if legacy.count != live.count {
+            return "snapshot copy count differs: legacy \(legacy.count), live \(live.count)"
+        }
+        for (index, pair) in zip(legacy, live).enumerated() {
+            let (legacyCopy, liveCopy) = pair
+            if legacyCopy.tracks.count != liveCopy.tracks.count {
+                return "copy \(index + 1) track count differs: "
+                    + "legacy \(legacyCopy.tracks.count), live \(liveCopy.tracks.count)"
+            }
+            for (trackIndex, trackPair) in zip(legacyCopy.tracks, liveCopy.tracks).enumerated() {
+                let (legacyTrack, liveTrack) = trackPair
+                if legacyTrack != liveTrack {
+                    return "copy \(index + 1) track \(trackIndex + 1) differs: "
+                        + "legacy \(legacyTrack), live \(liveTrack)"
+                }
+            }
+            if legacyCopy.name != liveCopy.name || legacyCopy.persistentId != liveCopy.persistentId {
+                return "copy \(index + 1) differs: legacy \(legacyCopy), live \(liveCopy)"
+            }
+        }
+        return nil
+    }
+}
+
 // MARK: - the view
 
 @MainActor
@@ -255,6 +460,8 @@ struct DiagnosticsView: View {
     @State private var elapsedText: String?
     @State private var exportStatus: String?
     @State private var errorText: String?
+    @State private var compareStatus: String?
+    @State private var compareErrorText: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -280,8 +487,24 @@ struct DiagnosticsView: View {
                 }
             }
 
+            HStack(spacing: 12) {
+                Button("Compare readers (legacy vs columnar)") { startCompareReaders() }
+                    .disabled(isBusy)
+            }
+
             if let preflightStatus {
                 statusRow(label: "Automation preflight", text: preflightStatus)
+            }
+
+            if let compareStatus {
+                statusRow(label: "Compare readers", text: compareStatus)
+            }
+
+            if let compareErrorText {
+                Text(compareErrorText)
+                    .foregroundStyle(.red)
+                    .textSelection(.enabled)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
             if let errorText {
@@ -382,6 +605,48 @@ struct DiagnosticsView: View {
             }
             isBusy = false
         }
+    }
+
+    /// "Compare readers": legacy vs columnar for BOTH the library listing
+    /// and one playlist's snapshot (Task 3, bulk-read-speedup). A fresh
+    /// OSAKitRunner is created and consumed entirely inside the detached
+    /// task — never escapes it — exactly like `startRead`.
+    private func startCompareReaders() {
+        guard !isBusy else { return }
+        isBusy = true
+        errorText = nil
+        compareStatus = nil
+        compareErrorText = nil
+        let name = playlistName
+        Task {
+            do {
+                let outcome = try await Task.detached(priority: .userInitiated) {
+                    let runner = OSAKitRunner()
+                    return try ReadWorker.compareReaders(playlistName: name, runner: runner)
+                }.value
+                compareStatus = Self.describeCompareOutcome(outcome)
+            } catch let failure as ReaderCompareFailure {
+                compareErrorText = "\(failure.stage) failed: \(failure.message)"
+            } catch {
+                compareErrorText = String(describing: error)
+            }
+            isBusy = false
+        }
+    }
+
+    private static func describeCompareOutcome(_ outcome: ReaderCompareOutcome) -> String {
+        let listing = outcome.listingElapsed
+        let snapshot = outcome.snapshotElapsed
+        let listingText = String(
+            format: "listing — legacy %.3f s, live %.3f s",
+            listing.legacySeconds, listing.liveSeconds
+        )
+        let snapshotText = String(
+            format: "snapshot \"%@\" — legacy %.3f s, live %.3f s",
+            outcome.snapshotPlaylistName, snapshot.legacySeconds, snapshot.liveSeconds
+        )
+        let verdict = outcome.firstDifference.map { "first difference: \($0)" } ?? "identical"
+        return "\(listingText)\n\(snapshotText)\n\(verdict)"
     }
 
     private func exportRawWireJSON() {
