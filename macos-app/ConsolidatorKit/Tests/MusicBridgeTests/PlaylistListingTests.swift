@@ -29,35 +29,42 @@ import ConsolidatorCore
 private let expectedListPlaylistsJXA = """
 const Music = Application("/System/Applications/Music.app");
 
-const playlists = Music.userPlaylists();
-const expectedCount = playlists.length;
+const playlistRefs = Music.userPlaylists;
+const expectedCount = playlistRefs.length;
 
-const ids = playlists.id();
+const ids = playlistRefs.id();
 if (!Array.isArray(ids) || ids.length !== expectedCount) {
     throw new Error("column length mismatch: id");
 }
 
-const names = playlists.name();
+const names = playlistRefs.name();
 if (!Array.isArray(names) || names.length !== expectedCount) {
     throw new Error("column length mismatch: name");
 }
 
-const persistentIds = playlists.persistentID();
+const persistentIds = playlistRefs.persistentID();
 if (!Array.isArray(persistentIds) || persistentIds.length !== expectedCount) {
     throw new Error("column length mismatch: persistent_id");
 }
 
-const trackCounts = playlists.tracks().length;
-if (!Array.isArray(trackCounts) || trackCounts.length !== expectedCount) {
+const trackCounts = [];
+for (let index = 0; index < expectedCount; index++) {
+    trackCounts.push(playlistRefs[index].tracks.length);
+}
+if (
+    !Array.isArray(trackCounts) ||
+    trackCounts.length !== expectedCount ||
+    !trackCounts.every(function (value) { return typeof value === "number"; })
+) {
     throw new Error("column length mismatch: track_count");
 }
 
-const smartFlags = playlists.smart();
+const smartFlags = playlistRefs.smart();
 if (!Array.isArray(smartFlags) || smartFlags.length !== expectedCount) {
     throw new Error("column length mismatch: smart");
 }
 
-const specialKinds = playlists.specialKind();
+const specialKinds = playlistRefs.specialKind();
 if (!Array.isArray(specialKinds) || specialKinds.length !== expectedCount) {
     throw new Error("column length mismatch: special_kind");
 }
@@ -137,7 +144,11 @@ struct ListPlaylistsBuilderTests {
         // Same enumeration root: every user playlist — smart playlists and
         // folder playlists included, subscription playlists excluded — so the
         // browser's groups always agree with what a subsequent audit reads.
-        #expect(listing.contains("Music.userPlaylists()"))
+        // The listing script accesses the root as an UN-CALLED specifier
+        // collection (`Music.userPlaylists`, no parens — see
+        // `usesUncalledPlaylistsSpecifierCollection` below for why), so this
+        // check does not require the call-parens the read script still uses.
+        #expect(listing.contains("Music.userPlaylists"))
         #expect(read.contains("Music.userPlaylists()"))
 
         // The listing must NOT filter by name (that is the read script's job).
@@ -177,21 +188,41 @@ struct ListPlaylistsBuilderTests {
     func fetchesColumnsWithArraySpecifiers() {
         let listing = ByteText(buildListPlaylistsJXA())
         for column in [
-            "playlists.id()", "playlists.name()", "playlists.persistentID()",
-            "playlists.tracks().length", "playlists.smart()", "playlists.specialKind()",
+            "playlistRefs.id()", "playlistRefs.name()", "playlistRefs.persistentID()",
+            "playlistRefs.smart()", "playlistRefs.specialKind()",
         ] {
             #expect(listing.contains(column), "missing columnar fetch: \(column)")
         }
     }
 
+    // I1 (review fix, 2026-08-10): the earlier pin suite could not tell a
+    // specifier COLLECTION apart from an EVALUATED array — text presence
+    // alone can't distinguish `Music.userPlaylists()` (evaluated into a
+    // plain Array with no `.id`/`.name`/… methods; every column read after
+    // it is a runtime TypeError) from `Music.userPlaylists` (the un-called,
+    // still-chainable specifier collection the columnar reads require).
+    // This pin locks in the un-called form and rejects the evaluated one.
+    @Test("the playlists root is an un-called specifier collection, never an evaluated array")
+    func usesUncalledPlaylistsSpecifierCollection() {
+        let listing = ByteText(buildListPlaylistsJXA())
+        #expect(!listing.contains("Music.userPlaylists();"), "root must not be evaluated with ()")
+        #expect(listing.contains("Music.userPlaylists;"), "root must be the un-called specifier")
+    }
+
+    // I2 (review fix, 2026-08-10): extended to ALL SIX columns, not just the
+    // first three — every column read, including the track_count loop, must
+    // follow the count-first read.
     @Test("reads the object count first, before any column fetch")
     func readsCountFirst() {
         let script = buildListPlaylistsJXA()
-        guard let countRange = script.range(of: "const expectedCount = playlists.length;") else {
+        guard let countRange = script.range(of: "const expectedCount = playlistRefs.length;") else {
             Issue.record("count-first read is missing")
             return
         }
-        for column in ["playlists.id()", "playlists.name()", "playlists.persistentID()"] {
+        for column in [
+            "playlistRefs.id()", "playlistRefs.name()", "playlistRefs.persistentID()",
+            "playlistRefs[index].tracks.length", "playlistRefs.smart()", "playlistRefs.specialKind()",
+        ] {
             guard let columnRange = script.range(of: column) else {
                 Issue.record("missing columnar fetch: \(column)")
                 continue
@@ -213,6 +244,18 @@ struct ListPlaylistsBuilderTests {
         ] {
             #expect(listing.contains(message), "missing mismatch message: \(message)")
         }
+    }
+
+    // C2 (review fix, 2026-08-10): track_count has no sdef columnar
+    // counterpart — it is a per-playlist LEAN count loop, indexed off the
+    // SAME `playlistRefs` collection, that never calls `.tracks()` WITH
+    // parens (which would materialize every track specifier of that
+    // playlist instead of just counting them).
+    @Test("track_count is a per-playlist lean count loop, never a materializing tracks() call")
+    func trackCountUsesLeanPerPlaylistCountLoop() {
+        let listing = ByteText(buildListPlaylistsJXA())
+        #expect(listing.contains("playlistRefs[index].tracks.length"))
+        #expect(!listing.contains(".tracks()"), "must never materialize track specifiers")
     }
 
     @Test("the old per-playlist property loop is gone")
