@@ -449,7 +449,104 @@ struct ReadJXAPortTests {
         #expect(!probe.contains("const requestedName = Source\""))
         #expect(probe.contains("Music.userPlaylists()"))
         #expect(probe.contains("playlist.name() === requestedName"))
-        #expect(probe.contains("playlist.fileTracks()"))
+        #expect(probe.contains("playlist.fileTracks;"))
+    }
+
+    // bulk-read-speedup Task 2: playlist lookup/matching discipline stays
+    // byte-identical (columnar rewrite touches only the per-playlist track
+    // and file-track reads inside the map body).
+    @Test("playlist lookup keeps the exact-name filter over the called specifiers array")
+    func playlistLookupDisciplineUnchanged() throws {
+        let script = buildReadJXA(name: "any")
+        let probe = ByteText(script)
+        let matchesBlock =
+            "const matches = Music.userPlaylists().filter(function (playlist) {\n" +
+            "    return playlist.name() === requestedName;\n" +
+            "});"
+        #expect(probe.contains(matchesBlock))
+    }
+
+    // bulk-read-speedup Task 2: every track column is fetched ONCE off the
+    // SAME un-called `playlist.tracks` specifier (never the called,
+    // materializing `playlist.tracks()` form).
+    @Test("fetches every track column off the un-called tracks specifier")
+    func fetchesTrackColumnsOffUncalledSpecifier() throws {
+        let script = buildReadJXA(name: "any")
+        let probe = ByteText(script)
+        #expect(probe.contains("const trackRefs = playlist.tracks;"))
+        for column in [
+            "trackRefs.databaseID()", "trackRefs.persistentID()", "trackRefs.name()",
+            "trackRefs.artist()", "trackRefs.album()", "trackRefs.duration()",
+            "trackRefs.kind()", "trackRefs.bitRate()", "trackRefs.sampleRate()",
+            "trackRefs.cloudStatus()",
+        ] {
+            #expect(probe.contains(column), "\(column)")
+        }
+        // Negative pin (Task 1 idiom): the CALLED form, without a trailing
+        // semicolon, so a chained `.tracks().map(...)` would also be caught.
+        #expect(!probe.contains("playlist.tracks()"))
+    }
+
+    // bulk-read-speedup Task 2: file-track database IDs are likewise a
+    // single columnar fetch off the un-called `fileTracks` specifier, never
+    // a per-file-track loop.
+    @Test("fetches file-track database IDs off the un-called file-tracks specifier")
+    func fetchesFileTrackColumnOffUncalledSpecifier() throws {
+        let script = buildReadJXA(name: "any")
+        let probe = ByteText(script)
+        #expect(probe.contains("const fileTrackRefs = playlist.fileTracks;"))
+        #expect(probe.contains("fileTrackRefs.databaseID()"))
+        #expect(!probe.contains("playlist.fileTracks()"))
+    }
+
+    // bulk-read-speedup Task 2: count-first, narrowest drift window — each
+    // collection's `.length` count read precedes every columnar get taken
+    // off that SAME collection.
+    @Test("counts each collection before fetching any of its columns")
+    func countsBeforeColumns() throws {
+        let script = buildReadJXA(name: "any")
+        let probe = ByteText(script)
+
+        let trackCount = try #require(probe.offset(of: "trackRefs.length"))
+        let firstTrackColumn = try #require(probe.offset(of: "trackRefs.databaseID()"))
+        #expect(trackCount < firstTrackColumn)
+
+        let fileTrackCount = try #require(probe.offset(of: "fileTrackRefs.length"))
+        let fileTrackColumn = try #require(probe.offset(of: "fileTrackRefs.databaseID()"))
+        #expect(fileTrackCount < fileTrackColumn)
+    }
+
+    // bulk-read-speedup Task 2: every track/file-track column's alignment
+    // guard names that exact column, fail-closed, in a source-text literal.
+    @Test("guards every track column's length against the count-first read")
+    func guardsEveryTrackColumnLength() throws {
+        let script = buildReadJXA(name: "any")
+        let probe = ByteText(script)
+        for message in [
+            "column length mismatch: database_id",
+            "column length mismatch: persistent_id",
+            "column length mismatch: title",
+            "column length mismatch: artist",
+            "column length mismatch: album",
+            "column length mismatch: duration",
+            "column length mismatch: kind",
+            "column length mismatch: bit_rate",
+            "column length mismatch: sample_rate",
+            "column length mismatch: cloud_status",
+            "column length mismatch: file_track_database_id",
+        ] {
+            #expect(probe.contains(message), "\(message)")
+        }
+    }
+
+    // bulk-read-speedup Task 2: the per-track loop construct (one callback
+    // invoked per track, each reading ten properties) disappears entirely.
+    @Test("no per-track loop construct remains")
+    func noPerTrackLoopConstructRemains() throws {
+        let script = buildReadJXA(name: "any")
+        let probe = ByteText(script)
+        #expect(!probe.contains("function (track, sourceIndex)"))
+        #expect(!probe.contains("function (fileTrack)"))
     }
 
     // test_read_jxa_targets_verified_absolute_music_app_path
