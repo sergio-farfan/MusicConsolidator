@@ -217,8 +217,11 @@ struct CopyButton: View {
 }
 
 /// The streaming progress row: phase label plus a ticking elapsed clock —
-/// never a bare spinner (reads cost ~8-9 s + ~0.16 s/track; a 1,600-track
-/// playlist is 4-5 minutes).
+/// never a bare spinner. Since the columnar readers landed (2026-08-11) a
+/// snapshot read is normally a few seconds even for a large playlist, but it
+/// is UNINTERRUPTIBLE once in flight and its duration still depends on the
+/// library and on Music's own responsiveness, so the ticking clock remains
+/// the only honest signal that work is still happening.
 struct ProgressPhaseView: View {
     let phase: AuditFlowModel.Phase
 
@@ -244,9 +247,10 @@ struct ProgressPhaseView: View {
                 // reviewer finding; pinned by
                 // StructuralViewTests.screenOneFitsDuringReadingPhase).
                 Text(
-                    "Reads cost about 8\u{2013}9 s plus ~0.16 s per track; a 1,600-track "
-                        + "playlist takes 4\u{2013}5 minutes. Cancel takes effect once the "
-                        + "in-flight read finishes (the read itself cannot be interrupted)."
+                    "The read fetches each track property for the whole playlist in one "
+                        + "request, so it usually takes a few seconds even for a large "
+                        + "playlist. Cancel takes effect once the in-flight read finishes "
+                        + "(the read itself cannot be interrupted)."
                 )
                 .font(.callout)
                 .foregroundStyle(.secondary)

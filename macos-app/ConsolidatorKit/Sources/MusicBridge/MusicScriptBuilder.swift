@@ -394,6 +394,15 @@ public func buildReadJXA(name: String) -> String {
 /// callers. Body and output are byte-identical to the pre-2026-08-11
 /// `buildReadJXA` (pinned verbatim in `LegacyReadJXABuilderTests`) — this is
 /// a pure copy under a new name, not a behavior change.
+///
+/// DEPRECATED ON PURPOSE (M1, 2026-08-11): the attribute is the removal
+/// reminder. It is not "do not use" — Diagnostics' cross-check MUST use it —
+/// it is "this symbol has a scheduled death, and the compiler will point at
+/// every site that has to go with it."
+@available(
+    *, deprecated,
+    message: "Diagnostics reader cross-check only; remove with the legacy builders"
+)
 public func legacyReadJXAScript(name: String) -> String {
     let encodedAppPath = appleScriptString(musicAppPath)
     let encodedName = appleScriptString(name)
@@ -463,14 +472,18 @@ public func legacyReadJXAScript(name: String) -> String {
 /// Enumeration semantics deliberately MIRROR `buildReadJXA`: the same
 /// absolute-path `Application(...)` targeting (the literal below must equal
 /// `appleScriptString(musicAppPath)`; the pin test ties them) and the same
-/// inclusion set — `Music.userPlaylists()`, which contains regular, smart,
-/// and folder playlists (subscription playlists inherit `playlist`, not
-/// `user playlist`, and are excluded) — so the browser's groups always agree
-/// with what a subsequent audit's exact-name filter will find. `smart` and
-/// `special kind` are cheap per-playlist properties (com.apple.Music.sdef:
-/// `user playlist.smart`, `playlist.special kind`) exposed to annotate those
-/// kinds; `tracks().length` counts the same tracks collection the read
-/// script serializes. Playlist-level properties are read raw (no coercion),
+/// inclusion SET — every `user playlist`, which contains regular, smart, and
+/// folder playlists (subscription playlists inherit `playlist`, not `user
+/// playlist`, and are excluded) — so the browser's groups always agree with
+/// what a subsequent audit's exact-name filter will find. Only the SPELLING
+/// differs (M2, 2026-08-11): this script binds the collection UN-CALLED as
+/// `Music.userPlaylists` (see COLUMNAR below), while `buildReadJXA` still
+/// evaluates the same collection as `Music.userPlaylists()` because it has to
+/// `.filter` it by name. `smart` and `special kind` are cheap per-playlist
+/// properties (com.apple.Music.sdef: `user playlist.smart`, `playlist.special
+/// kind`) exposed to annotate those kinds; `playlistRefs[index].tracks.length`
+/// counts the same tracks collection the read script serializes.
+/// Playlist-level properties are read raw (no coercion),
 /// like the read JXA's playlist block: a null/undefined anomaly surfaces as
 /// a strict-parse rejection, never a silent default.
 ///
@@ -520,12 +533,17 @@ public func legacyReadJXAScript(name: String) -> String {
 /// name` — a playlist created or deleted mid-scan skews alignment between
 /// the count read and a later column read). Both messages are source-text
 /// literals per column, not built via string concatenation, so they stay
-/// byte-pinnable. `trackCounts` is `expectedCount`-long by construction (the
-/// loop bound IS `expectedCount`), so its length check is a
-/// symmetry/defense-in-depth guard; its element-type check (`typeof value
-/// === "number"`) is the guard that actually earns its keep for that
-/// column, and — being a type concern, not a length one — reports `column
-/// type mismatch: track_count` too. Records are assembled by index
+/// byte-pinnable. `trackCounts` is the ONE exception, and deliberately so
+/// (M3, 2026-08-11): it is a JS array literal built by a loop whose bound IS
+/// `expectedCount`, in this same script, so `Array.isArray(trackCounts)` is
+/// unconditionally true and `trackCounts.length !== expectedCount` is
+/// unconditionally false — both checks were DEAD CODE that could not fire for
+/// any library state, and pretending otherwise made the guard set look wider
+/// than it is. They are gone; the column keeps the one guard that can
+/// actually fire, the per-element `typeof value === "number"` check (a
+/// non-numeric `.tracks.length` from Music), which reports `column type
+/// mismatch: track_count`. That column therefore has NO length message — the
+/// pins reflect this. Records are assembled by index
 /// afterward in a plain in-memory loop that touches no Music object — only
 /// the six already-fetched arrays — so it sends no further Apple Events.
 /// The JSON shape (keys, key order, per-record field order) is
@@ -564,12 +582,6 @@ public func buildListPlaylistsJXA() -> String {
         "const trackCounts = [];",
         "for (let index = 0; index < expectedCount; index++) {",
         "    trackCounts.push(playlistRefs[index].tracks.length);",
-        "}",
-        "if (!Array.isArray(trackCounts)) {",
-        "    throw new Error(\"column type mismatch: track_count\");",
-        "}",
-        "if (trackCounts.length !== expectedCount) {",
-        "    throw new Error(\"column length mismatch: track_count\");",
         "}",
         "if (!trackCounts.every(function (value) { return typeof value === \"number\"; })) {",
         "    throw new Error(\"column type mismatch: track_count\");",
@@ -619,6 +631,14 @@ public func buildListPlaylistsJXA() -> String {
 /// byte-identical to the pre-2026-08-06 script
 /// (pinned verbatim in `LegacyListPlaylistsBuilderTests`) — this is a pure
 /// rename, not a behavior change.
+///
+/// DEPRECATED ON PURPOSE (M1, 2026-08-11): see the note on
+/// `legacyReadJXAScript` — the attribute marks the scheduled removal, not a
+/// prohibition on the one sanctioned caller.
+@available(
+    *, deprecated,
+    message: "Diagnostics reader cross-check only; remove with the legacy builders"
+)
 public func legacyListPlaylistsScript() -> String {
     let lines = [
         "const Music = Application(\"/System/Applications/Music.app\");",
@@ -638,6 +658,69 @@ public func legacyListPlaylistsScript() -> String {
         "",
     ]
     return lines.joined(separator: "\n")
+}
+
+// MARK: - the legacy-builder deprecation seam (M1, 2026-08-11)
+//
+// The two builders above carry `@available(*, deprecated, …)` so that ANY new
+// direct caller, anywhere, is flagged the moment it is written. That reminder is
+// the point of M1 — but their SANCTIONED callers (Diagnostics' "Compare
+// readers" and the byte pins that keep the retained legacy text from drifting)
+// must not sit in a standing warning, and neither of the language's usual outs
+// applies here. Both were measured, not assumed:
+//
+//   - Marking the CALLING declaration deprecated only moves the warning one
+//     frame up the chain. For "Compare readers" it walks
+//     compareReaders -> startCompareReaders -> the Button inside SwiftUI's
+//     `body`, and `body` cannot be deprecated.
+//   - swift-testing REJECTS `@available` on `@Test`/`@Suite` declarations
+//     outright ("Attribute 'Test' cannot be applied to this function because it
+//     has been marked '@available'"), so the byte pins cannot carry it either.
+//
+// What remains is a non-deprecated protocol requirement satisfied by a
+// DEPRECATED witness: the reminder stays bound to the two witnesses below, and
+// the two accessors dispatch through the requirement, which the compiler does
+// not re-report. The accessors are pure forwarders — a pin calling
+// `legacyReadScript(name:)` still pins `legacyReadJXAScript(name:)`'s exact
+// output — and protocol, witnesses, accessors and builders are all deleted in
+// one sweep when the columnar readers have been validated live.
+public protocol LegacyReaderScriptSource {
+    static func legacyListingScriptText() -> String
+    static func legacyReadScriptText(name: String) -> String
+}
+
+public enum LegacyReaderScripts: LegacyReaderScriptSource {
+    @available(
+        *, deprecated,
+        message: "Diagnostics reader cross-check only; remove with the legacy builders"
+    )
+    public static func legacyListingScriptText() -> String {
+        legacyListPlaylistsScript()
+    }
+
+    @available(
+        *, deprecated,
+        message: "Diagnostics reader cross-check only; remove with the legacy builders"
+    )
+    public static func legacyReadScriptText(name: String) -> String {
+        legacyReadJXAScript(name: name)
+    }
+}
+
+/// The pre-columnar listing script text — `legacyListPlaylistsScript()`
+/// verbatim, reached through the seam above.
+public func legacyListingScript<T: LegacyReaderScriptSource>(
+    _ source: T.Type = LegacyReaderScripts.self
+) -> String {
+    T.legacyListingScriptText()
+}
+
+/// The pre-columnar snapshot script text for one name —
+/// `legacyReadJXAScript(name:)` verbatim, reached through the seam above.
+public func legacyReadScript<T: LegacyReaderScriptSource>(
+    _ source: T.Type = LegacyReaderScripts.self, name: String
+) -> String {
+    T.legacyReadScriptText(name: name)
 }
 
 // MARK: - fail-closed validation (music_bridge.py:599-631)

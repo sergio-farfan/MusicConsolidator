@@ -228,11 +228,18 @@ func cleanupOrchestrationCopies() -> [PlaylistSnapshot] {
 }
 
 /// Listing wire: the named copies plus the merged target (3 tracks).
-func cleanupListingWire(copyPIDs: [String]) -> String {
+/// `includeTarget: false` drops the merged target from the listing — the
+/// genuinely-absent-name case, which must stay a candidacy refusal and never
+/// be mistaken for a failed read (finding I4).
+func cleanupListingWire(copyPIDs: [String], includeTarget: Bool = true) -> String {
     var entries = copyFacts
         .filter { copyPIDs.contains($0.pid) }
         .map { gateEntry(id: $0.id, name: cleanupGroupName, pid: $0.pid, count: 1) }
-    entries.append(gateEntry(id: 100, name: cleanupTargetName, pid: "TARGET0000000001", count: 3))
+    if includeTarget {
+        entries.append(
+            gateEntry(id: 100, name: cleanupTargetName, pid: "TARGET0000000001", count: 3)
+        )
+    }
     return "{\"playlists\": [\(entries.joined(separator: ", "))]}"
 }
 
@@ -529,5 +536,100 @@ struct CleanupOrchestrationTests {
         #expect(runner.commands.count - before == 3)
         #expect(model.armedMutation != nil)
         #expect(model.cleanupContext?.plans.count == 2)
+    }
+}
+
+// MARK: - read failure vs evidence drift (final review, finding I4, 2026-08-11)
+
+@Suite("Cleanup gate-arm read failures are not evidence drift")
+@MainActor
+struct CleanupReadFailureTests {
+
+    // Before I4 the gate-arm live sample swallowed EVERY snapshot-read error
+    // with `try?`, so the columnar reader's fail-closed column guards
+    // ("column length mismatch: title", a mid-scan mutation), an Automation
+    // denial, and a strict-parse rejection all arrived as an EMPTY copy list —
+    // and armVerification then blamed the library: "merged target ... was not
+    // found" / "copy ... no longer bears the group name". Same fail-closed
+    // outcome (nothing is deleted either way), but the stated reason was false
+    // and pointed the operator at the wrong thing. The read failure is now its
+    // own refusal, carrying the verbatim operator message.
+    @Test("a column-mismatch error on the group snapshot read refuses as a READ failure")
+    func columnMismatchOnSnapshotReadRefusesAsReadFailure() async throws {
+        let allPIDs = copyFacts.map(\.pid)
+        let listing = cleanupListingWire(copyPIDs: allPIDs)
+        let snapshot = cleanupSnapshotWire(copyPIDs: allPIDs)
+        // refresh: listing. arm: listing, GROUP snapshot (fails), target snapshot.
+        let runner = ScriptedRunner(results: [
+            .success(listing),
+            .success(listing),
+            .failure(MusicCommandError("column length mismatch: title")),
+            .success(snapshot),
+        ])
+        let harness = try MutationGateHarness(runner: runner)
+        defer { harness.cleanUp() }
+        let model = harness.model
+        let plan = try buildMergePlan(name: cleanupGroupName, copies: cleanupOrchestrationCopies())
+        let auditPaths = try writeMergeAudit(
+            outputDir: harness.outputDirectory, plan: plan,
+            now: { planDate }, timeZone: TimeZone(identifier: "UTC")!
+        )
+
+        model.refreshCleanup()
+        await model.cleanupScanTask?.value
+        model.startCleanupAudit(planFileName: artifactBasename(auditPaths.planJson))
+        await harness.awaitMutation()
+
+        guard case .refused(let reason) = model.mutationGatePhase else {
+            Issue.record("expected .refused, got \(model.mutationGatePhase)")
+            return
+        }
+        // The read failure, verbatim, named as a read failure...
+        #expect(reason.contains("column length mismatch: title"))
+        #expect(reason.contains("live read"))
+        #expect(reason.contains("read failure, not drift"))
+        // ...and NOT the drifted-evidence verdicts the swallowed error produced.
+        #expect(!reason.contains("was not found"))
+        #expect(!reason.contains("no longer bears the group name"))
+        // Fail-closed: nothing armed, no per-copy delete artifact written.
+        #expect(model.armedMutation == nil)
+        #expect(model.cleanupContext == nil)
+        let deletePlans = try FileManager.default.contentsOfDirectory(
+            at: harness.outputDirectory, includingPropertiesForKeys: nil
+        ).filter { $0.lastPathComponent.hasSuffix(".delete.plan.json") }
+        #expect(deletePlans.isEmpty)
+    }
+
+    // The complementary case must keep working: a name that is genuinely
+    // ABSENT from the library is not a read failure, so it still flows to the
+    // ordinary candidacy/verification refusal wording rather than the new one.
+    @Test("a genuinely absent target is still reported as drift, not as a read failure")
+    func absentTargetStillReportsDrift() async throws {
+        let allPIDs = copyFacts.map(\.pid)
+        // A listing WITHOUT the merged target: the target name is absent, so no
+        // snapshot read is attempted for it at all.
+        let listing = cleanupListingWire(copyPIDs: allPIDs, includeTarget: false)
+        let snapshot = cleanupSnapshotWire(copyPIDs: allPIDs)
+        let runner = ScriptedRunner(outputs: [listing, listing, snapshot])
+        let harness = try MutationGateHarness(runner: runner)
+        defer { harness.cleanUp() }
+        let model = harness.model
+        let plan = try buildMergePlan(name: cleanupGroupName, copies: cleanupOrchestrationCopies())
+        let auditPaths = try writeMergeAudit(
+            outputDir: harness.outputDirectory, plan: plan,
+            now: { planDate }, timeZone: TimeZone(identifier: "UTC")!
+        )
+
+        model.refreshCleanup()
+        await model.cleanupScanTask?.value
+        model.startCleanupAudit(planFileName: artifactBasename(auditPaths.planJson))
+        await harness.awaitMutation()
+
+        guard case .refused(let reason) = model.mutationGatePhase else {
+            Issue.record("expected .refused, got \(model.mutationGatePhase)")
+            return
+        }
+        #expect(reason.contains("target absent from the live listing"))
+        #expect(!reason.contains("read failure, not drift"))
     }
 }

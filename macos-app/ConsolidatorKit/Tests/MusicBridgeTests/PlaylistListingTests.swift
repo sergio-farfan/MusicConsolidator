@@ -60,12 +60,6 @@ const trackCounts = [];
 for (let index = 0; index < expectedCount; index++) {
     trackCounts.push(playlistRefs[index].tracks.length);
 }
-if (!Array.isArray(trackCounts)) {
-    throw new Error("column type mismatch: track_count");
-}
-if (trackCounts.length !== expectedCount) {
-    throw new Error("column length mismatch: track_count");
-}
 if (!trackCounts.every(function (value) { return typeof value === "number"; })) {
     throw new Error("column type mismatch: track_count");
 }
@@ -253,13 +247,38 @@ struct ListPlaylistsBuilderTests {
     // expectedCount`) are separate `if` statements with their own accurate,
     // verbatim message per column — closes the deferred Task 1 minor
     // ("type-branch guard message says 'length mismatch' inaccurately").
+    //
+    // M3 (final review, 2026-08-11): `track_count` is deliberately EXCLUDED
+    // from the length-message list. It is a loop-built JS array literal whose
+    // bound is `expectedCount`, so an Array.isArray/length guard on it could
+    // never fire for any library state; both dead guards were deleted and the
+    // column keeps only the per-element `typeof` check, which reports a TYPE
+    // mismatch. The next assertion pins that asymmetry so the messages and the
+    // script can't silently drift apart again.
     @Test("alignment guard names the mismatched column, verbatim, for every field's type and length")
     func alignmentGuardNamesEveryColumn() {
         let listing = ByteText(buildListPlaylistsJXA())
-        for field in ["id", "name", "persistent_id", "track_count", "smart", "special_kind"] {
+        let wholeColumnFields = ["id", "name", "persistent_id", "smart", "special_kind"]
+        for field in wholeColumnFields {
             #expect(listing.contains("column type mismatch: \(field)"), "missing type mismatch message: \(field)")
             #expect(listing.contains("column length mismatch: \(field)"), "missing length mismatch message: \(field)")
         }
+        // The loop-built column: type message only.
+        #expect(listing.contains("column type mismatch: track_count"))
+    }
+
+    // M3 (final review, 2026-08-11): the two guards that could not fire are
+    // gone, and must stay gone — an `Array.isArray(trackCounts)` or a
+    // `trackCounts.length !== expectedCount` branch is unreachable by
+    // construction and misrepresents the real guard surface.
+    @Test("track_count carries no dead array/length guard and no length message")
+    func trackCountHasNoDeadGuards() {
+        let listing = ByteText(buildListPlaylistsJXA())
+        #expect(!listing.contains("!Array.isArray(trackCounts)"))
+        #expect(!listing.contains("trackCounts.length !== expectedCount"))
+        #expect(!listing.contains("column length mismatch: track_count"))
+        // The one guard that CAN fire stays.
+        #expect(listing.contains("typeof value === \"number\""))
     }
 
     // C2 (review fix, 2026-08-10): track_count has no sdef columnar
@@ -294,7 +313,7 @@ struct LegacyListPlaylistsBuilderTests {
     @Test("legacy script text is the pre-Task-1 pinned constant, byte for byte")
     func legacyScriptTextIsPinned() {
         expectByteEqual(
-            legacyListPlaylistsScript(),
+            legacyListingScript(),
             expectedLegacyListPlaylistsJXA,
             context: "legacyListPlaylistsScript"
         )
@@ -303,8 +322,8 @@ struct LegacyListPlaylistsBuilderTests {
     @Test("legacy builder is deterministic across calls")
     func legacyBuilderIsDeterministic() {
         expectByteEqual(
-            legacyListPlaylistsScript(),
-            legacyListPlaylistsScript(),
+            legacyListingScript(),
+            legacyListingScript(),
             context: "two calls"
         )
     }
@@ -322,7 +341,7 @@ struct LegacyListPlaylistsBuilderTests {
         let result = try runTool(
             osacompilePath,
             arguments: ["-l", "JavaScript", "-o", output.path],
-            stdinText: legacyListPlaylistsScript()
+            stdinText: legacyListingScript()
         )
         #expect(result.status == 0, "\(result.stderr)")
     }

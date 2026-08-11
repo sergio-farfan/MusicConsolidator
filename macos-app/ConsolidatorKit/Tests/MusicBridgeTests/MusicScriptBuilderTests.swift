@@ -436,8 +436,171 @@ struct ApplyScriptPortTests {
     }
 }
 
+// bulk-read-speedup Task 3, final-review finding I2 (2026-08-11): a
+// byte-verbatim pin for the LIVE COLUMNAR read builder, mirroring
+// `expectedLegacyReadJXA` further down this file. `buildReadJXA` lost its
+// Python-reference golden byte-parity case when the reader went columnar
+// (a deliberate divergence), which left the live read script's TEXT with no
+// verbatim gate at all -- only shape/ordering probes that a wholesale rewrite
+// could still satisfy. This constant closes that hole: it is the exact output
+// of `buildReadJXA(name: "any")`, so ANY unreviewed edit to the live read
+// script text fails here with a byte offset.
+private let expectedReadJXA = """
+const Music = Application("/System/Applications/Music.app");
+const requestedName = "any";
+
+function textOrEmpty(value) {
+    return value === null || value === undefined ? "" : String(value);
+}
+
+function numberOrNull(value) {
+    return value === null || value === undefined || Number.isNaN(value) ? null : value;
+}
+
+const matches = Music.userPlaylists().filter(function (playlist) {
+    return playlist.name() === requestedName;
+});
+
+const playlists = matches.map(function (playlist) {
+    const fileTrackRefs = playlist.fileTracks;
+    const expectedFileTrackCount = fileTrackRefs.length;
+
+    const fileTrackDatabaseIdColumn = fileTrackRefs.databaseID();
+    if (!Array.isArray(fileTrackDatabaseIdColumn)) {
+        throw new Error("column type mismatch: file_track_database_id");
+    }
+    if (fileTrackDatabaseIdColumn.length !== expectedFileTrackCount) {
+        throw new Error("column length mismatch: file_track_database_id");
+    }
+    const fileTrackDatabaseIDs = new Set(fileTrackDatabaseIdColumn);
+
+    const trackRefs = playlist.tracks;
+    const expectedTrackCount = trackRefs.length;
+
+    const databaseIds = trackRefs.databaseID();
+    if (!Array.isArray(databaseIds)) {
+        throw new Error("column type mismatch: database_id");
+    }
+    if (databaseIds.length !== expectedTrackCount) {
+        throw new Error("column length mismatch: database_id");
+    }
+
+    const persistentIds = trackRefs.persistentID();
+    if (!Array.isArray(persistentIds)) {
+        throw new Error("column type mismatch: persistent_id");
+    }
+    if (persistentIds.length !== expectedTrackCount) {
+        throw new Error("column length mismatch: persistent_id");
+    }
+
+    const titles = trackRefs.name();
+    if (!Array.isArray(titles)) {
+        throw new Error("column type mismatch: title");
+    }
+    if (titles.length !== expectedTrackCount) {
+        throw new Error("column length mismatch: title");
+    }
+
+    const artists = trackRefs.artist();
+    if (!Array.isArray(artists)) {
+        throw new Error("column type mismatch: artist");
+    }
+    if (artists.length !== expectedTrackCount) {
+        throw new Error("column length mismatch: artist");
+    }
+
+    const albums = trackRefs.album();
+    if (!Array.isArray(albums)) {
+        throw new Error("column type mismatch: album");
+    }
+    if (albums.length !== expectedTrackCount) {
+        throw new Error("column length mismatch: album");
+    }
+
+    const durations = trackRefs.duration();
+    if (!Array.isArray(durations)) {
+        throw new Error("column type mismatch: duration");
+    }
+    if (durations.length !== expectedTrackCount) {
+        throw new Error("column length mismatch: duration");
+    }
+
+    const kinds = trackRefs.kind();
+    if (!Array.isArray(kinds)) {
+        throw new Error("column type mismatch: kind");
+    }
+    if (kinds.length !== expectedTrackCount) {
+        throw new Error("column length mismatch: kind");
+    }
+
+    const bitRates = trackRefs.bitRate();
+    if (!Array.isArray(bitRates)) {
+        throw new Error("column type mismatch: bit_rate");
+    }
+    if (bitRates.length !== expectedTrackCount) {
+        throw new Error("column length mismatch: bit_rate");
+    }
+
+    const sampleRates = trackRefs.sampleRate();
+    if (!Array.isArray(sampleRates)) {
+        throw new Error("column type mismatch: sample_rate");
+    }
+    if (sampleRates.length !== expectedTrackCount) {
+        throw new Error("column length mismatch: sample_rate");
+    }
+
+    const cloudStatuses = trackRefs.cloudStatus();
+    if (!Array.isArray(cloudStatuses)) {
+        throw new Error("column type mismatch: cloud_status");
+    }
+    if (cloudStatuses.length !== expectedTrackCount) {
+        throw new Error("column length mismatch: cloud_status");
+    }
+
+    const tracks = [];
+    for (let sourceIndex = 0; sourceIndex < expectedTrackCount; sourceIndex++) {
+        const databaseID = databaseIds[sourceIndex];
+        tracks.push({
+            source_index: sourceIndex,
+            database_id: databaseID,
+            persistent_id: textOrEmpty(persistentIds[sourceIndex]),
+            title: textOrEmpty(titles[sourceIndex]),
+            artist: textOrEmpty(artists[sourceIndex]),
+            album: textOrEmpty(albums[sourceIndex]),
+            duration: numberOrNull(durations[sourceIndex]),
+            kind: textOrEmpty(kinds[sourceIndex]),
+            bit_rate: numberOrNull(bitRates[sourceIndex]),
+            sample_rate: numberOrNull(sampleRates[sourceIndex]),
+            cloud_status: textOrEmpty(cloudStatuses[sourceIndex]),
+            is_file_track: fileTrackDatabaseIDs.has(databaseID)
+        });
+    }
+    return {
+        id: playlist.id(),
+        name: playlist.name(),
+        persistent_id: playlist.persistentID(),
+        tracks: tracks
+    };
+});
+
+JSON.stringify({playlists: playlists});
+
+"""
+
 @Suite("Read JXA (ported pure read-builder cases)")
 struct ReadJXAPortTests {
+
+    // Finding I2 (2026-08-11): the live columnar script's byte-verbatim pin.
+    // Interpolation is confined to the two encoded values, so pinning the
+    // "any" rendering pins the whole template.
+    @Test("columnar read script text is the pinned constant, byte for byte")
+    func columnarScriptTextIsPinned() {
+        expectByteEqual(
+            buildReadJXA(name: "any"),
+            expectedReadJXA,
+            context: "buildReadJXA"
+        )
+    }
 
     // test_read_jxa_json_encodes_untrusted_playlist_name
     @Test("JSON-encodes an untrusted playlist name")
@@ -681,7 +844,7 @@ struct LegacyReadJXABuilderTests {
     @Test("legacy script text is the pre-Task-2 pinned constant, byte for byte")
     func legacyScriptTextIsPinned() {
         expectByteEqual(
-            legacyReadJXAScript(name: "any"),
+            legacyReadScript(name: "any"),
             expectedLegacyReadJXA,
             context: "legacyReadJXAScript"
         )
@@ -690,8 +853,8 @@ struct LegacyReadJXABuilderTests {
     @Test("legacy builder is deterministic across calls")
     func legacyBuilderIsDeterministic() {
         expectByteEqual(
-            legacyReadJXAScript(name: "any"),
-            legacyReadJXAScript(name: "any"),
+            legacyReadScript(name: "any"),
+            legacyReadScript(name: "any"),
             context: "two calls"
         )
     }
@@ -709,7 +872,7 @@ struct LegacyReadJXABuilderTests {
         let result = try runTool(
             osacompilePath,
             arguments: ["-l", "JavaScript", "-o", output.path],
-            stdinText: legacyReadJXAScript(name: "any")
+            stdinText: legacyReadScript(name: "any")
         )
         #expect(result.status == 0, "\(result.stderr)")
     }
