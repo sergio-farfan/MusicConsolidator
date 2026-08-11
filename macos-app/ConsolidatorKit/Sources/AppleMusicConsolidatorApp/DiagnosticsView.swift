@@ -308,35 +308,33 @@ extension ReadWorker {
     static func compareReaders(
         playlistName: String, runner: ScriptRunner
     ) throws -> ReaderCompareOutcome {
-        let legacyListingRun: (output: String, seconds: Double)
+        // Each timed block spans RUN + PARSE together (never just the OSA
+        // call) — true parity with `readAllCopies`'s elapsed contract, which
+        // `ReaderElapsed`'s doc comment promises. Folding the parse inside
+        // the timed closure (rather than timing the run and parsing after)
+        // is what makes that promise true, not just documented.
+        let legacyListingRun: (value: [PlaylistListing], seconds: Double)
         do {
             legacyListingRun = try timedRun {
-                try runner.run(.readJXA(script: legacyListPlaylistsScript()))
+                try parsePlaylistListing(
+                    raw: runner.run(.readJXA(script: legacyListPlaylistsScript()))
+                )
             }
         } catch {
             throw ReaderCompareFailure(stage: "legacy listing", message: String(describing: error))
         }
-        let liveListingRun: (output: String, seconds: Double)
+        let liveListingRun: (value: [PlaylistListing], seconds: Double)
         do {
             liveListingRun = try timedRun {
-                try runner.run(.readJXA(script: buildListPlaylistsJXA()))
+                try parsePlaylistListing(
+                    raw: runner.run(.readJXA(script: buildListPlaylistsJXA()))
+                )
             }
         } catch {
             throw ReaderCompareFailure(stage: "live listing", message: String(describing: error))
         }
-
-        let legacyListing: [PlaylistListing]
-        do {
-            legacyListing = try parsePlaylistListing(raw: legacyListingRun.output)
-        } catch {
-            throw ReaderCompareFailure(stage: "legacy listing", message: String(describing: error))
-        }
-        let liveListing: [PlaylistListing]
-        do {
-            liveListing = try parsePlaylistListing(raw: liveListingRun.output)
-        } catch {
-            throw ReaderCompareFailure(stage: "live listing", message: String(describing: error))
-        }
+        let legacyListing = legacyListingRun.value
+        let liveListing = liveListingRun.value
 
         let trimmedName = playlistName.trimmingCharacters(in: .whitespacesAndNewlines)
         let targetName: String
@@ -351,35 +349,30 @@ extension ReadWorker {
             )
         }
 
-        let legacyReadRun: (output: String, seconds: Double)
+        let legacyReadRun: (value: [PlaylistSnapshot], seconds: Double)
         do {
             legacyReadRun = try timedRun {
-                try runner.run(.readJXA(script: legacyReadJXAScript(name: targetName)))
+                try parseAllCopies(
+                    raw: runner.run(.readJXA(script: legacyReadJXAScript(name: targetName))),
+                    name: targetName
+                )
             }
         } catch {
             throw ReaderCompareFailure(stage: "legacy snapshot", message: String(describing: error))
         }
-        let liveReadRun: (output: String, seconds: Double)
+        let liveReadRun: (value: [PlaylistSnapshot], seconds: Double)
         do {
             liveReadRun = try timedRun {
-                try runner.run(.readJXA(script: buildReadJXA(name: targetName)))
+                try parseAllCopies(
+                    raw: runner.run(.readJXA(script: buildReadJXA(name: targetName))),
+                    name: targetName
+                )
             }
         } catch {
             throw ReaderCompareFailure(stage: "live snapshot", message: String(describing: error))
         }
-
-        let legacyCopies: [PlaylistSnapshot]
-        do {
-            legacyCopies = try parseAllCopies(raw: legacyReadRun.output, name: targetName)
-        } catch {
-            throw ReaderCompareFailure(stage: "legacy snapshot", message: String(describing: error))
-        }
-        let liveCopies: [PlaylistSnapshot]
-        do {
-            liveCopies = try parseAllCopies(raw: liveReadRun.output, name: targetName)
-        } catch {
-            throw ReaderCompareFailure(stage: "live snapshot", message: String(describing: error))
-        }
+        let legacyCopies = legacyReadRun.value
+        let liveCopies = liveReadRun.value
 
         let difference = firstListingDifference(legacy: legacyListing, live: liveListing)
             ?? firstSnapshotDifference(legacy: legacyCopies, live: liveCopies)
@@ -396,14 +389,17 @@ extension ReadWorker {
         )
     }
 
-    private static func timedRun(
-        _ body: () throws -> String
-    ) throws -> (output: String, seconds: Double) {
+    /// Times `body` — RUN and PARSE together, whatever `body` does — and
+    /// returns its value alongside the elapsed seconds. Generic so the same
+    /// helper covers both the `[PlaylistListing]` and `[PlaylistSnapshot]`
+    /// reads; each call site folds its `runner.run` and its parse into one
+    /// closure so neither read's elapsed time can silently drop the parse.
+    private static func timedRun<T>(_ body: () throws -> T) throws -> (value: T, seconds: Double) {
         let clock = ContinuousClock()
         let start = clock.now
-        let output = try body()
+        let value = try body()
         let elapsed = start.duration(to: clock.now)
-        return (output, elapsedSecondsValue(of: elapsed))
+        return (value, elapsedSecondsValue(of: elapsed))
     }
 
     private static func firstListingDifference(
@@ -614,7 +610,6 @@ struct DiagnosticsView: View {
     private func startCompareReaders() {
         guard !isBusy else { return }
         isBusy = true
-        errorText = nil
         compareStatus = nil
         compareErrorText = nil
         let name = playlistName
