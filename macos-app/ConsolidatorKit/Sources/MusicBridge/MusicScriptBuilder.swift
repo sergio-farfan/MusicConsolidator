@@ -214,11 +214,12 @@ public func buildReadJXA(name: String) -> String {
 // MARK: - list-playlists JXA (M8; no reference counterpart)
 
 /// Build the read-only playlist-enumeration JXA — the source browser's
-/// listing read (M8). STATIC BY CONTRACT: this builder takes no parameters
-/// and performs NO interpolation of any value; the returned text is a
-/// compile-time constant (pinned verbatim in PlaylistListingTests). That
-/// zero-interpolation property is load-bearing for the surface's safety
-/// review — do not parameterize it.
+/// listing read (M8, columnar since the 2026-08-06 bulk-read speedup, Task
+/// 1). STATIC BY CONTRACT: this builder takes no parameters and performs NO
+/// interpolation of any value; the returned text is a compile-time constant
+/// (pinned verbatim in PlaylistListingTests). That zero-interpolation
+/// property is load-bearing for the surface's safety review — do not
+/// parameterize it.
 ///
 /// Enumeration semantics deliberately MIRROR `buildReadJXA`: the same
 /// absolute-path `Application(...)` targeting (the literal below must equal
@@ -233,7 +234,94 @@ public func buildReadJXA(name: String) -> String {
 /// script serializes. Playlist-level properties are read raw (no coercion),
 /// like the read JXA's playlist block: a null/undefined anomaly surfaces as
 /// a strict-parse rejection, never a silent default.
+///
+/// COLUMNAR (2026-08-06): every field is fetched as ONE array-specifier call
+/// over the SAME `playlists` specifier — `playlists.id()`, `.name()`,
+/// `.persistentID()`, `.smart()`, `.specialKind()` each return the whole
+/// column in one Apple Event, and `.tracks().length` similarly returns the
+/// whole per-playlist track-count column in one Apple Event (JXA's `.length`
+/// dispatches the `count` command, which — like `get` — distributes over an
+/// "every" container and returns one count per element, not a single total).
+/// There is deliberately no per-playlist loop that calls a Music property
+/// getter: every column is read off the SAME filtered `playlists` specifier
+/// (never a fresh/unfiltered `Music.userPlaylists()` call), so every column's
+/// index lines up with every other column's index by construction. The
+/// object count is read FIRST (`playlists.length`, its own Apple Event); each
+/// column's guard then rejects — fail-closed, no retry, no repair — a column
+/// whose length disagrees with it, throwing a LITERAL (not concatenated)
+/// message naming that column, e.g. `column length mismatch: name` (a
+/// playlist created or deleted mid-scan skews alignment between the count
+/// read and a later column read). The message is a source-text literal per
+/// column, not built via string concatenation, so it stays byte-pinnable.
+/// Records are assembled by index afterward in a plain in-memory loop that
+/// touches no Music object — only the six already-fetched arrays — so it
+/// sends no further Apple Events. The JSON shape (keys, key order,
+/// per-record field order) is byte-identical to the pre-columnar script.
 public func buildListPlaylistsJXA() -> String {
+    let lines = [
+        "const Music = Application(\"/System/Applications/Music.app\");",
+        "",
+        "const playlists = Music.userPlaylists();",
+        "const expectedCount = playlists.length;",
+        "",
+        "const ids = playlists.id();",
+        "if (!Array.isArray(ids) || ids.length !== expectedCount) {",
+        "    throw new Error(\"column length mismatch: id\");",
+        "}",
+        "",
+        "const names = playlists.name();",
+        "if (!Array.isArray(names) || names.length !== expectedCount) {",
+        "    throw new Error(\"column length mismatch: name\");",
+        "}",
+        "",
+        "const persistentIds = playlists.persistentID();",
+        "if (!Array.isArray(persistentIds) || persistentIds.length !== expectedCount) {",
+        "    throw new Error(\"column length mismatch: persistent_id\");",
+        "}",
+        "",
+        "const trackCounts = playlists.tracks().length;",
+        "if (!Array.isArray(trackCounts) || trackCounts.length !== expectedCount) {",
+        "    throw new Error(\"column length mismatch: track_count\");",
+        "}",
+        "",
+        "const smartFlags = playlists.smart();",
+        "if (!Array.isArray(smartFlags) || smartFlags.length !== expectedCount) {",
+        "    throw new Error(\"column length mismatch: smart\");",
+        "}",
+        "",
+        "const specialKinds = playlists.specialKind();",
+        "if (!Array.isArray(specialKinds) || specialKinds.length !== expectedCount) {",
+        "    throw new Error(\"column length mismatch: special_kind\");",
+        "}",
+        "",
+        "const records = [];",
+        "for (let index = 0; index < expectedCount; index++) {",
+        "    records.push({",
+        "        id: ids[index],",
+        "        name: names[index],",
+        "        persistent_id: persistentIds[index],",
+        "        track_count: trackCounts[index],",
+        "        smart: smartFlags[index],",
+        "        special_kind: specialKinds[index]",
+        "    });",
+        "}",
+        "",
+        "JSON.stringify({playlists: records});",
+        "",
+    ]
+    return lines.joined(separator: "\n")
+}
+
+/// The PRE-columnar playlist-enumeration JXA (M8), kept ONLY for Task 3's
+/// Diagnostics "Compare listing readers" cross-check — it reads the same
+/// library with this legacy per-playlist-loop script and the new columnar
+/// `buildListPlaylistsJXA()` script back-to-back and diffs the parsed
+/// results. This builder exists for that one release and is removed after
+/// the columnar reader has been validated against it; do not add new
+/// callers. Body and output are byte-identical to the pre-2026-08-06 script
+/// (pinned verbatim in `LegacyListPlaylistsBuilderTests`) — this is a pure
+/// rename, not a behavior change.
+public func legacyListPlaylistsScript() -> String {
     let lines = [
         "const Music = Application(\"/System/Applications/Music.app\");",
         "",

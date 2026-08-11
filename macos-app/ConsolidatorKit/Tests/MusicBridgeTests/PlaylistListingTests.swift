@@ -21,11 +21,69 @@ import ConsolidatorCore
 
 // MARK: - the pinned static script text
 
-/// The enumeration script, pinned VERBATIM. This is the load-bearing safety
-/// property of the surface: the builder takes no parameters, and its output
-/// must equal this constant byte-for-byte on every call — no user input, no
-/// plan data, nothing can reach the script text.
+/// The COLUMNAR enumeration script (post bulk-read-speedup Task 1), pinned
+/// VERBATIM. This is the load-bearing safety property of the surface: the
+/// builder takes no parameters, and its output must equal this constant
+/// byte-for-byte on every call — no user input, no plan data, nothing can
+/// reach the script text.
 private let expectedListPlaylistsJXA = """
+const Music = Application("/System/Applications/Music.app");
+
+const playlists = Music.userPlaylists();
+const expectedCount = playlists.length;
+
+const ids = playlists.id();
+if (!Array.isArray(ids) || ids.length !== expectedCount) {
+    throw new Error("column length mismatch: id");
+}
+
+const names = playlists.name();
+if (!Array.isArray(names) || names.length !== expectedCount) {
+    throw new Error("column length mismatch: name");
+}
+
+const persistentIds = playlists.persistentID();
+if (!Array.isArray(persistentIds) || persistentIds.length !== expectedCount) {
+    throw new Error("column length mismatch: persistent_id");
+}
+
+const trackCounts = playlists.tracks().length;
+if (!Array.isArray(trackCounts) || trackCounts.length !== expectedCount) {
+    throw new Error("column length mismatch: track_count");
+}
+
+const smartFlags = playlists.smart();
+if (!Array.isArray(smartFlags) || smartFlags.length !== expectedCount) {
+    throw new Error("column length mismatch: smart");
+}
+
+const specialKinds = playlists.specialKind();
+if (!Array.isArray(specialKinds) || specialKinds.length !== expectedCount) {
+    throw new Error("column length mismatch: special_kind");
+}
+
+const records = [];
+for (let index = 0; index < expectedCount; index++) {
+    records.push({
+        id: ids[index],
+        name: names[index],
+        persistent_id: persistentIds[index],
+        track_count: trackCounts[index],
+        smart: smartFlags[index],
+        special_kind: specialKinds[index]
+    });
+}
+
+JSON.stringify({playlists: records});
+
+"""
+
+/// The PRE-Task-1 per-playlist-loop enumeration script, pinned VERBATIM.
+/// `legacyListPlaylistsScript` must keep emitting exactly this text — Task 3's
+/// Diagnostics cross-check reads the same library with this text and the
+/// columnar text above and diffs the parsed results, so any drift here would
+/// silently invalidate that cross-check.
+private let expectedLegacyListPlaylistsJXA = """
 const Music = Application("/System/Applications/Music.app");
 
 const playlists = Music.userPlaylists().map(function (playlist) {
@@ -109,6 +167,103 @@ struct ListPlaylistsBuilderTests {
             osacompilePath,
             arguments: ["-l", "JavaScript", "-o", output.path],
             stdinText: buildListPlaylistsJXA()
+        )
+        #expect(result.status == 0, "\(result.stderr)")
+    }
+
+    // MARK: - Task 1 (bulk-read speedup): columnar shape pins
+
+    @Test("fetches every scalar column with one array-specifier call each")
+    func fetchesColumnsWithArraySpecifiers() {
+        let listing = ByteText(buildListPlaylistsJXA())
+        for column in [
+            "playlists.id()", "playlists.name()", "playlists.persistentID()",
+            "playlists.tracks().length", "playlists.smart()", "playlists.specialKind()",
+        ] {
+            #expect(listing.contains(column), "missing columnar fetch: \(column)")
+        }
+    }
+
+    @Test("reads the object count first, before any column fetch")
+    func readsCountFirst() {
+        let script = buildListPlaylistsJXA()
+        guard let countRange = script.range(of: "const expectedCount = playlists.length;") else {
+            Issue.record("count-first read is missing")
+            return
+        }
+        for column in ["playlists.id()", "playlists.name()", "playlists.persistentID()"] {
+            guard let columnRange = script.range(of: column) else {
+                Issue.record("missing columnar fetch: \(column)")
+                continue
+            }
+            #expect(countRange.upperBound <= columnRange.lowerBound, "\(column) read before count")
+        }
+    }
+
+    @Test("alignment guard names the mismatched column, verbatim, for every field")
+    func alignmentGuardNamesEveryColumn() {
+        let listing = ByteText(buildListPlaylistsJXA())
+        for message in [
+            "column length mismatch: id",
+            "column length mismatch: name",
+            "column length mismatch: persistent_id",
+            "column length mismatch: track_count",
+            "column length mismatch: smart",
+            "column length mismatch: special_kind",
+        ] {
+            #expect(listing.contains(message), "missing mismatch message: \(message)")
+        }
+    }
+
+    @Test("the old per-playlist property loop is gone")
+    func perPlaylistPropertyLoopIsAbsent() {
+        let listing = ByteText(buildListPlaylistsJXA())
+        // The disappearing token: the Task-1 per-object record-building loop
+        // that called SIX property getters per playlist inside one closure.
+        #expect(!listing.contains("Music.userPlaylists().map(function (playlist)"))
+        #expect(!listing.contains("playlist.id()"))
+        #expect(!listing.contains("playlist.name()"))
+        #expect(!listing.contains("playlist.persistentID()"))
+        #expect(!listing.contains("playlist.smart()"))
+        #expect(!listing.contains("playlist.specialKind()"))
+    }
+}
+
+@Suite("Legacy list-playlists JXA builder (Task 3 Diagnostics cross-check only)")
+struct LegacyListPlaylistsBuilderTests {
+
+    @Test("legacy script text is the pre-Task-1 pinned constant, byte for byte")
+    func legacyScriptTextIsPinned() {
+        expectByteEqual(
+            legacyListPlaylistsScript(),
+            expectedLegacyListPlaylistsJXA,
+            context: "legacyListPlaylistsScript"
+        )
+    }
+
+    @Test("legacy builder is deterministic across calls")
+    func legacyBuilderIsDeterministic() {
+        expectByteEqual(
+            legacyListPlaylistsScript(),
+            legacyListPlaylistsScript(),
+            context: "two calls"
+        )
+    }
+
+    @Test(
+        "legacy enumeration script compiles (osacompile -l JavaScript; never executed)",
+        .enabled(if: appleScriptCompilerAndMusicAvailable)
+    )
+    func legacyStaticScriptCompiles() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("m8-jxa-compile-legacy-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let output = directory.appendingPathComponent("listing-legacy.scpt")
+        let result = try runTool(
+            osacompilePath,
+            arguments: ["-l", "JavaScript", "-o", output.path],
+            stdinText: legacyListPlaylistsScript()
         )
         #expect(result.status == 0, "\(result.stderr)")
     }
