@@ -32,7 +32,10 @@ const Music = Application("/System/Applications/Music.app");
 const playlistRefs = Music.userPlaylists;
 const expectedCount = playlistRefs.length;
 
-const ids = playlistRefs.id();
+// Live -1728 fix (2026-08-11): a columnar get against an EMPTY
+// element collection resolves no object and errors; an empty
+// library short-circuits every column to [].
+const ids = expectedCount === 0 ? [] : playlistRefs.id();
 if (!Array.isArray(ids)) {
     throw new Error("column type mismatch: id");
 }
@@ -40,7 +43,7 @@ if (ids.length !== expectedCount) {
     throw new Error("column length mismatch: id");
 }
 
-const names = playlistRefs.name();
+const names = expectedCount === 0 ? [] : playlistRefs.name();
 if (!Array.isArray(names)) {
     throw new Error("column type mismatch: name");
 }
@@ -48,7 +51,7 @@ if (names.length !== expectedCount) {
     throw new Error("column length mismatch: name");
 }
 
-const persistentIds = playlistRefs.persistentID();
+const persistentIds = expectedCount === 0 ? [] : playlistRefs.persistentID();
 if (!Array.isArray(persistentIds)) {
     throw new Error("column type mismatch: persistent_id");
 }
@@ -64,7 +67,7 @@ if (!trackCounts.every(function (value) { return typeof value === "number"; })) 
     throw new Error("column type mismatch: track_count");
 }
 
-const smartFlags = playlistRefs.smart();
+const smartFlags = expectedCount === 0 ? [] : playlistRefs.smart();
 if (!Array.isArray(smartFlags)) {
     throw new Error("column type mismatch: smart");
 }
@@ -72,7 +75,7 @@ if (smartFlags.length !== expectedCount) {
     throw new Error("column length mismatch: smart");
 }
 
-const specialKinds = playlistRefs.specialKind();
+const specialKinds = expectedCount === 0 ? [] : playlistRefs.specialKind();
 if (!Array.isArray(specialKinds)) {
     throw new Error("column type mismatch: special_kind");
 }

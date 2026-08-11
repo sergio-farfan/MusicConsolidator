@@ -462,12 +462,23 @@ const matches = Music.userPlaylists().filter(function (playlist) {
 });
 
 const playlists = matches.map(function (playlist) {
+    // Live -1728 fix (2026-08-11): a columnar get against an EMPTY
+    // element collection resolves no object and errors. Count first;
+    // a zero-track playlist returns its record before any column get.
+    const trackRefs = playlist.tracks;
+    const expectedTrackCount = trackRefs.length;
+    if (expectedTrackCount === 0) {
+        return {
+            id: playlist.id(),
+            name: playlist.name(),
+            persistent_id: playlist.persistentID(),
+            tracks: []
+        };
+    }
+
+    // Cloud playlists have zero FILE tracks; skip that fetch too.
     const fileTrackRefs = playlist.fileTracks;
     const expectedFileTrackCount = fileTrackRefs.length;
-
-    // Live -1728 fix (2026-08-11): a columnar get against an EMPTY
-    // element collection resolves no object and errors. Cloud
-    // playlists have zero FILE tracks; skip the fetch entirely.
     const fileTrackDatabaseIdColumn =
         expectedFileTrackCount === 0 ? [] : fileTrackRefs.databaseID();
     if (!Array.isArray(fileTrackDatabaseIdColumn)) {
@@ -477,20 +488,6 @@ const playlists = matches.map(function (playlist) {
         throw new Error("column length mismatch: file_track_database_id");
     }
     const fileTrackDatabaseIDs = new Set(fileTrackDatabaseIdColumn);
-
-    const trackRefs = playlist.tracks;
-    const expectedTrackCount = trackRefs.length;
-
-    // Live -1728 fix (2026-08-11): same empty-collection rule for a
-    // zero-track playlist — return its record before any column get.
-    if (expectedTrackCount === 0) {
-        return {
-            id: playlist.id(),
-            name: playlist.name(),
-            persistent_id: playlist.persistentID(),
-            tracks: []
-        };
-    }
 
     const databaseIds = trackRefs.databaseID();
     if (!Array.isArray(databaseIds)) {
@@ -911,6 +908,15 @@ struct EmptyCollectionGuardTests {
     // []). Both columnar snapshot builders must skip the column fetches
     // when the count read says the collection is empty.
 
+    @Test("the listing script guards every column against an empty library")
+    func listingColumnsGuarded() {
+        let script = buildListPlaylistsJXA()
+        for column in ["id()", "name()", "persistentID()", "smart()", "specialKind()"] {
+            #expect(script.contains("expectedCount === 0 ? [] : playlistRefs.\(column)"))
+        }
+        #expect(!script.contains("= playlistRefs.id();"))
+    }
+
     @Test("both columnar readers guard the empty file-track collection")
     func fileTrackColumnGuarded() {
         for script in [
@@ -942,6 +948,20 @@ struct EmptyCollectionGuardTests {
                 Issue.record("expected both the guard and the column fetch")
             }
         }
+    }
+}
+
+@Suite("Read-by-persistent-IDs byte pin (live -1728 follow-up, 2026-08-11)")
+struct ReadByPersistentIdsBytePinTests {
+    // The free-form revalidation reader is a WRITE-PATH reader; its guard
+    // bodies were fragment-pinned only. Byte pin, mirroring expectedReadJXA.
+    @Test("by-PID read script text is the pinned constant, byte for byte")
+    func bytePinned() {
+        expectByteEqual(
+            buildReadByPersistentIdsJXA(persistentIds: ["any"]),
+            expectedReadByPersistentIdsJXA,
+            context: "read-by-persistent-ids JXA"
+        )
     }
 }
 
@@ -1150,3 +1170,158 @@ struct MergeWriterPortTests {
         }
     }
 }
+
+private let expectedReadByPersistentIdsJXA = """
+const Music = Application("/System/Applications/Music.app");
+const requestedPersistentIds = ["any"];
+const requestedPersistentIdSet = new Set(requestedPersistentIds);
+
+function textOrEmpty(value) {
+    return value === null || value === undefined ? "" : String(value);
+}
+
+function numberOrNull(value) {
+    return value === null || value === undefined || Number.isNaN(value) ? null : value;
+}
+
+const matches = Music.userPlaylists().filter(function (playlist) {
+    return requestedPersistentIdSet.has(playlist.persistentID());
+});
+
+const playlists = matches.map(function (playlist) {
+    // Live -1728 fix (2026-08-11): a columnar get against an EMPTY
+    // element collection resolves no object and errors. Count first;
+    // a zero-track playlist returns its record before any column get.
+    const trackRefs = playlist.tracks;
+    const expectedTrackCount = trackRefs.length;
+    if (expectedTrackCount === 0) {
+        return {
+            id: playlist.id(),
+            name: playlist.name(),
+            persistent_id: playlist.persistentID(),
+            tracks: []
+        };
+    }
+
+    // Cloud playlists have zero FILE tracks; skip that fetch too.
+    const fileTrackRefs = playlist.fileTracks;
+    const expectedFileTrackCount = fileTrackRefs.length;
+    const fileTrackDatabaseIdColumn =
+        expectedFileTrackCount === 0 ? [] : fileTrackRefs.databaseID();
+    if (!Array.isArray(fileTrackDatabaseIdColumn)) {
+        throw new Error("column type mismatch: file_track_database_id");
+    }
+    if (fileTrackDatabaseIdColumn.length !== expectedFileTrackCount) {
+        throw new Error("column length mismatch: file_track_database_id");
+    }
+    const fileTrackDatabaseIDs = new Set(fileTrackDatabaseIdColumn);
+
+    const databaseIds = trackRefs.databaseID();
+    if (!Array.isArray(databaseIds)) {
+        throw new Error("column type mismatch: database_id");
+    }
+    if (databaseIds.length !== expectedTrackCount) {
+        throw new Error("column length mismatch: database_id");
+    }
+
+    const persistentIds = trackRefs.persistentID();
+    if (!Array.isArray(persistentIds)) {
+        throw new Error("column type mismatch: persistent_id");
+    }
+    if (persistentIds.length !== expectedTrackCount) {
+        throw new Error("column length mismatch: persistent_id");
+    }
+
+    const titles = trackRefs.name();
+    if (!Array.isArray(titles)) {
+        throw new Error("column type mismatch: title");
+    }
+    if (titles.length !== expectedTrackCount) {
+        throw new Error("column length mismatch: title");
+    }
+
+    const artists = trackRefs.artist();
+    if (!Array.isArray(artists)) {
+        throw new Error("column type mismatch: artist");
+    }
+    if (artists.length !== expectedTrackCount) {
+        throw new Error("column length mismatch: artist");
+    }
+
+    const albums = trackRefs.album();
+    if (!Array.isArray(albums)) {
+        throw new Error("column type mismatch: album");
+    }
+    if (albums.length !== expectedTrackCount) {
+        throw new Error("column length mismatch: album");
+    }
+
+    const durations = trackRefs.duration();
+    if (!Array.isArray(durations)) {
+        throw new Error("column type mismatch: duration");
+    }
+    if (durations.length !== expectedTrackCount) {
+        throw new Error("column length mismatch: duration");
+    }
+
+    const kinds = trackRefs.kind();
+    if (!Array.isArray(kinds)) {
+        throw new Error("column type mismatch: kind");
+    }
+    if (kinds.length !== expectedTrackCount) {
+        throw new Error("column length mismatch: kind");
+    }
+
+    const bitRates = trackRefs.bitRate();
+    if (!Array.isArray(bitRates)) {
+        throw new Error("column type mismatch: bit_rate");
+    }
+    if (bitRates.length !== expectedTrackCount) {
+        throw new Error("column length mismatch: bit_rate");
+    }
+
+    const sampleRates = trackRefs.sampleRate();
+    if (!Array.isArray(sampleRates)) {
+        throw new Error("column type mismatch: sample_rate");
+    }
+    if (sampleRates.length !== expectedTrackCount) {
+        throw new Error("column length mismatch: sample_rate");
+    }
+
+    const cloudStatuses = trackRefs.cloudStatus();
+    if (!Array.isArray(cloudStatuses)) {
+        throw new Error("column type mismatch: cloud_status");
+    }
+    if (cloudStatuses.length !== expectedTrackCount) {
+        throw new Error("column length mismatch: cloud_status");
+    }
+
+    const tracks = [];
+    for (let sourceIndex = 0; sourceIndex < expectedTrackCount; sourceIndex++) {
+        const databaseID = databaseIds[sourceIndex];
+        tracks.push({
+            source_index: sourceIndex,
+            database_id: databaseID,
+            persistent_id: textOrEmpty(persistentIds[sourceIndex]),
+            title: textOrEmpty(titles[sourceIndex]),
+            artist: textOrEmpty(artists[sourceIndex]),
+            album: textOrEmpty(albums[sourceIndex]),
+            duration: numberOrNull(durations[sourceIndex]),
+            kind: textOrEmpty(kinds[sourceIndex]),
+            bit_rate: numberOrNull(bitRates[sourceIndex]),
+            sample_rate: numberOrNull(sampleRates[sourceIndex]),
+            cloud_status: textOrEmpty(cloudStatuses[sourceIndex]),
+            is_file_track: fileTrackDatabaseIDs.has(databaseID)
+        });
+    }
+    return {
+        id: playlist.id(),
+        name: playlist.name(),
+        persistent_id: playlist.persistentID(),
+        tracks: tracks
+    };
+});
+
+JSON.stringify({playlists: playlists});
+
+"""
