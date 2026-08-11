@@ -307,6 +307,68 @@ struct FreeFormMergeFlowTests {
         #expect(commands[6] == .readJXA(script: byPidScript))
         #expect(commands[7] == .readJXA(script: buildReadJXA(name: "Alpha \u{2014} Merged")))
     }
+
+    /// Task 2 review finding F1: the double-suffix fix has TWO call sites —
+    /// `targetName` (the confirm gate / apply screen, pinned by
+    /// `orderingAndNaming` above) and `recordRunItem`'s `itemTargetName` (the
+    /// run record and the persisted run-report artifact). This pins the
+    /// second one through a real applied free-form apply: the record must
+    /// carry the plan's computed name verbatim, never `"… — Merged — Merged"`.
+    @Test("an applied free-form item records the computed target name, not a doubled suffix")
+    func runRecordTargetNameIsNotDoubled() async throws {
+        let runner = ScriptedRunner(outputs: [
+            twoSingletonsListingWire(),
+            twoSingletonsAuditWire(),
+            twoSingletonsAuditWire(), // ensureFreeFormCopiesMatch re-read (by PID)
+            emptySnapshotWire(), // assertTargetAbsent (by name)
+            "", // compile
+            "", // execute
+            twoSingletonsAuditWire(), // post-write source reread (by PID)
+            twoSingletonsTargetReadbackWire(), // target readback (by name)
+        ])
+        // Unattended: the run applies itself and finishes, producing the run
+        // report whose item carries the target name.
+        let harness = try ModelHarness(
+            runner: runner, mode: .merge, playlistName: "", confirmEachApply: false
+        )
+        defer { harness.cleanUp() }
+        harness.model.rescanLibrary()
+        await harness.model.scanTask?.value
+        harness.model.toggleCheckedFreeFormSingleton(persistentId: "FF-A")
+        harness.model.toggleCheckedFreeFormSingleton(persistentId: "FF-B")
+        harness.model.startFreeFormMerge()
+        #expect(await pollUntil { harness.model.finishedRunReport != nil })
+
+        let report = try #require(harness.model.finishedRunReport)
+        let item = try #require(report.items.first)
+        #expect(item.outcome.label == "applied")
+        #expect(item.targetName == "Alpha \u{2014} Merged")
+        #expect(item.targetName != "Alpha \u{2014} Merged \u{2014} Merged")
+    }
+
+    /// Task 2 review finding F3: the merge footer's "Queued: N playlists"
+    /// counted checked GROUPS only, so a free-form singleton pick was
+    /// invisible there even while it enabled "Merge selected as one…".
+    @Test("the merge footer count includes checked free-form singletons, not just groups")
+    func footerCountIncludesSingletons() async throws {
+        let harness = try ModelHarness(
+            runner: ScriptedRunner(outputs: [mixedSelectionListingWire()]),
+            mode: .merge, playlistName: ""
+        )
+        defer { harness.cleanUp() }
+        harness.model.rescanLibrary()
+        await harness.model.scanTask?.value
+        #expect(harness.model.mergeCheckedCount == 0)
+
+        harness.model.toggleCheckedFreeFormSingleton(persistentId: "S-SOLO")
+        #expect(harness.model.mergeCheckedCount == 1)
+
+        harness.model.toggleCheckedGroup(name: "Trance 2022")
+        #expect(harness.model.mergeCheckedCount == 2)
+
+        harness.model.clearSelection()
+        #expect(harness.model.mergeCheckedCount == 0)
+    }
 }
 
 // MARK: - footer structural tests
@@ -381,5 +443,83 @@ struct FreeFormMergeFooterStructuralTests {
             view(under: fixture.hosting, axIdentifier: M10ControlID.mergeAsOne) as? NSButton
         )
         #expect(button.isEnabled)
+    }
+}
+
+// MARK: - SINGLETONS row structural tests (Task 2 review finding F5)
+//
+// The merge tab's singleton checkbox is the ONLY way to reach the live
+// free-form flow Task 3's verification checklist describes ("select two
+// unrelated singletons -> Merge selected as one"), and Task 2 flipped it from
+// permanently-disabled-with-a-"nothing to merge"-tooltip to a live control.
+// Nothing structural covered that flip, so a regression back to
+// `.disabled(true)` would have left the model tests green and the feature
+// unreachable. `MergeBrowserList` is hosted directly with the SINGLETONS
+// disclosure seeded open: SwiftUI never materializes a COLLAPSED
+// DisclosureGroup's content, and the app's own default stays collapsed.
+
+@MainActor
+@Suite("Free-form merge — SINGLETONS row checkbox structural pins (F5)", .serialized)
+struct FreeFormSingletonRowStructuralTests {
+
+    @Test("the singleton row's checkbox exists, is enabled, and drives toggleCheckedFreeFormSingleton")
+    func singletonCheckboxIsLiveAndDrivesTheModel() async throws {
+        let harness = try await freeFormFooterHarness()
+        defer { harness.cleanUp() }
+        let sections = try #require(harness.model.loadedSections)
+        let fixture = HostedFixture(
+            MergeBrowserList(model: harness.model, sections: sections, singletonsShown: true),
+            width: 1200, height: 800
+        )
+        defer { fixture.tearDown() }
+
+        let checkbox = try #require(
+            view(under: fixture.hosting, axIdentifier: M10ControlID.singletonCheckbox("FF-A"))
+                as? NSButton
+        )
+        // Enabled — NOT the disabled "blocked row" treatment near matches get.
+        #expect(checkbox.isEnabled)
+        #expect(checkbox.state == .off)
+
+        checkbox.performClick(nil)
+        #expect(harness.model.isFreeFormSingletonChecked(persistentId: "FF-A"))
+        #expect(harness.model.checkedFreeFormSingletonPersistentIds == ["FF-A"])
+        fixture.pump()
+        #expect(checkbox.state == .on)
+
+        checkbox.performClick(nil)
+        #expect(!harness.model.isFreeFormSingletonChecked(persistentId: "FF-A"))
+        #expect(harness.model.checkedFreeFormSingletonPersistentIds.isEmpty)
+    }
+
+    @Test("the singleton row's checkbox is disabled while a queue is active")
+    func singletonCheckboxDisabledWhileQueueActive() async throws {
+        let harness = try ModelHarness(
+            runner: ScriptedRunner(outputs: [
+                twoSingletonsListingWire(), twoSingletonsAuditWire(),
+            ]),
+            mode: .merge, playlistName: ""
+        )
+        defer { harness.cleanUp() }
+        harness.model.rescanLibrary()
+        await harness.model.scanTask?.value
+        harness.model.toggleCheckedFreeFormSingleton(persistentId: "FF-A")
+        harness.model.toggleCheckedFreeFormSingleton(persistentId: "FF-B")
+        harness.model.startFreeFormMerge()
+        await harness.awaitAudit()
+        #expect(harness.model.isQueueActive)
+
+        let sections = try #require(harness.model.loadedSections)
+        let fixture = HostedFixture(
+            MergeBrowserList(model: harness.model, sections: sections, singletonsShown: true),
+            width: 1200, height: 800
+        )
+        defer { fixture.tearDown() }
+
+        let checkbox = try #require(
+            view(under: fixture.hosting, axIdentifier: M10ControlID.singletonCheckbox("FF-A"))
+                as? NSButton
+        )
+        #expect(!checkbox.isEnabled)
     }
 }

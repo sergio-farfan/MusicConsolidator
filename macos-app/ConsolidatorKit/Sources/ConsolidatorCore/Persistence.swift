@@ -362,11 +362,30 @@ public func renderSummaryMarkdown(_ plan: ConsolidationPlan) -> String {
 }
 
 /// Render the merge summary. Reference: audit.py:430-468 (`write_merge_markdown`).
+///
+/// SAME-NAME OUTPUT IS BYTE-IDENTICAL to the reference (AuditGoldenTests'
+/// `write_merge_audit` parity cases are the tripwire); every difference below
+/// is inside an `isFreeForm` branch. For a FREE-FORM plan (2026-08-06 design;
+/// Task 2 review finding F6) this artifact is what Sergio reads before
+/// approving the write, so it has to be honest about what the write will do —
+/// the spec's Engine bullet requires the summary to name every source and the
+/// description text:
+/// - the title is the plan's COMPUTED TARGET name verbatim.
+///   `mergedPlaylistSourceName` is the shared SOURCE name for a same-name plan
+///   (so the suffix belongs), but for a free-form plan it is ALREADY
+///   `<first source> — Merged`, and appending the suffix doubled it.
+/// - each copy line names its source playlist (free-form copies have distinct
+///   names; there is no single shared name to state once).
+/// - the exact `description` the guarded writer will set on the new playlist
+///   is listed, since nothing else in the artifact records it.
 public func renderMergeSummaryMarkdown(_ plan: MergePlan) -> String {
     let combinedCount = plan.combinedTrackCount
     let outputCount = plan.winnerSourceIndexes.count
+    let title = plan.isFreeForm
+        ? plan.mergedPlaylistSourceName
+        : "\(plan.mergedPlaylistSourceName) — Merged"
     var lines: [String] = [
-        "# \(plan.mergedPlaylistSourceName) — Merged",
+        "# \(title)",
         "",
         "- Merge fingerprint: `\(plan.mergeFingerprint)`",
         "- Copies: \(plan.copies.count)",
@@ -374,12 +393,26 @@ public func renderMergeSummaryMarkdown(_ plan: MergePlan) -> String {
         "- Output count: \(outputCount)",
         "- Omitted count: \(combinedCount - outputCount)",
         "- Non-eligible count: \(plan.nonEligibleSourceIndexes.count)",
-        "",
-        "## Source copies",
-        "",
     ]
+    if plan.isFreeForm, let targetDescription = plan.targetDescription {
+        lines.append("- Target description: \(targetDescription)")
+    }
+    lines.append(contentsOf: ["", "## Source copies", ""])
     for (ordinal, copy) in plan.copies.enumerated() {
-        lines.append("- Copy \(ordinal): `\(copy.persistentId)` — \(copy.tracks.count) tracks")
+        if plan.isFreeForm {
+            // `sourceNames` is cross-validated against `copies` in order by
+            // both `buildFreeFormMergePlan` and `validateMergePlanIntegrity`;
+            // the index guard keeps a hand-assembled plan from trapping here.
+            let sourceName = plan.sourceNames.flatMap {
+                $0.indices.contains(ordinal) ? $0[ordinal] : nil
+            } ?? copy.name
+            lines.append(
+                "- Copy \(ordinal): \u{201C}\(sourceName)\u{201D} (`\(copy.persistentId)`) "
+                    + "— \(copy.tracks.count) tracks"
+            )
+        } else {
+            lines.append("- Copy \(ordinal): `\(copy.persistentId)` — \(copy.tracks.count) tracks")
+        }
     }
     lines.append(contentsOf: ["", "## Duplicate decisions", ""])
     if plan.decisions.isEmpty {

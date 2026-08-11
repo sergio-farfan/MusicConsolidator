@@ -85,6 +85,15 @@ and never rewrite published history.
   Unchanged: mutations never run inside any apply or unattended run;
   applies keep every guard; source playlists are never modified by any
   create path; Library*.xml evidence stays read-only.
+- AMENDMENT (Sergio, 2026-08-06) — free-form merge, verbatim from
+  `docs/superpowers/specs/2026-08-06-free-form-merge-design.md`:
+  Merge may combine ANY user-selected set of playlists (Sergio,
+  2026-08-06): copy set pinned by persistent IDs, target auto-named
+  `<first source> — Merged`, target description recording the merge
+  timestamp and sources. Same-name group merges unchanged. The strict
+  duplicate key and winner preference are NOT broadened; every apply
+  guard (fresh audit, plan artifact, revalidation, existing-target
+  refusal, readback) applies identically.
 
 ## Duplicate and quality contract
 

@@ -506,6 +506,58 @@ struct ApplyFreeFormMergePlanTests {
         #expect(result.mismatches.first == "write failed: simulated free-form merge writer failure")
     }
 
+    // 2026-08-06 Task 2 review finding F2: the target name of a free-form
+    // merge is NOT caller-chosen — the PLAN computed it
+    // (`mergedPlaylistSourceName`), the writer sets it, the readback verifies
+    // it, and the description records it. A caller-supplied name that
+    // disagrees would create a playlist under a name no artifact records, so
+    // this entry point asserts the agreement itself instead of trusting the
+    // caller (the same posture as the `freeFormFieldsAreConsistent` assert
+    // beside it).
+    @Test("refuses a target name that is not the plan's own computed target name")
+    func refusesCallerChosenTargetName() throws {
+        let plan = try freeFormPlan()
+        let target = PlaylistSnapshot(
+            name: freeFormTargetName, persistentId: "T", tracks: winnerTracks(plan)
+        )
+        let bridge = FreeFormMergeApplyBridge(copies: freeFormCopies(), targetReadback: target)
+
+        expectThrowsByteEqualMessage(
+            "free-form target name does not match the plan's computed target name; refusing",
+            context: "caller-supplied free-form target name"
+        ) {
+            _ = try bridge.applyFreeFormMergePlan(plan: plan, targetName: "Somewhere Else")
+        }
+        #expect(bridge.writeCalls == 0)
+    }
+
+    @Test("refuses a canonically-equivalent-but-scalar-different target name")
+    func refusesCanonicallyEquivalentTargetName() throws {
+        // Precomposed é (U+00E9) in the plan; decomposed e + U+0301 supplied.
+        // Swift `String ==` calls these equal — the scalar comparator must
+        // not, exactly like every other name gate in this file.
+        let precomposed = "Caf\u{00E9} \u{2014} Merged"
+        let decomposed = "Cafe\u{0301} \u{2014} Merged"
+        let plan = try buildFreeFormMergePlan(
+            copies: freeFormCopies(),
+            targetName: precomposed,
+            targetDescription: freeFormDescription,
+            sourceNames: freeFormSourceNames
+        )
+        let target = PlaylistSnapshot(
+            name: precomposed, persistentId: "T", tracks: winnerTracks(plan)
+        )
+        let bridge = FreeFormMergeApplyBridge(copies: freeFormCopies(), targetReadback: target)
+
+        expectThrowsByteEqualMessage(
+            "free-form target name does not match the plan's computed target name; refusing",
+            context: "canonically-equivalent free-form target name"
+        ) {
+            _ = try bridge.applyFreeFormMergePlan(plan: plan, targetName: decomposed)
+        }
+        #expect(bridge.writeCalls == 0)
+    }
+
     @Test("refuses a same-name plan (variant guard, transitively via ensureFreeFormCopiesMatch)")
     func refusesSameNamePlan() throws {
         // A plain session (no override of ensureFreeFormCopiesMatch): the

@@ -931,6 +931,22 @@ public class MusicBridgeSession {
                 "merge plan mixes free-form and same-name fields; refusing"
             )
         }
+        // 2026-08-06 Task 2 review finding F2: a free-form target name is NOT
+        // caller-chosen. The PLAN computed it (`mergedPlaylistSourceName` =
+        // `buildFreeFormMergePlan`'s `targetName`), the writer sets exactly
+        // it, the description records the merge under it, and the readback
+        // verifies it — so a caller-supplied name that disagrees would create
+        // a playlist under a name no reviewed artifact mentions. Assert the
+        // agreement here rather than trusting the caller; scalar-exact, like
+        // every other name gate in this file (Swift `==` would accept
+        // canonically-equivalent drift). Gated on `isFreeForm` so a same-name
+        // plan still falls through to `ensureFreeFormCopiesMatch`'s existing
+        // variant refusal, and the same-name path is untouched.
+        if plan.isFreeForm, !scalarEqual(targetName, plan.mergedPlaylistSourceName) {
+            throw MusicBridgeError(
+                "free-form target name does not match the plan's computed target name; refusing"
+            )
+        }
         let verifiedCopies = try ensureFreeFormCopiesMatch(plan: plan)
         try assertTargetAbsent(targetName: targetName)
         do {

@@ -115,6 +115,56 @@ case: it already has a single-copy `#Musica xTotal — Consolidated` artifact fr
 the earlier pilot, so merging its two copies is a distinct, separately reviewed
 operation — keep it out of routine waves.
 
+### Free-form merge (AGENTS.md amendment, 2026-08-06)
+
+The native app can also merge ANY user-selected set of playlists, with no
+same-name requirement. On the Merge tab, check any mix of same-name groups and
+SINGLETONS — a checked group contributes all its copies, a checked singleton
+contributes itself — and the footer's second action, `Merge selected as one…`,
+enqueues ONE item for the whole selection; the footer's `Queued: N playlists`
+count counts checked groups plus checked singletons, and the button enables at
+two or more source playlists. `Start Queue` keeps its own meaning (one merge per
+checked group). The tab's caption states both paths:
+“Check same-name groups and Start Queue to merge one group at a time, or
+check any mix of groups and singletons and use ‘Merge selected as one…’
+to combine them into a single new playlist.” A near match is still not a
+same-name group — rename its variants in Music to merge them as a group, or
+check them individually as singletons.
+
+The target name is automatic — `<first source> — Merged`, where "first" is the
+first source in ascending Apple Music playlist-ID order (the same copy order
+same-name merges use), so there is no naming sheet: the queue row shows the
+computed name immediately. The new playlist's `description` is set inside the
+same guarded writer execution that creates it, to exactly
+`Merged on <YYYY-MM-DD HH:MM> from: <source names, comma-separated, in
+playlist-ID order>`, and the readback verifies it. Sources are never modified;
+the description is written to the NEW playlist only.
+
+Every guard is unchanged: the copy set is pinned by PERSISTENT ID instead of by
+a shared name, so revalidation re-reads each pinned ID and refuses if any is
+missing, renamed, or drifted in count, order, identity, metadata, availability,
+or file-track status; the plan's integrity hash covers the new fields (source
+IDs, source names, description); an existing playlist with the computed target
+name refuses the item up front with the standard already-done advisory; and the
+apply is the same one guarded create-and-duplicate followed by readback of every
+source (unchanged) plus the target's name, description, and ordered database and
+persistent IDs. Dedup is the UNCHANGED strict key and winner preference over the
+concatenated copies. The artifact triple is the standard one, and the
+`.summary.md` for a free-form plan names every source playlist beside its
+persistent ID and lists the exact `Target description:` the writer will set.
+Cleanup's merge-group discovery SKIPS free-form plans: its model is "a group of
+same-name copies", which a free-form plan is not, so source cleanup after a
+free-form merge stays manual. Free-form merge is app-only — the CLI keeps
+same-name `merge-audit` / `merge-apply`.
+
+First live run (checklist): pick TWO SMALL unrelated singletons, check both,
+click `Merge selected as one…`, review the named plan artifacts, then apply. In
+Music, verify the new playlist's NAME is `<first source> — Merged` and its
+DESCRIPTION reads `Merged on <timestamp> from: <both names>`; verify both source
+playlists are untouched (same names, same track counts); and verify the
+`reports/` triple plus the run report exist, with the `.summary.md` listing both
+source names and the description text.
+
 ## Native app batch mode (AGENTS.md amendment, 2026-08-03)
 
 The native macOS app runs batch consolidations and merges FULLY UNATTENDED:

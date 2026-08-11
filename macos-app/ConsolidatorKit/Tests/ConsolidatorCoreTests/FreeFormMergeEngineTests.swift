@@ -406,3 +406,74 @@ struct FreeFormMergePlanCodableTests {
         try validateMergePlanIntegrity(decoded)
     }
 }
+
+// MARK: - the reviewable summary artifact (Task 2 review finding F6)
+//
+// The `.summary.md` is the artifact Sergio reads before approving a write, so
+// for a free-form plan it has to be honest about what the write will do: the
+// real target name (not a doubled suffix), every source it will read, and the
+// description text the writer will set. The spec's Engine bullet requires it:
+// "the summary names every source and the description text". Same-name output
+// is byte-identical to the Python reference implementation and stays that way —
+// the golden parity suite (AuditGoldenTests) is the tripwire.
+
+@Suite("renderMergeSummaryMarkdown — free-form artifact honesty (F6)")
+struct FreeFormMergeSummaryMarkdownTests {
+
+    private func freeFormPlan() throws -> MergePlan {
+        try buildFreeFormMergePlan(
+            copies: freeFormCopies(),
+            targetName: freeFormTargetName,
+            targetDescription: freeFormDescription,
+            sourceNames: freeFormSourceNames
+        )
+    }
+
+    @Test("titles the summary with the plan's computed target name, never double-suffixed")
+    func titleIsNotDoubleSuffixed() throws {
+        let text = try renderMergeSummaryMarkdown(freeFormPlan())
+        let firstLine = try #require(text.split(separator: "\n", omittingEmptySubsequences: false).first)
+
+        #expect(String(firstLine) == "# DJ Set A \u{2014} Merged")
+        #expect(!text.contains("Merged \u{2014} Merged"))
+    }
+
+    @Test("names every source playlist, in copy order, beside its persistent ID")
+    func namesEverySource() throws {
+        let text = try renderMergeSummaryMarkdown(freeFormPlan())
+
+        #expect(text.contains(
+            "- Copy 0: \u{201C}DJ Set A\u{201D} (`PID-A`) \u{2014} 2 tracks"
+        ))
+        #expect(text.contains(
+            "- Copy 1: \u{201C}DJ Set B\u{201D} (`PID-B`) \u{2014} 1 tracks"
+        ))
+    }
+
+    @Test("includes the exact description text the guarded writer will set")
+    func includesDescription() throws {
+        let text = try renderMergeSummaryMarkdown(freeFormPlan())
+
+        #expect(text.contains("- Target description: \(freeFormDescription)"))
+    }
+
+    @Test("a same-name plan's summary keeps the reference format exactly")
+    func sameNameSummaryUnchanged() throws {
+        let plan = try buildMergePlan(name: "Trance 2022", copies: [
+            PlaylistSnapshot(name: "Trance 2022", persistentId: "PID-A", tracks: [track()]),
+            PlaylistSnapshot(
+                name: "Trance 2022", persistentId: "PID-B",
+                tracks: [track(persistentId: "OTHER", title: "Two")]
+            ),
+        ])
+        let text = renderMergeSummaryMarkdown(plan)
+
+        // The suffix IS appended here: `mergedPlaylistSourceName` is the
+        // shared SOURCE name for a same-name plan.
+        #expect(text.hasPrefix("# Trance 2022 \u{2014} Merged\n"))
+        #expect(text.contains("- Copy 0: `PID-A` \u{2014} 1 tracks"))
+        #expect(text.contains("- Copy 1: `PID-B` \u{2014} 1 tracks"))
+        // No free-form-only line leaks into a same-name summary.
+        #expect(!text.contains("- Target description:"))
+    }
+}
