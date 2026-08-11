@@ -133,6 +133,52 @@ struct RunReportRenderingTests {
         #expect(text.contains("unattended"))
     }
 
+    // 2026-08-06 final review, finding M5: a free-form item's report record
+    // names its sources, mirroring the plan summary; same-name items
+    // (RunItemRecord's `freeFormSourceNames` left at its `nil` default) omit
+    // the line entirely.
+    @Test("a free-form item's rendered text includes a Sources line; same-name items omit it")
+    func sourcesLineOnlyForFreeForm() {
+        let report = BatchRunReport(
+            mode: .merge,
+            unattended: true,
+            startedAt: Date(timeIntervalSince1970: 1_000_000),
+            finishedAt: Date(timeIntervalSince1970: 1_000_120),
+            stoppedEarly: false,
+            items: [
+                RunItemRecord(
+                    name: "Alpha \u{2014} Merged",
+                    outcome: .applied(trackCount: 2),
+                    failureClass: nil,
+                    inputCount: 2, outputCount: 2,
+                    nearIdenticalPairLines: [], distinctOmissionLines: [],
+                    countAnomalyLines: [],
+                    targetName: "Alpha \u{2014} Merged",
+                    planFileName: "Alpha.plan.json",
+                    elapsedSeconds: 5,
+                    freeFormSourceNames: ["Alpha", "Beta"]
+                ),
+                RunItemRecord(
+                    name: "Trance 2022",
+                    outcome: .applied(trackCount: 10),
+                    failureClass: nil,
+                    inputCount: 19, outputCount: 10,
+                    nearIdenticalPairLines: [], distinctOmissionLines: [],
+                    countAnomalyLines: [],
+                    targetName: "Trance 2022 \u{2014} Merged",
+                    planFileName: "Trance-2022.plan.json",
+                    elapsedSeconds: 42
+                    // freeFormSourceNames defaults to nil — same-name item.
+                ),
+            ]
+        )
+        let text = renderRunReportText(report)
+        #expect(text.contains("- Sources: Alpha, Beta"))
+        // Exactly one item carries the line — the same-name item omits it.
+        let sourcesLines = text.split(separator: "\n").filter { $0.hasPrefix("- Sources:") }
+        #expect(sourcesLines.count == 1)
+    }
+
     @Test("report counters aggregate outcomes")
     func counters() {
         let report = sampleReport()

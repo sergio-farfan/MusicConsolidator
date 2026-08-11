@@ -180,8 +180,12 @@ struct SourceSelectionView: View {
                 // F4: the claim is scoped to the SAME-NAME path now — a
                 // near-match variant is a singleton, so it IS free-form
                 // mergeable. Kept terse: this caption is `.lineLimit(2)`.
-                + "confirm gate, and apply. Near matches are not a same-name group "
-                + "\u{2014} rename in Music, or check them as singletons."
+                // Caption trim (2026-08-06 final review, triage ruling): the
+                // "rename in Music, or check them as singletons" clause is
+                // dropped — the near-match row's own tooltip
+                // (SourceBrowserView's blockedCheckbox `help`) already
+                // carries that guidance in full.
+                + "confirm gate, and apply. Near matches are not a same-name group."
         }
     }
 

@@ -276,23 +276,32 @@ public func validateMergePlanIntegrity(_ plan: MergePlan) throws {
     }
 
     // 2026-08-06 review finding I1: a free-form plan's fingerprint covers
-    // targetDescription/sourceNames too (freeFormMergeFingerprint), so a
-    // hand-edited description or source-name list — recomputed from the
-    // SAME persisted fields checked above — no longer agrees with the
-    // persisted fingerprint and fails closed here, even though the
-    // canonical-recompute-and-diff below cannot see that tamper on its own
-    // (it necessarily echoes the persisted description back as its own
-    // input). Same-name plans are UNCHANGED: `mergeFingerprint(_:)` alone,
-    // exactly as before.
+    // targetDescription/sourceNames/targetName too (freeFormMergeFingerprint),
+    // so a hand-edited description, source-name list, or target name —
+    // recomputed from the SAME persisted fields checked above — no longer
+    // agrees with the persisted fingerprint and fails closed here, even
+    // though the canonical-recompute-and-diff below cannot see that tamper
+    // on its own (it necessarily echoes the persisted fields back as its
+    // own input). Same-name plans are UNCHANGED: `mergeFingerprint(_:)`
+    // alone, exactly as before.
     let expectedFingerprint = plan.isFreeForm
         ? freeFormMergeFingerprint(
             copies: plan.copies,
             targetDescription: plan.targetDescription!,
-            sourceNames: plan.sourceNames!
+            sourceNames: plan.sourceNames!,
+            targetName: plan.mergedPlaylistSourceName
         )
         : mergeFingerprint(plan.copies)
     if expectedFingerprint != plan.mergeFingerprint {
-        throw PlanIntegrityError("merge fingerprint does not match the persisted copies")
+        // Final review deferred cosmetic: a free-form mismatch is caught
+        // over PERSISTED PLAN FIELDS (copies, description, source names,
+        // target name), not just "copies" — the same-name message stays
+        // exactly as it always was.
+        throw PlanIntegrityError(
+            plan.isFreeForm
+                ? "merge fingerprint does not match the persisted plan fields"
+                : "merge fingerprint does not match the persisted copies"
+        )
     }
     let canonical: MergePlan
     if plan.isFreeForm {

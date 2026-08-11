@@ -99,6 +99,11 @@ nonisolated struct RunItemRecord: Equatable, Sendable, Identifiable {
     let elapsedSeconds: Double?
     /// Optional advisory (e.g. "already done" pre-skip guidance).
     var note: String? = nil
+    /// 2026-08-06 final review, finding M5: the free-form item's source
+    /// playlist names (`FreeFormMergeSpec.sourceNames`), in copy order; nil
+    /// for every consolidate item and every same-name merge item, exactly
+    /// like `AuditQueueItem.freeForm` itself.
+    var freeFormSourceNames: [String]? = nil
 
     var id: String { name }
 
@@ -157,6 +162,12 @@ nonisolated func renderRunReportText(_ report: BatchRunReport) -> String {
     lines.append("")
     for item in report.items {
         lines.append("## \(item.name) \u{2014} \(item.outcome.label)")
+        // 2026-08-06 final review, finding M5: a free-form item's report
+        // record names its sources, like the plan summary already does;
+        // same-name items are unchanged (freeFormSourceNames stays nil).
+        if let sourceNames = item.freeFormSourceNames, !sourceNames.isEmpty {
+            lines.append("- Sources: \(sourceNames.joined(separator: ", "))")
+        }
         if case .applied(let trackCount) = item.outcome {
             lines.append("- Created: \(item.targetName ?? "\u{2014}") (\(trackCount) tracks)")
         }

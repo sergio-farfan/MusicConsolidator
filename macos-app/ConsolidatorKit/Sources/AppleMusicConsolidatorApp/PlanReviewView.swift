@@ -112,6 +112,24 @@ struct PlanReviewView: View {
 private struct ReviewHeader: View {
     let result: AuditFlowModel.CompletedAudit
 
+    /// Non-nil only for a free-form merge plan (2026-08-06 final review,
+    /// finding I2): mirrors the summary artifact's honesty about which of
+    /// the two merge variants this is. Same-name plans render exactly as
+    /// they always have — every read below is gated on this being non-nil.
+    private var freeFormMergePlan: MergePlan? {
+        if case .merge(let plan) = result.plan, plan.isFreeForm { return plan }
+        return nil
+    }
+
+    /// The free-form copy's own source name (`MergePlan.sourceNames`, in
+    /// copy order) — nil for a same-name plan or an out-of-range ordinal.
+    private func freeFormSourceName(at ordinal: Int) -> String? {
+        guard let names = freeFormMergePlan?.sourceNames, names.indices.contains(ordinal) else {
+            return nil
+        }
+        return names[ordinal]
+    }
+
     var body: some View {
         GroupBox {
             VStack(alignment: .leading, spacing: 10) {
@@ -150,6 +168,17 @@ private struct ReviewHeader: View {
                                 Text("Copy \(ordinal)")
                                     .foregroundStyle(.secondary)
                                     .frame(width: 60, alignment: .leading)
+                                // Free-form only (I2): the copy's NAME beside
+                                // its PID, mirroring the summary artifact's
+                                // "Name" (PID) — N tracks shape. Same-name
+                                // rendering below is byte-untouched.
+                                if let sourceName = freeFormSourceName(at: ordinal) {
+                                    AppKitStaticText(
+                                        identifier: M8ControlID.freeFormCopyName(ordinal),
+                                        text: "\u{201C}\(sourceName)\u{201D}",
+                                        maximumLines: 1
+                                    )
+                                }
                                 IdentifierText(text: copy.persistentId)
                                 Text(trackCountText(copyCounts: [copy.tracks.count]))
                                     .foregroundStyle(.secondary)
@@ -162,6 +191,22 @@ private struct ReviewHeader: View {
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
+                }
+                // Free-form only (I2): the exact description text the
+                // guarded writer will set, so this screen is honest about
+                // what the apply does (mirrors the summary artifact's
+                // `Target description:` line).
+                if let targetDescription = freeFormMergePlan?.targetDescription {
+                    HStack(spacing: 8) {
+                        Text("Target description")
+                            .foregroundStyle(.secondary)
+                        AppKitStaticText(
+                            identifier: M8ControlID.freeFormTargetDescription,
+                            text: targetDescription,
+                            maximumLines: 3
+                        )
+                    }
+                    .font(.callout)
                 }
                 HStack(spacing: 8) {
                     Text("Fingerprint")

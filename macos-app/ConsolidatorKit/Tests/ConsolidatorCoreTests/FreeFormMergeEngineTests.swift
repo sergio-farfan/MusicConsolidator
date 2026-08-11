@@ -76,10 +76,11 @@ struct BuildFreeFormMergePlanTests {
         #expect(plan.targetDescription == freeFormDescription)
         #expect(plan.copies.map(\.persistentId) == ["PID-A", "PID-B"])
         // 2026-08-06 review finding I1: the free-form fingerprint covers
-        // targetDescription/sourceNames too, so it is NOT the plain
-        // copies-only mergeFingerprint(_:) same-name plans use.
+        // targetDescription/sourceNames/targetName too, so it is NOT the
+        // plain copies-only mergeFingerprint(_:) same-name plans use.
         #expect(plan.mergeFingerprint == freeFormMergeFingerprint(
-            copies: copies, targetDescription: freeFormDescription, sourceNames: freeFormSourceNames
+            copies: copies, targetDescription: freeFormDescription, sourceNames: freeFormSourceNames,
+            targetName: freeFormTargetName
         ))
         #expect(plan.mergeFingerprint != mergeFingerprint(copies))
     }
@@ -238,7 +239,9 @@ struct FreeFormMergePlanIntegrityTests {
             targetDescription: "Tampered description",
             sourceNames: plan.sourceNames
         )
-        expectRejection(tampered, messageContains: "merge fingerprint does not match the persisted copies")
+        expectRejection(
+            tampered, messageContains: "merge fingerprint does not match the persisted plan fields"
+        )
     }
 
     // The controller's exact tamper scenario: flip ONLY target_description
@@ -262,7 +265,57 @@ struct FreeFormMergePlanIntegrityTests {
             try validateMergePlanIntegrity(decoded)
             Issue.record("expected the hand-edited description to be refused")
         } catch let error as PlanIntegrityError {
-            #expect(error.message.contains("merge fingerprint does not match the persisted copies"))
+            #expect(error.message.contains("merge fingerprint does not match the persisted plan fields"))
+        } catch {
+            Issue.record("expected PlanIntegrityError, got \(error)")
+        }
+    }
+
+    // 2026-08-06 FINAL review finding I1: `mergedPlaylistSourceName` (the
+    // computed target name) was the one persisted free-form field the
+    // fingerprint did NOT cover — this pins it closed the exact same way
+    // the description tamper above is, mirroring both its in-memory and
+    // serialized shapes. Do NOT assert the `sourceNames[0] + " — Merged"`
+    // derivation here — that would break the deliberate `Café — Merged`
+    // builder test elsewhere; this only proves a tampered name disagrees
+    // with the persisted fingerprint.
+    @Test("rejects a tampered target name (in-memory construction)")
+    func rejectsTamperedTargetNameInMemory() throws {
+        let plan = try plan()
+        let tampered = MergePlan(
+            mergedPlaylistSourceName: "Tampered Target Name",
+            copies: plan.copies,
+            mergeFingerprint: plan.mergeFingerprint,
+            winnerSourceIndexes: plan.winnerSourceIndexes,
+            decisions: plan.decisions,
+            nonEligibleSourceIndexes: plan.nonEligibleSourceIndexes,
+            sourcePersistentIDs: plan.sourcePersistentIDs,
+            targetDescription: plan.targetDescription,
+            sourceNames: plan.sourceNames
+        )
+        expectRejection(
+            tampered, messageContains: "merge fingerprint does not match the persisted plan fields"
+        )
+    }
+
+    // Same tamper, but through the serialized plan.json + Codable-decode
+    // path (mirrors `serializedDescriptionTamperFailsClosed` above):
+    // `merged_playlist_source_name` is hand-edited while `merge_fingerprint`
+    // is left exactly as the untampered plan produced.
+    @Test("a hand-edited merged_playlist_source_name in a serialized plan.json fails closed")
+    func serializedTargetNameTamperFailsClosed() throws {
+        let plan = try plan()
+        var object = try jsonObject(plan)
+        object["merged_playlist_source_name"] = "Hand-edited Target Name"
+        // merge_fingerprint is left exactly as the untampered plan produced.
+        let data = try JSONSerialization.data(withJSONObject: object)
+        let decoded = try JSONDecoder().decode(MergePlan.self, from: data)
+        #expect(decoded.mergedPlaylistSourceName == "Hand-edited Target Name")
+        do {
+            try validateMergePlanIntegrity(decoded)
+            Issue.record("expected the hand-edited target name to be refused")
+        } catch let error as PlanIntegrityError {
+            #expect(error.message.contains("merge fingerprint does not match the persisted plan fields"))
         } catch {
             Issue.record("expected PlanIntegrityError, got \(error)")
         }

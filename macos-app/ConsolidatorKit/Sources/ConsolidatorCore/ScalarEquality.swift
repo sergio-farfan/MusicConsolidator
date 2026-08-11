@@ -131,11 +131,9 @@ func scalarEqual(_ lhs: String?, _ rhs: String?) -> Bool {
 /// for that gate to see them at all. `sourcePersistentIDs`/`sourceNames`
 /// tampering IS caught this way (both are cross-validated against
 /// `plan.copies` before this comparison ever runs — see
-/// `validateMergePlanIntegrity`); `targetDescription` tampering alone is NOT
-/// — it is caller-supplied opaque text with nothing else in the plan to
-/// check it against, so the canonical recompute necessarily echoes back
-/// whatever the persisted plan already says (documented, deliberate
-/// boundary; see FreeFormMergePlanIntegrityTests).
+/// `validateMergePlanIntegrity`); `targetDescription` tampering alone is not
+/// caught by this comparison; the free-form fingerprint recheck in
+/// `validateMergePlanIntegrity` catches it before this runs.
 func scalarEqual(_ lhs: MergePlan, _ rhs: MergePlan) -> Bool {
     scalarEqual(lhs.mergedPlaylistSourceName, rhs.mergedPlaylistSourceName)
         && scalarEqual(lhs.copies, rhs.copies)

@@ -217,6 +217,10 @@ enum M8ControlID {
     static let continueToGate = "m8.continueToGate"
     static let startOver = "m8.startOver"
     static func checkbox(_ persistentId: String) -> String { "m8.check.\(persistentId)" }
+    /// 2026-08-06 final review, finding I2: the plan review header's
+    /// free-form-only copy-name row and target-description row.
+    static func freeFormCopyName(_ ordinal: Int) -> String { "m8.freeFormCopyName.\(ordinal)" }
+    static let freeFormTargetDescription = "m8.freeFormTargetDescription"
 }
 
 /// Stable accessibility identifiers for the M9 in-app-apply controls
