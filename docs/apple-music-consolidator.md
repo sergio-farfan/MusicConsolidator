@@ -115,21 +115,30 @@ case: it already has a single-copy `#Musica xTotal — Consolidated` artifact fr
 the earlier pilot, so merging its two copies is a distinct, separately reviewed
 operation — keep it out of routine waves.
 
-### Free-form merge (AGENTS.md amendment, 2026-08-06)
+### Free-form merge (AGENTS.md amendment, 2026-08-06; unified list, 2026-08-11)
 
 The native app can also merge ANY user-selected set of playlists, with no
-same-name requirement. On the Merge tab, check any mix of same-name groups and
-SINGLETONS — a checked group contributes all its copies, a checked singleton
-contributes itself — and the footer's second action, `Merge selected as one…`,
-enqueues ONE item for the whole selection; the footer's `Queued: N playlists`
-count counts checked groups plus checked singletons, and the button enables at
-two or more source playlists. `Start Queue` keeps its own meaning (one merge per
-checked group). The tab's caption states both paths:
-“Check same-name groups and Start Queue to merge one group at a time, or
-check any mix of groups and singletons and use ‘Merge selected as one…’
-to combine them into a single new playlist.” A near match is still not a
-same-name group — rename its variants in Music to merge them as a group, or
-check them individually as singletons.
+same-name requirement. The Merge tab is ONE alphabetical ALL PLAYLISTS
+checklist: every same-name group is one row (its `xN` badge and per-copy
+counts unchanged) interleaved with every singleton, every row checkable —
+there is no separate MERGEABLE GROUPS / NEAR MATCHES / SINGLETONS anatomy to
+navigate. A checked group contributes all its copies, a checked singleton
+contributes itself, and the footer's second action, `Merge selected as
+one…`, enqueues ONE item for the whole selection; the footer's `Selected: N
+playlists` count is the total SOURCE playlist count behind the current
+selection (checked groups' copies summed, plus one per checked singleton),
+and `Merge selected as one…` enables at two or more source playlists.
+`Merge each group separately` (the renamed `Start Queue`; one merge per
+checked group) enables ONLY for a groups-only selection — checking even one
+singleton disables it, so a mixed pick cannot silently drop that singleton;
+its tooltip explains the trade-off. The tab's caption states the general
+shape: “Pick any playlists to combine — same-name groups merge as one
+unit.” A near match is still not a same-name group: its row carries a `near
+match` badge instead (tooltip: differs from its twin only by invisible
+characters or edge whitespace), and selecting the row still opens the
+inspector's rename hint and `Align names…` entry point — rename its variants
+in Music to merge them as a group, or check them individually as
+singletons.
 
 The target name is automatic — `<first source> — Merged`, where "first" is the
 first source in ascending Apple Music playlist-ID order (the same copy order
@@ -159,11 +168,10 @@ same-name copies", which a free-form plan is not, so source cleanup after a
 free-form merge stays manual. Free-form merge is app-only — the CLI keeps
 same-name `merge-audit` / `merge-apply`.
 
-First live run (checklist): expand the SINGLETONS section to see its
-checkboxes (collapsed by default), then pick TWO SMALL unrelated singletons —
-plain playlists, not smart playlists or folders — check both, click `Merge
-selected as one…`, review the named plan artifacts, then apply. In
-Music, verify the new playlist's NAME is `<first source> — Merged` and its
+First live run (checklist): in the ALL PLAYLISTS list, pick TWO SMALL
+unrelated singletons — plain playlists, not smart playlists or folders —
+check both, click `Merge selected as one…`, review the named plan artifacts,
+then apply. In Music, verify the new playlist's NAME is `<first source> — Merged` and its
 DESCRIPTION reads `Merged on <timestamp> from: <both names>`; verify both source
 playlists are untouched (same names, same track counts); and verify the
 `reports/` triple plus the run report exist, with the `.summary.md` listing both
@@ -195,8 +203,9 @@ color-coded status chips (pending / auditing / awaiting review / applying
 step k of 7 / applied / skipped / failed); the apply progress list is a
 three-column Step | Status | Elapsed table that shows all seven guarded
 steps up front. The source browser supports shift-click range selection
-plus Cmd+A / Cmd+D, scoped per tab (the Merge tab selects mergeable groups
-only; the Consolidate tab selects every checkable row). Every surface that
+plus Cmd+A / Cmd+D, scoped per tab (the Merge tab's unified list selects
+every eligible group AND singleton, skipping already-processed sources of
+either kind; the Consolidate tab selects every checkable row). Every surface that
 names a playlist shows its track count in one shared wording: "551 tracks"
 for a single playlist, per-copy counts joined with " + " for merge groups
 ("9 + 10 tracks"). Run surfaces show the freshest audit-derived count when
@@ -275,11 +284,12 @@ direct-mutation sheet. Like every direct action, batch rename writes no
 The Library and Cleanup lists still order by clickable
 Name/Tracks headers — display-only; ordering never feeds a mutation.
 Browser rows (Merge/Consolidate tabs) carry the same Delete and Rename…
-actions. NEAR MATCHES clusters carry "Align names…": the canonical name
-is the variant equal to its own NFC form with no leading/trailing
-whitespace and no invisible scalars (Sergio picks when none or several
-qualify), and each deviant copy in the cluster opens the same pre-filled
-rename sheet — one confirm per rename, no typed gate.
+actions. A near match's inspector (reached by selecting its badged row on
+the Merge tab, or its warning icon's row on the Consolidate tab) carries
+"Align names…": the canonical name is the variant equal to its own NFC form
+with no leading/trailing whitespace and no invisible scalars (Sergio picks
+when none or several qualify), and each deviant copy in the cluster opens
+the same pre-filled rename sheet — one confirm per rename, no typed gate.
 
 As the pilot section above records, deleting a playlist removes the
 playlist, not its songs from the library. Source playlists of merges and

@@ -54,11 +54,6 @@ struct SourceSelectionView: View {
         model.loadedSections == nil ? "Scan Library (read-only)" : "Rescan"
     }
 
-    private var mergeStartQueueTitle: String {
-        let count = model.checkedGroupNames.count
-        return count == 0 ? "Merge" : "Merge \(count) groups"
-    }
-
     private var consolidateStartQueueTitle: String {
         let count = model.checkedPersistentIds.count
         return count == 0 ? "Consolidate" : "Consolidate \(count) playlists"
@@ -173,19 +168,12 @@ struct SourceSelectionView: View {
                 + "Check playlists to build a batch queue \u{2014} every item still gets "
                 + "its own plan review, confirm gate, and apply."
         case .merge:
-            return "Check same-name groups and Start Queue to merge one group at a "
-                + "time, or check any mix of groups and singletons and use "
-                + "\u{201C}Merge selected as one\u{2026}\u{201D} to combine them into a "
-                + "single new playlist. Every item still gets its own plan review, "
-                // F4: the claim is scoped to the SAME-NAME path now — a
-                // near-match variant is a singleton, so it IS free-form
-                // mergeable. Kept terse: this caption is `.lineLimit(2)`.
-                // Caption trim (2026-08-06 final review, triage ruling): the
-                // "rename in Music, or check them as singletons" clause is
-                // dropped — the near-match row's own tooltip
-                // (SourceBrowserView's blockedCheckbox `help`) already
-                // carries that guidance in full.
-                + "confirm gate, and apply. Near matches are not a same-name group."
+            // 2026-08-11 unified merge list: one ALL PLAYLISTS checklist
+            // (groups and singletons interleaved) replaces the old
+            // three-section anatomy this caption used to explain in detail;
+            // the caption is now the spec's exact verbatim binding.
+            return "Pick any playlists to combine \u{2014} same-name groups merge "
+                + "as one unit."
         }
     }
 
@@ -364,29 +352,29 @@ struct SourceSelectionView: View {
         }
     }
 
-    /// M10: the merge footer mirrors the consolidate footer — the queue is
-    /// the ONE path (a single merge is a one-group queue); the M8 arming
-    /// footer is superseded. The Start Queue control shares its id with the
-    /// consolidate footer's (exactly one renders at a time).
+    /// 2026-08-11 unified merge list: the footer's count is now the total
+    /// SOURCE playlist count behind the current selection
+    /// (`mergeSelectedSourceCount` — every checked group's copies plus every
+    /// checked singleton), not a per-row pick count. Two actions read that
+    /// same underlying selection two different ways: `Merge each group
+    /// separately` (Start Queue's new title; same control id) runs one
+    /// merge per checked group and so only makes sense for a groups-only
+    /// selection; `Merge selected as one…` is unchanged. The Start Queue
+    /// control shares its id with the consolidate footer's (exactly one
+    /// renders at a time).
     @ViewBuilder
     private var mergeFooter: some View {
         if model.isQueueActive {
             QueueRailView(model: model)
         } else {
             HStack(spacing: 12) {
-                // Sergio, 2026-08-06: same noun as the consolidate footer —
-                // each queued group produces exactly one merged playlist.
-                // Counts checked GROUPS plus checked free-form SINGLETONS
-                // (`mergeCheckedCount`) — a singleton pick is a real merge
-                // source and must not be invisible here (F3).
-                Text("Queued: \(model.mergeCheckedCount) playlists")
+                Text("Selected: \(model.mergeSelectedSourceCount) playlists")
                     .bold()
                 Spacer()
                 // 2026-08-06 free-form design: combines the WHOLE current
                 // selection (every checked group's copies + every checked
                 // singleton) into ONE new playlist, named and described
-                // automatically — Start Queue keeps its own meaning (one
-                // merge per checked group).
+                // automatically.
                 AppKitActionButton(
                     identifier: M10ControlID.mergeAsOne,
                     title: "Merge selected as one\u{2026}",
@@ -402,15 +390,23 @@ struct SourceSelectionView: View {
                         || model.isScanning
                         || model.isApplying
                 )
+                // 2026-08-11: retitled from "Merge"/"Merge N groups" and
+                // re-gated to a GROUPS-ONLY selection — with a singleton
+                // also checked, "one merge per checked group" would silently
+                // drop that singleton, so the help text sends the user to
+                // "Merge selected as one…" instead.
                 AppKitActionButton(
                     identifier: M8ControlID.startQueue,
-                    title: mergeStartQueueTitle,
-                    prominent: true
+                    title: "Merge each group separately",
+                    prominent: true,
+                    help: "Runs one merge per checked group. Uncheck singletons to "
+                        + "use this, or use Merge selected as one."
                 ) {
                     model.startQueue()
                 }
                 .disabled(
                     model.checkedGroupNames.isEmpty
+                        || !model.checkedFreeFormSingletonPersistentIds.isEmpty
                         || model.loadedSections == nil
                         || model.isRunning
                         || model.isScanning

@@ -1292,31 +1292,19 @@ final class AuditFlowModel {
         return freeFormSelectionSources(sections: sections)
     }
 
-    /// The merge footer's "Queued: N playlists" count (2026-08-06 free-form
-    /// design; Task 2 review finding F3): checked same-name GROUPS plus
-    /// checked free-form SINGLETONS — everything the merge tab currently has
-    /// checked. Before the free-form design the merge tab had group
-    /// checkboxes only, so this was `checkedGroupNames.count`; leaving it
-    /// there made a singleton pick invisible in the footer even while it was
-    /// what enabled "Merge selected as one…". Deliberately NOT
-    /// `freeFormMergeSelection.count` (which expands each group into its
-    /// copies): the footer counts PICKS, and Start Queue still runs one merge
-    /// per checked group.
-    var mergeCheckedCount: Int {
-        checkedGroupNames.count + checkedFreeFormSingletonPersistentIds.count
-    }
-
     /// The unified merge list's footer count (2026-08-11 design): total
     /// SOURCE playlists behind the current selection — every checked
     /// group's own copy count summed, plus one per checked singleton. This
     /// is exactly `freeFormMergeSelection.count` (reused rather than
     /// re-derived: that property already expands checked groups into their
-    /// copies and appends checked singletons). Deliberately DISTINCT from
-    /// `mergeCheckedCount` above, which counts PICKS (one per checked row
-    /// regardless of a group's copy count) for the pre-unification
-    /// "Queued: N playlists" footer; this one feeds the unified list's
+    /// copies and appends checked singletons). Feeds the unified list's
     /// "Selected: N playlists" footer (e.g. a 2-copy group plus one checked
-    /// singleton reads 3, not 2).
+    /// singleton reads 3). Retires the pre-unification `mergeCheckedCount`
+    /// (2026-08-06 free-form design; Task 2 review finding F3), which
+    /// counted PICKS — one per checked row regardless of a group's copy
+    /// count — for the old "Queued: N playlists" footer; the unified footer
+    /// has no use for a picks-count now that Start Queue's own title
+    /// ("Merge each group separately") no longer echoes a count either.
     var mergeSelectedSourceCount: Int {
         freeFormMergeSelection.count
     }
