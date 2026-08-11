@@ -384,10 +384,16 @@ struct FreeFormMergeFlowTests {
         #expect(renderRunReportText(report).contains("- Sources: Alpha, Beta"))
     }
 
-    /// Task 2 review finding F3: the merge footer's "Queued: N playlists"
-    /// counted checked GROUPS only, so a free-form singleton pick was
-    /// invisible there even while it enabled "Merge selected as one…".
-    @Test("the merge footer count includes checked free-form singletons, not just groups")
+    /// Task 2 review finding F3 (2026-08-06): the merge footer's old
+    /// "Queued: N playlists" counted checked GROUPS only, so a free-form
+    /// singleton pick was invisible there even while it enabled "Merge
+    /// selected as one…". The 2026-08-11 unified list retired that count in
+    /// favor of `mergeSelectedSourceCount` (the footer's "Selected: N
+    /// playlists"), which carries the same fix forward: it already counts a
+    /// checked singleton (not just checked groups) — and, being a SOURCE
+    /// count rather than a pick count, a checked 2-copy group contributes
+    /// both its copies.
+    @Test("the unified merge footer's source count includes checked free-form singletons, not just groups")
     func footerCountIncludesSingletons() async throws {
         let harness = try ModelHarness(
             runner: ScriptedRunner(outputs: [mixedSelectionListingWire()]),
@@ -396,16 +402,16 @@ struct FreeFormMergeFlowTests {
         defer { harness.cleanUp() }
         harness.model.rescanLibrary()
         await harness.model.scanTask?.value
-        #expect(harness.model.mergeCheckedCount == 0)
+        #expect(harness.model.mergeSelectedSourceCount == 0)
 
         harness.model.toggleCheckedFreeFormSingleton(persistentId: "S-SOLO")
-        #expect(harness.model.mergeCheckedCount == 1)
+        #expect(harness.model.mergeSelectedSourceCount == 1)
 
         harness.model.toggleCheckedGroup(name: "Trance 2022")
-        #expect(harness.model.mergeCheckedCount == 2)
+        #expect(harness.model.mergeSelectedSourceCount == 3, "the group contributes both its copies")
 
         harness.model.clearSelection()
-        #expect(harness.model.mergeCheckedCount == 0)
+        #expect(harness.model.mergeSelectedSourceCount == 0)
     }
 }
 
@@ -484,20 +490,21 @@ struct FreeFormMergeFooterStructuralTests {
     }
 }
 
-// MARK: - SINGLETONS row structural tests (Task 2 review finding F5)
+// MARK: - singleton row checkbox structural tests (Task 2 review finding F5)
 //
 // The merge tab's singleton checkbox is the ONLY way to reach the live
 // free-form flow Task 3's verification checklist describes ("select two
-// unrelated singletons -> Merge selected as one"), and Task 2 flipped it from
-// permanently-disabled-with-a-"nothing to merge"-tooltip to a live control.
-// Nothing structural covered that flip, so a regression back to
-// `.disabled(true)` would have left the model tests green and the feature
-// unreachable. `MergeBrowserList` is hosted directly with the SINGLETONS
-// disclosure seeded open: SwiftUI never materializes a COLLAPSED
-// DisclosureGroup's content, and the app's own default stays collapsed.
+// unrelated singletons -> Merge selected as one"), and Task 2 (2026-08-06)
+// flipped it from permanently-disabled-with-a-"nothing to merge"-tooltip to
+// a live control. Nothing structural covered that flip, so a regression
+// back to `.disabled(true)` would have left the model tests green and the
+// feature unreachable. The 2026-08-11 unified merge list retired the
+// collapsed SINGLETONS disclosure this suite used to seed open —
+// `MergeBrowserList` now renders every singleton row directly in its one
+// ALL PLAYLISTS list, so hosting it needs no extra state.
 
 @MainActor
-@Suite("Free-form merge — SINGLETONS row checkbox structural pins (F5)", .serialized)
+@Suite("Free-form merge — singleton row checkbox structural pins (F5)", .serialized)
 struct FreeFormSingletonRowStructuralTests {
 
     @Test("the singleton row's checkbox exists, is enabled, and drives toggleCheckedFreeFormSingleton")
@@ -506,7 +513,7 @@ struct FreeFormSingletonRowStructuralTests {
         defer { harness.cleanUp() }
         let sections = try #require(harness.model.loadedSections)
         let fixture = HostedFixture(
-            MergeBrowserList(model: harness.model, sections: sections, singletonsShown: true),
+            MergeBrowserList(model: harness.model, sections: sections),
             width: 1200, height: 800
         )
         defer { fixture.tearDown() }
@@ -549,7 +556,7 @@ struct FreeFormSingletonRowStructuralTests {
 
         let sections = try #require(harness.model.loadedSections)
         let fixture = HostedFixture(
-            MergeBrowserList(model: harness.model, sections: sections, singletonsShown: true),
+            MergeBrowserList(model: harness.model, sections: sections),
             width: 1200, height: 800
         )
         defer { fixture.tearDown() }

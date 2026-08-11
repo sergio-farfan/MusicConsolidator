@@ -174,10 +174,13 @@ private func loadedFixtureHarness(mode: ConsolidatorMode) async throws -> ModelH
 @Suite("Offscreen structural view tests (fix round 2)", .serialized)
 struct StructuralViewTests {
 
-    // (a) + (e): merge mode exposes the mode control, the filter field, the
-    // scan control, the three sections with the fixture's row counts, the
-    // M10 group checkboxes, and the queue footer control.
-    @Test("merge browser exposes mode control, filter, sections, checkboxes, and footer")
+    // (a) + (e), updated 2026-08-11 for the unified merge list: merge mode
+    // exposes the mode control, the filter field, the scan control, the ONE
+    // ALL PLAYLISTS list with the fixture's row count (no more MERGEABLE
+    // GROUPS / NEAR MATCHES / SINGLETONS sections), the M10 group AND
+    // singleton checkboxes (near-match twins included — no disabled
+    // "blocked" row survives), and the queue footer control.
+    @Test("merge browser exposes mode control, filter, the unified list, checkboxes, and footer")
     func mergeBrowserStructure() async throws {
         let harness = try await loadedFixtureHarness(mode: .merge)
         defer { harness.cleanUp() }
@@ -193,25 +196,32 @@ struct StructuralViewTests {
         #expect(view(under: fixture.hosting, axIdentifier: "m8.filterField") != nil)
         #expect(view(under: fixture.hosting, axIdentifier: "m8.scanLibrary") != nil)
 
-        // Three sections: MERGEABLE GROUPS / NEAR MATCHES / SINGLETONS.
-        #expect(listHeaderCount(under: fixture.hosting) == 3)
-        // Three content rows: 1 group + 1 near-match cluster + the collapsed
-        // singletons disclosure row.
-        #expect(listContentCellCount(under: fixture.hosting) == 3)
+        // One section: ALL PLAYLISTS.
+        #expect(listHeaderCount(under: fixture.hosting) == 1)
+        // Five content rows: the "Trance 2022" group (2 copies, one row) +
+        // the four singletons ("Kdrama", "Kdrama " near-match twins, "Solo
+        // List", "Another List").
+        #expect(listContentCellCount(under: fixture.hosting) == 5)
 
-        // M10: the GROUP row carries an ENABLED checkbox; the near-match
-        // cluster row carries a DISABLED one (non-checkable, like
-        // consolidate's blocked rows).
+        // M10: the GROUP row carries an ENABLED checkbox.
         let groupCheckbox = try #require(
             view(under: fixture.hosting, axIdentifier: M10ControlID.groupCheckbox("Trance 2022"))
                 as? NSButton
         )
         #expect(groupCheckbox.isEnabled)
-        let blocked = try #require(
-            view(under: fixture.hosting, axIdentifier: M10ControlID.blockedCheckbox("Kdrama"))
+
+        // The near-match twins are LIVE, checkable singleton rows now — no
+        // standalone disabled "blocked" row survives the unification.
+        let twinA = try #require(
+            view(under: fixture.hosting, axIdentifier: M10ControlID.singletonCheckbox("S-C"))
                 as? NSButton
         )
-        #expect(!blocked.isEnabled)
+        #expect(twinA.isEnabled)
+        let twinB = try #require(
+            view(under: fixture.hosting, axIdentifier: M10ControlID.singletonCheckbox("S-D"))
+                as? NSButton
+        )
+        #expect(twinB.isEnabled)
 
         // The footer's queue control exists (shared id with consolidate:
         // exactly one footer renders at a time).

@@ -2,19 +2,22 @@
 // Apple Music Consolidator
 // Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // M8 — the sectioned source browser (design Option B), recomposed in fix
-// round 2. Merge tab: an eligibility-sectioned list (MERGEABLE GROUPS /
-// NEAR MATCHES / SINGLETONS) where a tap highlights ONE row for the
-// inspector, and — since M10 — GROUP rows carry native checkboxes building
-// the merge batch queue. Since the 2026-08-06 free-form design SINGLETON rows
-// carry live checkboxes too (they contribute to "Merge selected as one…");
-// near-match CLUSTER rows stay non-checkable, their checkboxes disabled with
-// an explanation, exactly like consolidate's blocked rows — a near match is
-// not a same-name group, though its variants are individually checkable as
-// singletons. Consolidate tab: the flat alphabetical ALL PLAYLISTS list
-// with native checkboxes building the consolidate batch queue (group
-// members disabled — the engine fails closed on ambiguous names). A
-// trailing inspector explains the selected row; selection for inspection is
-// independent of checking for the queue in both tabs.
+// round 2 and unified in the 2026-08-11 merge-list redesign. Merge tab: ONE
+// alphabetical ALL PLAYLISTS checklist (`mergeRows`) — a same-name group is
+// one row (all copies), interleaved with every singleton, every row
+// checkable — where a tap highlights ONE row for the inspector, GROUP rows
+// carry native checkboxes building the merge batch queue
+// (`toggleChecked(name:)`, M10), and SINGLETON rows carry live checkboxes
+// too (2026-08-06 free-form design: they contribute to "Merge selected as
+// one…"). A near-match singleton carries a badge and selects its cluster
+// (not itself) so the inspector's rename hint + Align names… stay reachable
+// without a separate non-checkable cluster row — the old MERGEABLE GROUPS /
+// NEAR MATCHES / SINGLETONS three-section anatomy and its collapsed-
+// singletons disclosure are retired. Consolidate tab: the flat alphabetical
+// ALL PLAYLISTS list with native checkboxes building the consolidate batch
+// queue (group members disabled — the engine fails closed on ambiguous
+// names). A trailing inspector explains the selected row; selection for
+// inspection is independent of checking for the queue in both tabs.
 //
 // Fix round 2 rules:
 // - The lists carry NO `selection:` binding (the broken composition shipped
@@ -82,77 +85,74 @@ extension View {
 
 // MARK: - the merge tab
 
+/// The near-match cluster a listing belongs to, by its normalized name.
+func nearMatchClusterName(
+    for listing: PlaylistListing, in sections: PlaylistBrowseSections
+) -> String? {
+    sections.nearMatches.first { cluster in
+        cluster.variants.contains { scalarExact($0.name, listing.name) }
+    }?.normalizedName
+}
+
+/// The row-tap selection target for a merge-tab singleton row (2026-08-11
+/// unified merge list): a near-match twin selects its CLUSTER, by
+/// `nearMatchClusterName` — so tapping EITHER twin's row resolves to the
+/// same `.nearMatch` selection (mirroring how selecting a same-name GROUP
+/// highlights every copy together) and the near-match inspector detail +
+/// Align names… entry point stay reachable without a standalone NEAR
+/// MATCHES row; a plain singleton (no twin) selects itself. Pure and
+/// directly testable — no click simulation needed to pin the routing.
+func mergeSingletonRowSelection(
+    for listing: PlaylistListing,
+    nearMatchTwin: String?,
+    in sections: PlaylistBrowseSections
+) -> BrowserSelection {
+    guard nearMatchTwin != nil, let clusterName = nearMatchClusterName(for: listing, in: sections)
+    else {
+        return .singleton(listing.persistentId)
+    }
+    return .nearMatch(clusterName)
+}
+
+/// One "already merged" advisory chip, shared by group and singleton rows.
+private func alreadyMergedHelp(sourceName: String, plural: Bool) -> String {
+    "Already merged: \u{201C}\(sourceName) \u{2014} Merged\u{201D} exists. Review "
+        + "it, then clean up the \(plural ? "sources" : "source"); delete it "
+        + "first to reprocess."
+}
+
+/// The merge tab's unified ALL PLAYLISTS checklist (2026-08-11 design): one
+/// alphabetical `List` of `mergeRows` — a same-name group (one row, all
+/// copies) interleaved with every singleton, every row checkable. Replaces
+/// the old MERGEABLE GROUPS / NEAR MATCHES / SINGLETONS three-section
+/// anatomy and its collapsed-singletons disclosure entirely: a near match's
+/// rename hint now surfaces as a badge on its (still checkable) singleton
+/// row instead of a separate non-checkable cluster row.
 struct MergeBrowserList: View {
     @Bindable var model: AuditFlowModel
     let sections: PlaylistBrowseSections
-    @State private var singletonsShown: Bool
-
-    /// `singletonsShown` seeds the SINGLETONS disclosure state. The app always
-    /// uses the default (collapsed, as shipped); the offscreen structural
-    /// tests pass `true` because SwiftUI never materializes a COLLAPSED
-    /// DisclosureGroup's content, and the singleton row's checkbox — the only
-    /// entry point to a free-form merge from a singleton (2026-08-06 design)
-    /// — has to be reachable in the view tree to be pinned (F5).
-    init(
-        model: AuditFlowModel,
-        sections: PlaylistBrowseSections,
-        singletonsShown: Bool = false
-    ) {
-        _model = Bindable(model)
-        self.sections = sections
-        _singletonsShown = State(initialValue: singletonsShown)
-    }
 
     var body: some View {
+        // `sections` already passed the active search filter (the caller
+        // applies `filteredSections` once, same as ConsolidateBrowserList),
+        // so `mergeRows` is called with an empty needle here.
+        let rows = mergeRows(
+            sections: sections, needle: "",
+            key: model.browserSortKey, ascending: model.browserSortAscending
+        )
         List {
             Section {
-                if sections.groups.isEmpty {
-                    Text("No same-name groups. Every playlist name is unique.")
-                        .foregroundStyle(.secondary)
-                } else {
-                    ForEach(applyBrowserSort(
-                        sections.groups,
-                        key: model.browserSortKey,
-                        ascending: model.browserSortAscending,
-                        count: { $0.copies.reduce(0) { $0 + $1.trackCount } }
-                    ), id: \.name) { group in
-                        HStack(spacing: 8) {
-                            // M10: check a group to queue its merge. Checking
-                            // is independent of the row highlight (which only
-                            // feeds the inspector).
-                            let alreadyDone = model.isAlreadyProcessed(name: group.name)
-                            AppKitCheckbox(
-                                identifier: M10ControlID.groupCheckbox(group.name),
-                                isOn: model.isGroupChecked(group.name),
-                                help: alreadyDone
-                                    ? "Already merged: \u{201C}\(group.name) \u{2014} "
-                                        + "Merged\u{201D} exists. Review it, then clean "
-                                        + "up the sources; delete it first to reprocess."
-                                    : "Queue \u{201C}\(group.name)\u{201D} "
-                                        + "(\(group.copies.count) copies) for merging."
-                            ) {
-                                model.toggleChecked(
-                                    name: group.name,
-                                    rangeSelect: NSEvent.modifierFlags.contains(.shift)
-                                )
-                            }
-                            .disabled(alreadyDone || model.isQueueActive)
-                            if alreadyDone {
-                                Chip(text: "already merged", tint: .green)
-                            }
-                            BrowserNameText(name: group.name)
-                            Chip(text: "x\(group.copies.count)", tint: .blue)
-                            Spacer()
-                            Text(trackCountText(copyCounts: group.copies.map(\.trackCount)))
-                                .foregroundStyle(.secondary)
-                                .monospacedDigit()
-                        }
-                        .browserRow(model, selects: .group(group.name))
+                ForEach(rows) { row in
+                    switch row {
+                    case .group(let group):
+                        groupRow(group)
+                    case .singleton(let listing, let nearMatchTwin):
+                        singletonRow(listing, nearMatchTwin: nearMatchTwin)
                     }
                 }
             } header: {
                 HStack(spacing: 8) {
-                    Text("MERGEABLE GROUPS (\(sections.groups.count))")
+                    Text("ALL PLAYLISTS (\(rows.count))")
                     BrowserSortHeader(model: model)
                     Spacer()
                     AppKitActionButton(
@@ -164,7 +164,7 @@ struct MergeBrowserList: View {
                         model.selectAllEligible()
                     }
                     .disabled(model.isQueueActive)
-                    .help("Check every mergeable group (\u{2318}A).")
+                    .help("Check every eligible group and singleton (\u{2318}A).")
                     AppKitActionButton(
                         identifier: WaveAControlID.clearChecks,
                         title: "Clear",
@@ -174,84 +174,102 @@ struct MergeBrowserList: View {
                         model.clearSelection()
                     }
                     .disabled(model.isQueueActive)
-                    .help("Uncheck every group (\u{2318}D).")
+                    .help("Uncheck every group and singleton (\u{2318}D).")
                 }
                 .controlSize(.small)
             }
-
-            Section("NEAR MATCHES \u{2014} rename to merge (\(sections.nearMatches.count))") {
-                if sections.nearMatches.isEmpty {
-                    Text("No invisible-character twins found.")
-                        .foregroundStyle(.secondary)
-                } else {
-                    ForEach(sections.nearMatches, id: \.normalizedName) { cluster in
-                        HStack(spacing: 8) {
-                            // Non-checkable, like consolidate's blocked rows:
-                            // a disabled checkbox that explains itself.
-                            AppKitCheckbox(
-                                identifier: M10ControlID.blockedCheckbox(cluster.normalizedName),
-                                isOn: false,
-                                help: "Not a same-name group \u{2014} these names differ "
-                                    + "by invisible characters, so they cannot be merged "
-                                    + "as a group. Rename in Music and rescan, or check "
-                                    + "them individually under SINGLETONS and use "
-                                    + "\u{201C}Merge selected as one\u{2026}\u{201D}."
-                            ) {}
-                            .disabled(true)
-                            Image(systemName: "exclamationmark.triangle.fill")
-                                .foregroundStyle(.orange)
-                            VStack(alignment: .leading, spacing: 2) {
-                                ForEach(cluster.variants, id: \.name) { variant in
-                                    BrowserNameText(name: variant.name)
-                                }
-                            }
-                            Spacer()
-                            Text("not a same-name group \u{2014} rename to group")
-                                .font(.caption)
-                                .foregroundStyle(.orange)
-                        }
-                        .browserRow(model, selects: .nearMatch(cluster.normalizedName))
-                    }
-                }
-            }
-
-            Section("SINGLETONS (\(sections.singletons.count))") {
-                DisclosureGroup(isExpanded: $singletonsShown) {
-                    ForEach(sections.singletons, id: \.persistentId) { listing in
-                        HStack(spacing: 8) {
-                            // 2026-08-06 free-form design: a singleton
-                            // cannot merge with itself, but it CAN
-                            // contribute to a free-form merge alongside
-                            // other checked groups/singletons.
-                            AppKitCheckbox(
-                                identifier: M10ControlID.singletonCheckbox(listing.persistentId),
-                                isOn: model.isFreeFormSingletonChecked(
-                                    persistentId: listing.persistentId
-                                ),
-                                help: "Check to include \u{201C}\(listing.name)\u{201D} as a "
-                                    + "source in \u{201C}Merge selected as one\u{2026}\u{201D}."
-                            ) {
-                                model.toggleCheckedFreeFormSingleton(
-                                    persistentId: listing.persistentId
-                                )
-                            }
-                            .disabled(model.isQueueActive)
-                            BrowserNameText(name: listing.name)
-                            listingBadges(listing)
-                            Spacer()
-                            Text(trackCountText(copyCounts: [listing.trackCount]))
-                                .foregroundStyle(.secondary)
-                                .monospacedDigit()
-                        }
-                        .browserRow(model, selects: .singleton(listing.persistentId))
-                    }
-                } label: {
-                    Text(singletonsShown ? "Hide" : "Show")
-                        .foregroundStyle(.secondary)
-                }
-            }
         }
         .listStyle(.inset)
+    }
+
+    // MARK: rows
+
+    /// A same-name group row: name, `xN` badge, per-copy counts, checkbox ->
+    /// `toggleChecked(name:)`, already-merged chip — unchanged from the old
+    /// MERGEABLE GROUPS section row.
+    @ViewBuilder
+    private func groupRow(_ group: PlaylistNameGroup) -> some View {
+        let alreadyDone = model.isAlreadyProcessed(name: group.name)
+        HStack(spacing: 8) {
+            // M10: check a group to queue its merge. Checking is
+            // independent of the row highlight (which only feeds the
+            // inspector).
+            AppKitCheckbox(
+                identifier: M10ControlID.groupCheckbox(group.name),
+                isOn: model.isGroupChecked(group.name),
+                help: alreadyDone
+                    ? alreadyMergedHelp(sourceName: group.name, plural: true)
+                    : "Queue \u{201C}\(group.name)\u{201D} "
+                        + "(\(group.copies.count) copies) for merging."
+            ) {
+                model.toggleChecked(
+                    name: group.name,
+                    rangeSelect: NSEvent.modifierFlags.contains(.shift)
+                )
+            }
+            .disabled(alreadyDone || model.isQueueActive)
+            if alreadyDone {
+                Chip(text: "already merged", tint: .green)
+            }
+            BrowserNameText(name: group.name)
+            Chip(text: "x\(group.copies.count)", tint: .blue)
+            Spacer()
+            Text(trackCountText(copyCounts: group.copies.map(\.trackCount)))
+                .foregroundStyle(.secondary)
+                .monospacedDigit()
+        }
+        .browserRow(model, selects: .group(group.name))
+    }
+
+    /// A singleton row: checkbox -> `toggleCheckedFreeFormSingleton`,
+    /// already-merged chip (2026-08-11: extended to singletons — the same
+    /// `isAlreadyProcessed` skip `selectAllEligible` already applies to a
+    /// checked-out singleton is now visible on its row too), PLUS a near
+    /// match badge when this row carries a twin. Selecting the row targets
+    /// the near-match cluster instead of the plain singleton when a twin is
+    /// present, keeping the rename hint reachable.
+    @ViewBuilder
+    private func singletonRow(_ listing: PlaylistListing, nearMatchTwin: String?) -> some View {
+        let alreadyDone = model.isAlreadyProcessed(name: listing.name)
+        HStack(spacing: 8) {
+            // 2026-08-06 free-form design: a singleton cannot merge with
+            // itself, but it CAN contribute to a free-form merge alongside
+            // other checked groups/singletons.
+            AppKitCheckbox(
+                identifier: M10ControlID.singletonCheckbox(listing.persistentId),
+                isOn: model.isFreeFormSingletonChecked(persistentId: listing.persistentId),
+                help: alreadyDone
+                    ? alreadyMergedHelp(sourceName: listing.name, plural: false)
+                    : "Check to include \u{201C}\(listing.name)\u{201D} as a "
+                        + "source in \u{201C}Merge selected as one\u{2026}\u{201D}."
+            ) {
+                model.toggleCheckedFreeFormSingleton(persistentId: listing.persistentId)
+            }
+            .disabled(alreadyDone || model.isQueueActive)
+            if alreadyDone {
+                Chip(text: "already merged", tint: .green)
+            }
+            BrowserNameText(name: listing.name)
+            listingBadges(listing)
+            if let nearMatchTwin {
+                Chip(text: "near match", tint: .orange)
+                    .help(
+                        "Near match: differs from \u{201C}\(nearMatchTwin)\u{201D} only "
+                            + "by invisible characters or edge whitespace \u{2014} select "
+                            + "the row for the rename hint."
+                    )
+            }
+            Spacer()
+            Text(trackCountText(copyCounts: [listing.trackCount]))
+                .foregroundStyle(.secondary)
+                .monospacedDigit()
+        }
+        .browserRow(
+            model,
+            selects: mergeSingletonRowSelection(
+                for: listing, nearMatchTwin: nearMatchTwin, in: sections
+            )
+        )
     }
 }
 
@@ -306,9 +324,10 @@ struct ConsolidateBrowserList: View {
                             Image(systemName: "exclamationmark.triangle.fill")
                                 .foregroundStyle(.orange)
                                 .help(
-                                    "This name has a near-identical twin \u{2014} see the "
-                                        + "Merge tab's NEAR MATCHES. Consolidating it is "
-                                        + "still legal (it is a single copy)."
+                                    "This name has a near-identical twin \u{2014} see its "
+                                        + "\u{201C}near match\u{201D} badge on the Merge tab. "
+                                        + "Consolidating it is still legal (it is a single "
+                                        + "copy)."
                                 )
                         }
                         listingBadges(listing)
@@ -468,7 +487,7 @@ struct BrowserInspector: View {
     private var emptyHint: some View {
         Text(
             model.mode == .merge
-                ? "Check groups to queue their merges (each gets its own read, review, and confirm gate); select any row to inspect it, or a near match to see its rename hint."
+                ? "Check any groups and singletons to merge (each queued item gets its own read, review, and confirm gate); select any row to inspect it, including a near match's rename hint."
                 : "Check the playlists to consolidate; each queued item gets its own read, review, and confirm gate."
         )
         .font(.callout)
@@ -568,7 +587,8 @@ struct BrowserInspector: View {
                 "These names differ only by invisible characters, so the strict "
                     + "exact-name contract keeps them separate (correctly). To merge "
                     + "them: rename the twin(s) in Music to the exact name below, "
-                    + "then rescan \u{2014} the group appears under MERGEABLE GROUPS."
+                    + "then rescan \u{2014} the group becomes ONE checkable row in "
+                    + "ALL PLAYLISTS."
             )
             .font(.caption)
             .foregroundStyle(.secondary)
@@ -624,8 +644,9 @@ struct BrowserInspector: View {
             Text(
                 model.mode == .merge
                     ? "Nothing to merge \u{2014} only one playlist has this exact name. "
-                        + "If you expected more copies, check NEAR MATCHES for "
-                        + "invisible-character twins (trailing spaces render as \u{B7})."
+                        + "If you expected more copies, look for a \u{201C}near "
+                        + "match\u{201D} badge \u{2014} invisible-character twins render "
+                        + "as separate rows (trailing spaces render as \u{B7})."
                     : "Eligible for the consolidate queue (exactly one playlist has "
                         + "this exact name)."
             )

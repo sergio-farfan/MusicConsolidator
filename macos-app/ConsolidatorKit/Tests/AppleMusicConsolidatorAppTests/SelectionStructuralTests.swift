@@ -2,10 +2,10 @@
 // Apple Music Consolidator
 // Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
 // Wave A (spec A4) — offscreen structural pins for the browser selection
-// controls: Select all / Clear render on the MERGEABLE GROUPS header
-// (merge tab) and the ALL PLAYLISTS header (consolidate tab) ONLY, carry
-// the Cmd+A / Cmd+D key equivalents, sit within the window bounds, and
-// REALLY drive the model (performClick). Same harness rules as
+// controls: Select all / Clear render on the ALL PLAYLISTS header, on both
+// the merge tab (2026-08-11 unified list) and the consolidate tab ONLY,
+// carry the Cmd+A / Cmd+D key equivalents, sit within the window bounds,
+// and REALLY drive the model (performClick). Same harness rules as
 // StructuralViewTests: never-shown NSWindow, fixture-driven model, no
 // Music contact.
 

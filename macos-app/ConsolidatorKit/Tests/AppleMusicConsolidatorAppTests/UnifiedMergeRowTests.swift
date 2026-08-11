@@ -8,10 +8,20 @@
 // `selectAllEligible`'s merge branch now also checks eligible singletons
 // (skipping already-processed sources of either kind), and
 // `mergeSelectedSourceCount` reports the total SOURCE playlist count (group
-// copies + singletons) the unified footer needs. Offline only — no Music,
-// no view code (Task 2 builds the view over these).
+// copies + singletons) the unified footer needs. Offline only — no Music.
+//
+// Task 2 additions (view recomposition over Task 1's rows): the pure
+// `mergeSingletonRowSelection` routing test (a near-match twin row selects
+// its CLUSTER, keeping the inspector's rename hint + Align names… reachable
+// without a standalone NEAR MATCHES row — combines with
+// BrowserMutationStructuralTests' unchanged `.nearMatch` inspector pin to
+// prove the whole path), plus the spec's structural list: unified-list
+// anatomy at 900x620, the footer's enable matrix, and Select all driving
+// both selection sets through the real `SourceSelectionView` composition.
 
+import AppKit
 import Foundation
+import SwiftUI
 import Testing
 import ConsolidatorCore
 @testable import AppleMusicConsolidatorApp
@@ -212,11 +222,203 @@ struct MergeSelectedSourceCountTests {
         model.toggleCheckedFreeFormSingleton(persistentId: "S-SOLO")
         #expect(model.mergeSelectedSourceCount == 3)
 
-        // Distinct from mergeCheckedCount, which counts PICKS (one per
-        // checked row: 1 group + 1 singleton = 2), not source playlists.
-        #expect(model.mergeCheckedCount == 2)
-
         model.clearSelection()
         #expect(model.mergeSelectedSourceCount == 0)
+    }
+}
+
+// MARK: - mergeSingletonRowSelection (pure, display-only; Task 2)
+
+/// The row-tap selection routing a near-match twin's row now uses instead of
+/// a standalone NEAR MATCHES cluster row. `BrowserMutationStructuralTests`
+/// (unchanged) already pins that a `.nearMatch(name)` selection renders the
+/// inspector's rename hint and the Align names… entry point; this suite
+/// pins the OTHER half of that path — that the twin's own row targets
+/// exactly that selection — closing the loop without needing to simulate a
+/// tap on a plain (non-NSButton) SwiftUI row offscreen.
+@Suite("mergeSingletonRowSelection (pure, display-only)")
+struct MergeSingletonRowSelectionTests {
+
+    @Test("a near-match twin's row selects its CLUSTER, not itself")
+    func nearMatchTwinSelectsCluster() throws {
+        let sections = buildPlaylistBrowseSections(from: [
+            rowListing(id: 10, name: "Kdrama", pid: "K-A"),
+            rowListing(id: 20, name: "Kdrama ", pid: "K-B"),
+            rowListing(id: 30, name: "Foxtrot", pid: "F-1"),
+        ])
+        let kdramaA = try #require(sections.singletons.first { $0.persistentId == "K-A" })
+        #expect(
+            mergeSingletonRowSelection(for: kdramaA, nearMatchTwin: "Kdrama ", in: sections)
+                == .nearMatch("Kdrama")
+        )
+        let kdramaB = try #require(sections.singletons.first { $0.persistentId == "K-B" })
+        #expect(
+            mergeSingletonRowSelection(for: kdramaB, nearMatchTwin: "Kdrama", in: sections)
+                == .nearMatch("Kdrama"),
+            "either twin's row resolves to the SAME cluster selection"
+        )
+    }
+
+    @Test("a plain singleton (no twin) selects itself")
+    func plainSingletonSelectsItself() throws {
+        let sections = buildPlaylistBrowseSections(from: [
+            rowListing(id: 30, name: "Foxtrot", pid: "F-1"),
+        ])
+        let foxtrot = try #require(sections.singletons.first { $0.persistentId == "F-1" })
+        #expect(
+            mergeSingletonRowSelection(for: foxtrot, nearMatchTwin: nil, in: sections)
+                == .singleton("F-1")
+        )
+    }
+}
+
+// MARK: - unified list structural pins (Task 2, spec Testing list)
+
+/// One 2-copy group ("Trance 2022") plus TWO singletons ("Alpha", "Beta") —
+/// enough to drive every cell of the footer's enable matrix: a 2-copy group
+/// alone, or two singletons alone, each clear the free-form ">= 2 source
+/// playlists" threshold on their own.
+private func unifiedFooterMatrixListingWire() -> String {
+    plumbingListingWire([
+        plumbingEntry(id: 10, name: "Trance 2022", pid: "T-LOW", count: 3),
+        plumbingEntry(id: 20, name: "Trance 2022", pid: "T-HIGH", count: 4),
+        plumbingEntry(id: 30, name: "Alpha", pid: "FM-A", count: 1),
+        plumbingEntry(id: 40, name: "Beta", pid: "FM-B", count: 1),
+    ])
+}
+
+@MainActor
+private func loadedUnifiedMergeHarness(wire: String = unifiedFooterMatrixListingWire()) async throws -> ModelHarness {
+    let harness = try ModelHarness(
+        runner: ScriptedRunner(outputs: [wire]), mode: .merge, playlistName: ""
+    )
+    harness.model.rescanLibrary()
+    await harness.model.scanTask?.value
+    return harness
+}
+
+@MainActor
+@Suite("Unified merge list — anatomy structural pin (2026-08-11)", .serialized)
+struct UnifiedMergeListAnatomyStructuralTests {
+
+    @Test("at 900x620 the group row's and a singleton row's checkboxes are contained and live")
+    func anatomyAt900x620() async throws {
+        let harness = try await loadedUnifiedMergeHarness(wire: sourceCountListingWire())
+        defer { harness.cleanUp() }
+
+        let fixture = HostedFixture(
+            SourceSelectionView(model: harness.model), width: 900, height: 620
+        )
+        defer { fixture.tearDown() }
+        let windowBox = NSRect(x: 0, y: 0, width: 900, height: 620)
+
+        // One list, one header — no MERGEABLE GROUPS/NEAR MATCHES/SINGLETONS
+        // sections survive.
+        #expect(listHeaderCount(under: fixture.hosting) == 1)
+
+        let groupCheckbox = try #require(
+            view(under: fixture.hosting, axIdentifier: M10ControlID.groupCheckbox("Trance 2022"))
+                as? NSButton
+        )
+        #expect(groupCheckbox.isEnabled)
+        let groupFrame = groupCheckbox.convert(groupCheckbox.bounds, to: fixture.hosting)
+        #expect(windowBox.contains(groupFrame), "group checkbox at \(groupFrame)")
+
+        let singletonCheckbox = try #require(
+            view(under: fixture.hosting, axIdentifier: M10ControlID.singletonCheckbox("S-SOLO"))
+                as? NSButton
+        )
+        #expect(singletonCheckbox.isEnabled)
+        let singletonFrame = singletonCheckbox.convert(singletonCheckbox.bounds, to: fixture.hosting)
+        #expect(windowBox.contains(singletonFrame), "singleton checkbox at \(singletonFrame)")
+    }
+}
+
+@MainActor
+@Suite("Unified merge footer — enable matrix (2026-08-11)", .serialized)
+struct UnifiedMergeFooterEnableMatrixTests {
+
+    private func footerButtons(
+        _ harness: ModelHarness
+    ) throws -> (mergeEachGroup: NSButton, mergeAsOne: NSButton, fixture: HostedFixture<SourceSelectionView>) {
+        let fixture = HostedFixture(
+            SourceSelectionView(model: harness.model), width: 1200, height: 800
+        )
+        let mergeEachGroup = try #require(
+            view(under: fixture.hosting, axIdentifier: M8ControlID.startQueue) as? NSButton
+        )
+        let mergeAsOne = try #require(
+            view(under: fixture.hosting, axIdentifier: M10ControlID.mergeAsOne) as? NSButton
+        )
+        return (mergeEachGroup, mergeAsOne, fixture)
+    }
+
+    @Test("groups-only selection: both actions enabled")
+    func groupsOnly() async throws {
+        let harness = try await loadedUnifiedMergeHarness()
+        defer { harness.cleanUp() }
+        harness.model.toggleCheckedGroup(name: "Trance 2022")
+        let (mergeEachGroup, mergeAsOne, fixture) = try footerButtons(harness)
+        defer { fixture.tearDown() }
+        #expect(mergeEachGroup.isEnabled)
+        #expect(mergeAsOne.isEnabled)
+    }
+
+    @Test("mixed selection (a group plus a singleton): only Merge selected as one enables")
+    func mixed() async throws {
+        let harness = try await loadedUnifiedMergeHarness()
+        defer { harness.cleanUp() }
+        harness.model.toggleCheckedGroup(name: "Trance 2022")
+        harness.model.toggleCheckedFreeFormSingleton(persistentId: "FM-A")
+        let (mergeEachGroup, mergeAsOne, fixture) = try footerButtons(harness)
+        defer { fixture.tearDown() }
+        #expect(!mergeEachGroup.isEnabled, "a checked singleton disables the groups-only action")
+        #expect(mergeAsOne.isEnabled)
+    }
+
+    @Test("singletons-only selection: only Merge selected as one enables")
+    func singletonsOnly() async throws {
+        let harness = try await loadedUnifiedMergeHarness()
+        defer { harness.cleanUp() }
+        harness.model.toggleCheckedFreeFormSingleton(persistentId: "FM-A")
+        harness.model.toggleCheckedFreeFormSingleton(persistentId: "FM-B")
+        let (mergeEachGroup, mergeAsOne, fixture) = try footerButtons(harness)
+        defer { fixture.tearDown() }
+        #expect(!mergeEachGroup.isEnabled, "no group is checked")
+        #expect(mergeAsOne.isEnabled)
+    }
+
+    @Test("empty selection: both actions disabled")
+    func empty() async throws {
+        let harness = try await loadedUnifiedMergeHarness()
+        defer { harness.cleanUp() }
+        let (mergeEachGroup, mergeAsOne, fixture) = try footerButtons(harness)
+        defer { fixture.tearDown() }
+        #expect(!mergeEachGroup.isEnabled)
+        #expect(!mergeAsOne.isEnabled)
+    }
+}
+
+@MainActor
+@Suite("Unified merge list — Select all drives both sets (2026-08-11)", .serialized)
+struct UnifiedMergeSelectAllStructuralTests {
+
+    @Test("Select all checks every eligible group AND every eligible singleton")
+    func selectAllChecksBothSets() async throws {
+        let harness = try await loadedUnifiedMergeHarness()
+        defer { harness.cleanUp() }
+
+        let fixture = HostedFixture(
+            SourceSelectionView(model: harness.model), width: 1200, height: 800
+        )
+        defer { fixture.tearDown() }
+
+        let selectAll = try #require(
+            view(under: fixture.hosting, axIdentifier: WaveAControlID.selectAll) as? NSButton
+        )
+        selectAll.performClick(nil)
+
+        #expect(harness.model.checkedGroupNames == ["Trance 2022"])
+        #expect(harness.model.checkedFreeFormSingletonPersistentIds == Set(["FM-A", "FM-B"]))
     }
 }

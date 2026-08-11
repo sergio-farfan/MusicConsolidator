@@ -263,24 +263,20 @@ enum M11ControlID {
 enum M10ControlID {
     /// A mergeable group row's checkbox, by the group's exact name.
     static func groupCheckbox(_ name: String) -> String { "m10.checkGroup.\(name)" }
-    /// A non-checkable merge-tab row's DISABLED checkbox (near-match
-    /// clusters by normalized name).
-    static func blockedCheckbox(_ key: String) -> String { "m10.checkBlocked.\(key)" }
     /// A merge-tab singleton row's LIVE checkbox (2026-08-06 free-form
     /// design): singletons are no longer permanently blocked on this tab —
     /// checking one contributes it to a free-form merge source list.
     static func singletonCheckbox(_ persistentId: String) -> String {
         "m10.checkSingleton.\(persistentId)"
     }
-    /// The merge-tab footer's free-form action, beside Start Queue
-    /// (2026-08-06 free-form design).
+    /// The merge-tab footer's free-form action, beside "Merge each group
+    /// separately" (2026-08-06 free-form design).
     static let mergeAsOne = "m10.mergeAsOne"
 }
 
 /// Stable accessibility identifiers for the Wave A selection controls. One
-/// id per control: the two hosts (merge MERGEABLE GROUPS header,
-/// consolidate ALL PLAYLISTS header) never render at the same time, like
-/// `m8.startQueue`.
+/// id per control: the two hosts (merge ALL PLAYLISTS header, consolidate
+/// ALL PLAYLISTS header) never render at the same time, like `m8.startQueue`.
 enum WaveAControlID {
     static let selectAll = "wavea.selectAll"
     static let clearChecks = "wavea.clearChecks"
