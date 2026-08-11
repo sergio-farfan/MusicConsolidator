@@ -66,6 +66,45 @@ func requireExactTopLevelKeys(decoder: Decoder, expected: Set<String>, context: 
     }
 }
 
+/// Like `requireExactTopLevelKeys`, but an `optional` subset of keys may be
+/// entirely ABSENT rather than required-present (possibly null). Used for
+/// `MergePlan`'s free-form fields (2026-08-06 free-form design): plan.json
+/// files written before that design has no `source_persistent_ids` /
+/// `target_description` / `source_names` keys at all, and must keep loading
+/// unchanged — `requireExactTopLevelKeys`'s "no missing, no extras" would
+/// reject every one of them. `required` keys must all be present;
+/// `optional` keys may be present (with any legal value, including an
+/// explicit null) or absent; anything outside `required ∪ optional` is
+/// still rejected as unknown, exactly like `requireExactTopLevelKeys`.
+func requireTopLevelKeys(
+    decoder: Decoder,
+    required: Set<String>,
+    optional: Set<String>,
+    context: String
+) throws {
+    let rawContainer = try decoder.container(keyedBy: AnyCodingKey.self)
+    let present = Set(rawContainer.allKeys.map(\.stringValue))
+    let missing = required.subtracting(present).sorted()
+    let unknown = present.subtracting(required.union(optional)).sorted()
+    if !missing.isEmpty {
+        throw DecodingError.keyNotFound(
+            AnyCodingKey(stringValue: missing[0])!,
+            DecodingError.Context(
+                codingPath: rawContainer.codingPath,
+                debugDescription: "\(context) missing field(s): \(missing.joined(separator: ", "))"
+            )
+        )
+    }
+    if !unknown.isEmpty {
+        throw DecodingError.dataCorrupted(
+            DecodingError.Context(
+                codingPath: rawContainer.codingPath,
+                debugDescription: "\(context) has unexpected field(s): \(unknown.joined(separator: ", "))"
+            )
+        )
+    }
+}
+
 /// Immutable snapshot of a single Apple Music track, as produced by the Python
 /// reference's `TrackSnapshot` dataclass (see apple_music_consolidator/models.py).
 public struct TrackSnapshot: Equatable, Hashable, Codable, Sendable {
@@ -411,9 +450,17 @@ public func combineSourceTracks(_ copies: [PlaylistSnapshot]) -> [TrackSnapshot]
     return combined
 }
 
-/// A complete, reviewable same-name playlist merge plan. Mirrors Python's
-/// `MergePlan` dataclass, including the derived helpers over the ordered
-/// copy concatenation.
+/// A complete, reviewable playlist merge plan. Mirrors Python's `MergePlan`
+/// dataclass, including the derived helpers over the ordered copy
+/// concatenation, PLUS the free-form variant (2026-08-06 design amendment,
+/// Swift-native — no Python counterpart): `sourcePersistentIDs`,
+/// `targetDescription`, and `sourceNames` are nil for a same-name plan and
+/// ALL non-nil for a free-form plan (never mixed — enforced in both
+/// `init(from:)` below and `validateMergePlanIntegrity`). For a same-name
+/// plan, `mergedPlaylistSourceName` is the name every copy shares (used to
+/// re-read "every copy of this name"); for a free-form plan it is the
+/// COMPUTED TARGET name (`buildFreeFormMergePlan`'s `targetName`) — copies
+/// carry their own distinct names instead, recorded in `sourceNames`.
 public struct MergePlan: Equatable, Hashable, Codable, Sendable {
     public let mergedPlaylistSourceName: String
     public let copies: [PlaylistSnapshot]
@@ -421,6 +468,16 @@ public struct MergePlan: Equatable, Hashable, Codable, Sendable {
     public let winnerSourceIndexes: [Int]
     public let decisions: [DuplicateDecision]
     public let nonEligibleSourceIndexes: [Int]
+    public let sourcePersistentIDs: [String]?
+    public let targetDescription: String?
+    public let sourceNames: [String]?
+
+    /// True for a free-form plan (copy set pinned by persistent ID, no
+    /// shared name); false for a same-name plan. The three free-form fields
+    /// are all-or-none, so any one of them is representative.
+    public var isFreeForm: Bool {
+        sourcePersistentIDs != nil
+    }
 
     public var combinedTracks: [TrackSnapshot] {
         combineSourceTracks(copies)
@@ -446,7 +503,10 @@ public struct MergePlan: Equatable, Hashable, Codable, Sendable {
         mergeFingerprint: String,
         winnerSourceIndexes: [Int],
         decisions: [DuplicateDecision],
-        nonEligibleSourceIndexes: [Int]
+        nonEligibleSourceIndexes: [Int],
+        sourcePersistentIDs: [String]? = nil,
+        targetDescription: String? = nil,
+        sourceNames: [String]? = nil
     ) {
         self.mergedPlaylistSourceName = mergedPlaylistSourceName
         self.copies = copies
@@ -454,6 +514,9 @@ public struct MergePlan: Equatable, Hashable, Codable, Sendable {
         self.winnerSourceIndexes = winnerSourceIndexes
         self.decisions = decisions
         self.nonEligibleSourceIndexes = nonEligibleSourceIndexes
+        self.sourcePersistentIDs = sourcePersistentIDs
+        self.targetDescription = targetDescription
+        self.sourceNames = sourceNames
     }
 
     enum CodingKeys: String, CodingKey, CaseIterable {
@@ -463,12 +526,31 @@ public struct MergePlan: Equatable, Hashable, Codable, Sendable {
         case winnerSourceIndexes = "winner_source_indexes"
         case decisions
         case nonEligibleSourceIndexes = "non_eligible_source_indexes"
+        case sourcePersistentIDs = "source_persistent_ids"
+        case targetDescription = "target_description"
+        case sourceNames = "source_names"
     }
 
+    /// The 6 fields every merge plan has always had; every plan.json written
+    /// before the 2026-08-06 free-form design has exactly these keys.
+    private static let requiredCodingKeys: Set<String> = Set([
+        CodingKeys.mergedPlaylistSourceName, .copies, .mergeFingerprint,
+        .winnerSourceIndexes, .decisions, .nonEligibleSourceIndexes,
+    ].map(\.stringValue))
+
+    /// The 3 free-form fields: OPTIONALLY absent (never required), so a
+    /// pre-2026-08-06 plan.json keeps decoding unchanged — see
+    /// `requireTopLevelKeys`'s header for why this can't reuse
+    /// `requireExactTopLevelKeys`.
+    private static let optionalCodingKeys: Set<String> = Set([
+        CodingKeys.sourcePersistentIDs, .targetDescription, .sourceNames,
+    ].map(\.stringValue))
+
     public init(from decoder: Decoder) throws {
-        try requireExactTopLevelKeys(
+        try requireTopLevelKeys(
             decoder: decoder,
-            expected: Set(CodingKeys.allCases.map(\.stringValue)),
+            required: Self.requiredCodingKeys,
+            optional: Self.optionalCodingKeys,
             context: "merge plan"
         )
         let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -478,6 +560,33 @@ public struct MergePlan: Equatable, Hashable, Codable, Sendable {
         self.winnerSourceIndexes = try container.decode([Int].self, forKey: .winnerSourceIndexes)
         self.decisions = try container.decode([DuplicateDecision].self, forKey: .decisions)
         self.nonEligibleSourceIndexes = try container.decode([Int].self, forKey: .nonEligibleSourceIndexes)
+        // `decodeIfPresent` treats BOTH an absent key and an explicit JSON
+        // null as nil, which is exactly the "not a free-form plan" signal —
+        // a pre-2026-08-06 plan.json (key absent) and a same-name plan
+        // freshly re-encoded (key omitted, see `encode(to:)` below) decode
+        // identically.
+        self.sourcePersistentIDs = try container.decodeIfPresent([String].self, forKey: .sourcePersistentIDs)
+        self.targetDescription = try container.decodeIfPresent(String.self, forKey: .targetDescription)
+        self.sourceNames = try container.decodeIfPresent([String].self, forKey: .sourceNames)
+
+        // Strict Codable rejects a plan mixing the same-name and free-form
+        // variants: the three free-form fields must be all-nil or all-non-nil,
+        // never a partial set (2026-08-06 free-form design, Engine section).
+        let presence = [
+            self.sourcePersistentIDs != nil,
+            self.targetDescription != nil,
+            self.sourceNames != nil,
+        ]
+        if Set(presence).count != 1 {
+            throw DecodingError.dataCorrupted(
+                DecodingError.Context(
+                    codingPath: container.codingPath,
+                    debugDescription:
+                        "merge plan must set source_persistent_ids, target_description, "
+                        + "and source_names together, or omit all three"
+                )
+            )
+        }
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -488,6 +597,15 @@ public struct MergePlan: Equatable, Hashable, Codable, Sendable {
         try container.encode(winnerSourceIndexes, forKey: .winnerSourceIndexes)
         try container.encode(decisions, forKey: .decisions)
         try container.encode(nonEligibleSourceIndexes, forKey: .nonEligibleSourceIndexes)
+        // `encodeIfPresent` OMITS the key entirely when nil (never writes an
+        // explicit null): a same-name plan's rendered JSON therefore stays
+        // BYTE-IDENTICAL to the pre-2026-08-06 shape — the six keys above,
+        // nothing else — which is what the Python-reference golden-parity
+        // gates (AuditGoldenTests) and every persisted historical plan.json
+        // in reports/ already are.
+        try container.encodeIfPresent(sourcePersistentIDs, forKey: .sourcePersistentIDs)
+        try container.encodeIfPresent(targetDescription, forKey: .targetDescription)
+        try container.encodeIfPresent(sourceNames, forKey: .sourceNames)
     }
 }
 

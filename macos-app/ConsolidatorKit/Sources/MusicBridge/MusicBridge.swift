@@ -312,6 +312,40 @@ public func parseAllCopies(raw: String, name: String) throws -> [PlaylistSnapsho
     return try ordered.map { try parseWirePlaylist($0.playlist) }
 }
 
+/// The PID-set counterpart to `exactPlaylistMatches` (2026-08-06 free-form
+/// design, Swift-native — no Python counterpart): playlists from
+/// `buildReadByPersistentIdsJXA`'s response whose persistent ID
+/// scalar-exact-matches ANY of `persistentIds` — an NFD-drifted or
+/// otherwise canonically-equivalent-but-scalar-different ID is NOT a match,
+/// exactly as `exactPlaylistMatches`' name comparison is scalar-exact.
+func exactPersistentIdMatches(
+    raw: String, persistentIds: [String]
+) throws -> [[String: WireJSON]] {
+    let payload = try requireMapping(loadWireJSON(raw), "Music snapshot")
+    let playlists = try requireList(payload["playlists"], "playlists")
+    return playlists.compactMap { item in
+        guard case .object(let playlist) = item,
+            case .string(let candidate)? = playlist["persistent_id"],
+            persistentIds.contains(where: { scalarEqual($0, candidate) })
+        else {
+            return nil
+        }
+        return playlist
+    }
+}
+
+/// Parse every live playlist matching one of the pinned persistent IDs from
+/// a `buildReadByPersistentIdsJXA` result (2026-08-06 free-form design,
+/// Swift-native — no Python counterpart). Wire order only; the caller
+/// (`ensureFreeFormCopiesMatch`) re-orders to plan order and rejects
+/// missing/duplicate PIDs itself, mirroring `parseAllCopies`'s division of
+/// labor with `ensureAllCopiesMatch`.
+public func parseCopiesByPersistentIds(
+    raw: String, persistentIds: [String]
+) throws -> [PlaylistSnapshot] {
+    try exactPersistentIdMatches(raw: raw, persistentIds: persistentIds).map(parseWirePlaylist)
+}
+
 // MARK: - playlist listing parse (M8; no reference counterpart)
 
 /// Parse the playlist-enumeration wire payload (the static
@@ -652,12 +686,81 @@ public class MusicBridgeSession {
         return try parsePlaylistListing(raw: raw)
     }
 
+    /// Read every live playlist pinned by persistent ID for a free-form
+    /// merge, without changing Music (2026-08-06 free-form design,
+    /// Swift-native — no Python counterpart): the PID-pinned sibling of
+    /// `snapshotAllCopies(name:)`, needed because free-form copies are not
+    /// required to share a name.
+    public func snapshotCopiesByPersistentIds(_ persistentIds: [String]) throws -> [PlaylistSnapshot] {
+        let raw = try runner.run(.readJXA(script: buildReadByPersistentIdsJXA(persistentIds: persistentIds)))
+        return try parseCopiesByPersistentIds(raw: raw, persistentIds: persistentIds)
+    }
+
     /// Reject any drift in the live same-name copy set before a merge write
     /// (music_bridge.py:311-343). Copies are matched by persistent ID only,
     /// scalar-exactly; the returned copies are in plan order.
     public func ensureAllCopiesMatch(plan: MergePlan) throws -> [PlaylistSnapshot] {
+        guard !plan.isFreeForm else {
+            throw MusicBridgeError(
+                "ensureAllCopiesMatch requires a same-name merge plan; use ensureFreeFormCopiesMatch"
+            )
+        }
         applyProgress?(.rereadingSources)
         let live = try snapshotAllCopies(name: plan.mergedPlaylistSourceName)
+        applyProgress?(.revalidating)
+        if live.count != plan.copies.count {
+            throw MusicBridgeError(
+                "live copy count changed after audit: "
+                    + "planned \(plan.copies.count), actual \(live.count); create a fresh audit"
+            )
+        }
+        for (index, copy) in live.enumerated() {
+            if live[..<index].contains(where: { scalarEqual($0.persistentId, copy.persistentId) }) {
+                throw MusicBridgeError("live copies contain a duplicate persistent ID")
+            }
+        }
+
+        var ordered: [PlaylistSnapshot] = []
+        for expected in plan.copies {
+            guard let actual = live.first(
+                where: { scalarEqual($0.persistentId, expected.persistentId) }
+            ) else {
+                throw MusicBridgeError(
+                    "expected copy \(pythonRepr(expected.persistentId)) is absent; "
+                        + "create a fresh audit"
+                )
+            }
+            try validateCloudStatusNames(actual.tracks)
+            let mismatches = sourceMismatches(expected: expected, actual: actual)
+            if let first = mismatches.first {
+                throw MusicBridgeError(
+                    "copy \(pythonRepr(expected.persistentId)) changed after audit: "
+                        + "\(first); create a fresh audit"
+                )
+            }
+            ordered.append(actual)
+        }
+        return ordered
+    }
+
+    /// The PID-pinned sibling of `ensureAllCopiesMatch` for a free-form
+    /// merge (2026-08-06 free-form design, Swift-native — no Python
+    /// counterpart): re-reads each pinned persistent ID's live snapshot
+    /// through `snapshotCopiesByPersistentIds` instead of "every copy of
+    /// this name", and refuses missing/renamed/drifted with the SAME
+    /// full-snapshot comparison (`sourceMismatches`, which already checks
+    /// name first — so a live rename of a pinned copy is caught here with
+    /// no special-casing, exactly like the extra fail-closed surfaces
+    /// `ensureAllCopiesMatch` already covers). The returned copies are in
+    /// plan order.
+    public func ensureFreeFormCopiesMatch(plan: MergePlan) throws -> [PlaylistSnapshot] {
+        guard let expectedPersistentIds = plan.sourcePersistentIDs else {
+            throw MusicBridgeError(
+                "ensureFreeFormCopiesMatch requires a free-form merge plan; use ensureAllCopiesMatch"
+            )
+        }
+        applyProgress?(.rereadingSources)
+        let live = try snapshotCopiesByPersistentIds(expectedPersistentIds)
         applyProgress?(.revalidating)
         if live.count != plan.copies.count {
             throw MusicBridgeError(
@@ -799,6 +902,33 @@ public class MusicBridgeSession {
         )
     }
 
+    /// The free-form sibling of `applyMergePlan` (2026-08-06 free-form
+    /// design, Swift-native — no Python counterpart, no CLI surface): same
+    /// preflight-create-verify shape, PID-pinned revalidation
+    /// (`ensureFreeFormCopiesMatch`) in place of the same-name path's
+    /// "every copy of this name" (`ensureAllCopiesMatch`). Everything after
+    /// revalidation — target-absence check, the guarded writer dispatch,
+    /// failure/verify readback — is the SAME shared merge-apply machinery
+    /// `applyMergePlan` uses; `buildMergeApplyScript` and `verifyMergeOutput`
+    /// branch on the plan's variant internally, so this method does not
+    /// duplicate them.
+    public func applyFreeFormMergePlan(plan: MergePlan, targetName: String) throws -> ApplyResult {
+        let verifiedCopies = try ensureFreeFormCopiesMatch(plan: plan)
+        try assertTargetAbsent(targetName: targetName)
+        do {
+            try runMergeApplyScript(
+                plan: plan, verifiedCopies: verifiedCopies, targetName: targetName
+            )
+        } catch {
+            return try mergeWriterFailureResult(
+                plan: plan, verifiedCopies: verifiedCopies, targetName: targetName, error: error
+            )
+        }
+        return try verifyMergeAfterWrite(
+            plan: plan, verifiedCopies: verifiedCopies, targetName: targetName
+        )
+    }
+
     // MARK: private
 
     /// Compile into a fresh temporary directory and execute the compiled
@@ -914,6 +1044,21 @@ public class MusicBridgeSession {
         )
     }
 
+    /// Re-read the merge's source copies post-write, routed by plan variant
+    /// (2026-08-06 free-form design): a same-name plan's copies share a
+    /// name to re-read "every copy of"; a free-form plan's do not — for
+    /// that variant `plan.mergedPlaylistSourceName` is the TARGET name, not
+    /// a source name, so re-reading by it here would read the wrong thing
+    /// (or the target itself). Shared by `verifyMergeAfterWrite` and
+    /// `mergeWriterFailureResult`, the two callers that used to call
+    /// `snapshotAllCopies(name: plan.mergedPlaylistSourceName)` directly.
+    private func rereadMergeCopies(for plan: MergePlan) throws -> [PlaylistSnapshot] {
+        if let expectedPersistentIds = plan.sourcePersistentIDs {
+            return try snapshotCopiesByPersistentIds(expectedPersistentIds)
+        }
+        return try snapshotAllCopies(name: plan.mergedPlaylistSourceName)
+    }
+
     /// Verify both the unchanged source copies and the exact target readback
     /// (music_bridge.py:527-557).
     private func verifyMergeAfterWrite(
@@ -924,7 +1069,7 @@ public class MusicBridgeSession {
         applyProgress?(.verifyingReadback)
         var mismatches: [String] = []
         do {
-            let postCopies = try snapshotAllCopies(name: plan.mergedPlaylistSourceName)
+            let postCopies = try rereadMergeCopies(for: plan)
             mismatches.append(
                 contentsOf: copiesMismatches(expectedCopies: verifiedCopies, actualCopies: postCopies)
             )
@@ -968,7 +1113,7 @@ public class MusicBridgeSession {
         var mismatches = ["write failed: \(sanitizedException(error))"]
 
         do {
-            let postCopies = try snapshotAllCopies(name: plan.mergedPlaylistSourceName)
+            let postCopies = try rereadMergeCopies(for: plan)
             mismatches.append(
                 contentsOf: copiesMismatches(expectedCopies: verifiedCopies, actualCopies: postCopies)
             )

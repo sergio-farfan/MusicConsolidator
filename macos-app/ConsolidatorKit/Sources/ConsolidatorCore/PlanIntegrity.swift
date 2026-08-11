@@ -215,7 +215,13 @@ public func validatePlanIntegrity(_ plan: ConsolidationPlan) throws {
 }
 
 /// Reject malformed or non-canonical merge state before apply.
-/// Reference: audit.py:471-488 (`validate_merge_plan_integrity`).
+/// Reference: audit.py:471-488 (`validate_merge_plan_integrity`), extended
+/// (2026-08-06 free-form design) to branch on the plan variant: a same-name
+/// plan keeps the reference's "every copy shares this name" check; a
+/// free-form plan instead checks its pinned persistent IDs and source names
+/// against the copies, since free-form copies are not required to share a
+/// name. Both variants share the same trailing fingerprint check and
+/// canonical-recompute-and-diff gate, extended to call the matching builder.
 public func validateMergePlanIntegrity(_ plan: MergePlan) throws {
     if plan.copies.isEmpty {
         throw PlanIntegrityError("merge plan must contain at least one source copy")
@@ -225,20 +231,67 @@ public func validateMergePlanIntegrity(_ plan: MergePlan) throws {
     if Set(persistentIds).count != persistentIds.count {
         throw PlanIntegrityError("merge plan copies must have distinct persistent IDs")
     }
-    for copy in plan.copies {
-        if !scalarEqual(copy.name, plan.mergedPlaylistSourceName) {
+
+    if plan.isFreeForm {
+        // Codable's init(from:) already rejects a partial free-form field
+        // set on load; a plan built in-memory bypasses that decode path, so
+        // re-check the all-or-none invariant here too (fail closed either
+        // way this struct reaches the gate).
+        guard let sourcePersistentIDs = plan.sourcePersistentIDs,
+            let sourceNames = plan.sourceNames,
+            plan.targetDescription != nil
+        else {
             throw PlanIntegrityError(
-                "merge plan copy name does not match the merged source name"
+                "free-form merge plan must set source_persistent_ids, target_description, "
+                    + "and source_names together"
             )
         }
+        if sourcePersistentIDs.count != plan.copies.count
+            || !zip(sourcePersistentIDs, plan.copies).allSatisfy({ scalarEqual($0, $1.persistentId) })
+        {
+            throw PlanIntegrityError(
+                "free-form merge plan source persistent IDs do not match the copies"
+            )
+        }
+        if sourceNames.count != plan.copies.count
+            || !zip(sourceNames, plan.copies).allSatisfy({ scalarEqual($0, $1.name) })
+        {
+            throw PlanIntegrityError(
+                "free-form merge plan source names do not match the copies"
+            )
+        }
+    } else {
+        if plan.targetDescription != nil || plan.sourceNames != nil {
+            throw PlanIntegrityError(
+                "same-name merge plan must not set free-form fields"
+            )
+        }
+        for copy in plan.copies {
+            if !scalarEqual(copy.name, plan.mergedPlaylistSourceName) {
+                throw PlanIntegrityError(
+                    "merge plan copy name does not match the merged source name"
+                )
+            }
+        }
     }
+
     if mergeFingerprint(plan.copies) != plan.mergeFingerprint {
         throw PlanIntegrityError("merge fingerprint does not match the persisted copies")
     }
-    let canonical = try buildMergePlan(
-        name: plan.mergedPlaylistSourceName,
-        copies: plan.copies
-    )
+    let canonical: MergePlan
+    if plan.isFreeForm {
+        canonical = try buildFreeFormMergePlan(
+            copies: plan.copies,
+            targetName: plan.mergedPlaylistSourceName,
+            targetDescription: plan.targetDescription!,
+            sourceNames: plan.sourceNames!
+        )
+    } else {
+        canonical = try buildMergePlan(
+            name: plan.mergedPlaylistSourceName,
+            copies: plan.copies
+        )
+    }
     if !scalarEqual(canonical, plan) {
         throw PlanIntegrityError(
             "merge plan is not the canonical result for the persisted copies; "
