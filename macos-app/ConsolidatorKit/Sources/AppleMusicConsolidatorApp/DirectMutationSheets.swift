@@ -23,7 +23,8 @@
 // so the offscreen structural tests can locate it by accessibility
 // identifier; every multiline SwiftUI Text carries an explicit `lineLimit`
 // and `.fixedSize` is never applied to long text; content is bounded to
-// `maxWidth: 460`.
+// `maxWidth: 460`, except the batch-rename panel's spec-mandated 560 (see
+// `BatchRenamePanel` below).
 
 import AppKit
 import SwiftUI

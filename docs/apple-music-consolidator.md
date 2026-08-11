@@ -199,7 +199,24 @@ with the same folder-cascade line if any selection is a folder — then
 runs the batch: deletes execute sequentially in selection order, each
 success removes the row from the list immediately, and the first failure
 stops the batch, surfaces the verbatim error, and leaves the remaining
-rows untouched. The Library and Cleanup lists still order by clickable
+rows untouched.
+
+Checking N rows and choosing `Rename selected (N)…` opens one sheet titled
+`Rename N playlists` that lists every selected playlist with an editable,
+pre-filled name field per row; a `Find` / `Replace with` / `Apply to all`
+helper runs a literal, case-sensitive replacement over every row's current
+draft (not the original names), so a second use composes on the first. The
+caption reads `Unchanged names are skipped. Duplicates allowed.`; the commit
+button reads `Rename N playlists`, where N counts only drafts that are
+non-empty and differ from their original name, and stays disabled at zero.
+Confirming renames sequentially in selection order, skips any draft that is
+empty or unchanged, patches each row's display name live as its rename
+lands, and stops at the first verbatim script error, leaving the remaining
+rows untouched — the sheet stays up through dispatch, same as every other
+direct-mutation sheet. Like every direct action, batch rename writes no
+`.plan.json` or `.mutationresult.md`.
+
+The Library and Cleanup lists still order by clickable
 Name/Tracks headers — display-only; ordering never feeds a mutation.
 Browser rows (Merge/Consolidate tabs) carry the same Delete and Rename…
 actions. NEAR MATCHES clusters carry "Align names…": the canonical name
