@@ -215,3 +215,48 @@ public func buildMergePlan(name: String, copies: [PlaylistSnapshot]) throws -> M
         nonEligibleSourceIndexes: consolidation.nonEligibleSourceIndexes
     )
 }
+
+/// Build a free-form merge plan: the same dedup engine as `buildMergePlan`
+/// (the UNCHANGED `build_plan` strict key over the caller-ordered copy
+/// concatenation — 2026-08-06 free-form design, "Dedup" bullet), but the
+/// copy set is pinned by explicit persistent ID rather than a shared name,
+/// because free-form copies are not required to share a name.
+///
+/// `copies` must already be in playlist-ID order (the caller's
+/// responsibility, mirrored from `buildMergePlan`'s same contract).
+/// `sourceNames` is a caller-supplied, independently-recorded echo of each
+/// copy's name in that SAME order — trusted call sites derive it directly
+/// from `copies`, but it is validated here against `copies.map(\.name)`
+/// rather than silently re-derived, so a caller bug (wrong order, stale
+/// names) fails closed at plan-build time instead of surfacing later as a
+/// silent provenance/description mismatch.
+public func buildFreeFormMergePlan(
+    copies: [PlaylistSnapshot],
+    targetName: String,
+    targetDescription: String,
+    sourceNames: [String]
+) throws -> MergePlan {
+    guard sourceNames.count == copies.count,
+        zip(sourceNames, copies).allSatisfy({ scalarEqual($0, $1.name) })
+    else {
+        throw ResolverError(
+            "free-form merge source names do not match the supplied copies, in order"
+        )
+    }
+
+    let combined = combineSourceTracks(copies)
+    let consolidation = try buildPlan(
+        PlaylistSnapshot(name: targetName, persistentId: "", tracks: combined)
+    )
+    return MergePlan(
+        mergedPlaylistSourceName: targetName,
+        copies: copies,
+        mergeFingerprint: mergeFingerprint(copies),
+        winnerSourceIndexes: consolidation.winnerSourceIndexes,
+        decisions: consolidation.decisions,
+        nonEligibleSourceIndexes: consolidation.nonEligibleSourceIndexes,
+        sourcePersistentIDs: copies.map(\.persistentId),
+        targetDescription: targetDescription,
+        sourceNames: sourceNames
+    )
+}

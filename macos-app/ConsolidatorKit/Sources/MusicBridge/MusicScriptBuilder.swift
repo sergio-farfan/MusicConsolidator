@@ -160,6 +160,33 @@ let mergeApplyScriptLocals: [String] = [
     "selectedTrack",
 ]
 
+/// Free-form merge writer locals (2026-08-06 free-form design, Swift-native
+/// — no Python counterpart): `mergeApplyScriptLocals` minus
+/// `sourcePlaylistName` (free-form copies do not share one name, so there is
+/// no single name to hold) plus the PID-set-scan lookup's own two locals
+/// (`candidatePersistentID`, `expectedIdCandidate`) and the optional
+/// description readback's (`liveTargetDescription`, declared unconditionally
+/// — an unused `local` is harmless and keeps this list stable regardless of
+/// whether a given plan carries a description).
+let freeFormMergeApplyScriptLocals: [String] = [
+    "targetPlaylistName", "expectedCopyCount",
+    "expectedCopyPersistentIDs", "expectedCopyTrackCounts",
+    "expectedCombinedTrackCount", "expectedCombinedPayload",
+    "expectedFieldDelimiter", "expectedRowDelimiter", "selectedCombinedPositions",
+    "savedTextItemDelimiters", "expectedSourceRows", "expectedSourceFieldsByPosition",
+    "expectedSourceRow", "expectedSourceFields", "errorMessage", "errorNumber",
+    "sourcePlaylists", "candidatePlaylist", "candidatePersistentID", "expectedIdCandidate",
+    "candidateName", "targetPlaylists",
+    "copyIndex", "expectedCopyPersistentID", "expectedCopyTrackCount",
+    "matchedCopy", "candidateCopy", "candidateCopyPID", "copyTracks",
+    "withinPosition", "combinedPosition", "combinedTracks", "sourceIndex",
+    "liveSourceTrack", "expectedDatabaseID", "liveTextValue", "expectedTextValue",
+    "expectedNumberText", "liveDurationSeconds", "expectedNumberValue",
+    "liveNumberValue", "liveCloudStatus", "liveTrackClass", "liveIsFileTrack",
+    "expectedFileTrackText", "destinationPlaylist", "selectedCombinedPosition",
+    "selectedTrack", "liveTargetDescription",
+]
+
 // MARK: - read JXA (music_bridge.py:143-195)
 
 /// Build read-only JXA that serializes every exact-name user playlist.
@@ -254,6 +281,175 @@ public func buildReadJXA(name: String) -> String {
         "",
         "const matches = Music.userPlaylists().filter(function (playlist) {",
         "    return playlist.name() === requestedName;",
+        "});",
+        "",
+        "const playlists = matches.map(function (playlist) {",
+        "    const fileTrackRefs = playlist.fileTracks;",
+        "    const expectedFileTrackCount = fileTrackRefs.length;",
+        "",
+        "    const fileTrackDatabaseIdColumn = fileTrackRefs.databaseID();",
+        "    if (!Array.isArray(fileTrackDatabaseIdColumn)) {",
+        "        throw new Error(\"column type mismatch: file_track_database_id\");",
+        "    }",
+        "    if (fileTrackDatabaseIdColumn.length !== expectedFileTrackCount) {",
+        "        throw new Error(\"column length mismatch: file_track_database_id\");",
+        "    }",
+        "    const fileTrackDatabaseIDs = new Set(fileTrackDatabaseIdColumn);",
+        "",
+        "    const trackRefs = playlist.tracks;",
+        "    const expectedTrackCount = trackRefs.length;",
+        "",
+        "    const databaseIds = trackRefs.databaseID();",
+        "    if (!Array.isArray(databaseIds)) {",
+        "        throw new Error(\"column type mismatch: database_id\");",
+        "    }",
+        "    if (databaseIds.length !== expectedTrackCount) {",
+        "        throw new Error(\"column length mismatch: database_id\");",
+        "    }",
+        "",
+        "    const persistentIds = trackRefs.persistentID();",
+        "    if (!Array.isArray(persistentIds)) {",
+        "        throw new Error(\"column type mismatch: persistent_id\");",
+        "    }",
+        "    if (persistentIds.length !== expectedTrackCount) {",
+        "        throw new Error(\"column length mismatch: persistent_id\");",
+        "    }",
+        "",
+        "    const titles = trackRefs.name();",
+        "    if (!Array.isArray(titles)) {",
+        "        throw new Error(\"column type mismatch: title\");",
+        "    }",
+        "    if (titles.length !== expectedTrackCount) {",
+        "        throw new Error(\"column length mismatch: title\");",
+        "    }",
+        "",
+        "    const artists = trackRefs.artist();",
+        "    if (!Array.isArray(artists)) {",
+        "        throw new Error(\"column type mismatch: artist\");",
+        "    }",
+        "    if (artists.length !== expectedTrackCount) {",
+        "        throw new Error(\"column length mismatch: artist\");",
+        "    }",
+        "",
+        "    const albums = trackRefs.album();",
+        "    if (!Array.isArray(albums)) {",
+        "        throw new Error(\"column type mismatch: album\");",
+        "    }",
+        "    if (albums.length !== expectedTrackCount) {",
+        "        throw new Error(\"column length mismatch: album\");",
+        "    }",
+        "",
+        "    const durations = trackRefs.duration();",
+        "    if (!Array.isArray(durations)) {",
+        "        throw new Error(\"column type mismatch: duration\");",
+        "    }",
+        "    if (durations.length !== expectedTrackCount) {",
+        "        throw new Error(\"column length mismatch: duration\");",
+        "    }",
+        "",
+        "    const kinds = trackRefs.kind();",
+        "    if (!Array.isArray(kinds)) {",
+        "        throw new Error(\"column type mismatch: kind\");",
+        "    }",
+        "    if (kinds.length !== expectedTrackCount) {",
+        "        throw new Error(\"column length mismatch: kind\");",
+        "    }",
+        "",
+        "    const bitRates = trackRefs.bitRate();",
+        "    if (!Array.isArray(bitRates)) {",
+        "        throw new Error(\"column type mismatch: bit_rate\");",
+        "    }",
+        "    if (bitRates.length !== expectedTrackCount) {",
+        "        throw new Error(\"column length mismatch: bit_rate\");",
+        "    }",
+        "",
+        "    const sampleRates = trackRefs.sampleRate();",
+        "    if (!Array.isArray(sampleRates)) {",
+        "        throw new Error(\"column type mismatch: sample_rate\");",
+        "    }",
+        "    if (sampleRates.length !== expectedTrackCount) {",
+        "        throw new Error(\"column length mismatch: sample_rate\");",
+        "    }",
+        "",
+        "    const cloudStatuses = trackRefs.cloudStatus();",
+        "    if (!Array.isArray(cloudStatuses)) {",
+        "        throw new Error(\"column type mismatch: cloud_status\");",
+        "    }",
+        "    if (cloudStatuses.length !== expectedTrackCount) {",
+        "        throw new Error(\"column length mismatch: cloud_status\");",
+        "    }",
+        "",
+        "    const tracks = [];",
+        "    for (let sourceIndex = 0; sourceIndex < expectedTrackCount; sourceIndex++) {",
+        "        const databaseID = databaseIds[sourceIndex];",
+        "        tracks.push({",
+        "            source_index: sourceIndex,",
+        "            database_id: databaseID,",
+        "            persistent_id: textOrEmpty(persistentIds[sourceIndex]),",
+        "            title: textOrEmpty(titles[sourceIndex]),",
+        "            artist: textOrEmpty(artists[sourceIndex]),",
+        "            album: textOrEmpty(albums[sourceIndex]),",
+        "            duration: numberOrNull(durations[sourceIndex]),",
+        "            kind: textOrEmpty(kinds[sourceIndex]),",
+        "            bit_rate: numberOrNull(bitRates[sourceIndex]),",
+        "            sample_rate: numberOrNull(sampleRates[sourceIndex]),",
+        "            cloud_status: textOrEmpty(cloudStatuses[sourceIndex]),",
+        "            is_file_track: fileTrackDatabaseIDs.has(databaseID)",
+        "        });",
+        "    }",
+        "    return {",
+        "        id: playlist.id(),",
+        "        name: playlist.name(),",
+        "        persistent_id: playlist.persistentID(),",
+        "        tracks: tracks",
+        "    };",
+        "});",
+        "",
+        "JSON.stringify({playlists: playlists});",
+        "",
+    ]
+    return lines.joined(separator: "\n")
+}
+
+/// Build read-only JXA that serializes every live user playlist whose
+/// persistent ID is one of `persistentIds` (2026-08-06 free-form design,
+/// Swift-native — no Python counterpart, no same-name analogue: a free-form
+/// copy set is pinned by persistent ID, not a shared name, so
+/// `ensureFreeFormCopiesMatch`'s live re-read needs a filter that does not
+/// depend on the copies still sharing a name — a rename is exactly one of
+/// the drift conditions it must detect, not something it should follow).
+///
+/// Otherwise identical to `buildReadJXA`: same absolute-path targeting, same
+/// columnar per-matched-playlist track-reading body (byte-for-byte copied,
+/// per this file's own established practice for divergent-but-related
+/// readers — see `legacyReadJXAScript`'s header), same wire JSON shape
+/// (`{playlists: [{id, name, persistent_id, tracks: [...]}]}`) — so the
+/// EXISTING wire parser (`parseCopiesByPersistentIds`, itself built on the
+/// same strict decode gate as `parseAllCopies`) consumes its output with no
+/// new wire contract to review. Only the LOOKUP differs: a `Set` of the
+/// requested persistent IDs, tested with JS `===`/`Set.has` (exact code-unit
+/// comparison — no Unicode normalization) instead of one name equality;
+/// like `buildReadJXA`'s own name filter, this is a coarse selection only —
+/// the scalar-exact gate that actually matters is downstream, in
+/// `parseWirePlaylist`'s callers.
+public func buildReadByPersistentIdsJXA(persistentIds: [String]) -> String {
+    let encodedAppPath = appleScriptString(musicAppPath)
+    let encodedIds = "[" + persistentIds.map { appleScriptString($0) }.joined(separator: ", ") + "]"
+    let lines = [
+        "const Music = Application(\(encodedAppPath));",
+        "const requestedPersistentIds = \(encodedIds);",
+        "const requestedPersistentIdSet = new Set(requestedPersistentIds);",
+        "",
+        "function textOrEmpty(value) {",
+        "    return value === null || value === undefined ? \"\" : String(value);",
+        "}",
+        "",
+        "function numberOrNull(value) {",
+        "    return value === null || value === undefined || Number.isNaN(value) ? null : value;",
+        "}",
+        "",
+        "const matches = Music.userPlaylists().filter(function (playlist) {",
+        "    return requestedPersistentIdSet.has(playlist.persistentID());",
         "});",
         "",
         "const playlists = matches.map(function (playlist) {",
@@ -794,6 +990,37 @@ func exactPlaylistLookup(variable: String, requestedName: String) -> [String] {
     ]
 }
 
+/// PID-set membership lookup for the free-form merge writer (2026-08-06
+/// free-form design, Swift-native — no Python counterpart): free-form
+/// copies do not share one name to filter by, so this collects every live
+/// user playlist whose persistent ID scalar-exact-matches ANY entry of
+/// `idsVariable` (an AppleScript list literal already `set` earlier in the
+/// script — `expectedCopyPersistentIDs`). Mirrors `exactPlaylistLookup`'s
+/// shape (one outer scan of `every user playlist`, `my textCodePointsMatch`,
+/// accumulate into `variable`) so the rest of the writer — the
+/// `(count of \(variable)) is not expectedCopyCount` guard and the nested
+/// per-copy PID search that follows — is byte-identical prose to the
+/// same-name path regardless of which lookup populated `variable`. Because
+/// persistent IDs are unique per live playlist, a matched count can never
+/// exceed the number of distinct requested IDs, so the existing
+/// count-equals-expected guard still means exactly what it means for the
+/// same-name path: every pinned copy, and only pinned copies, were found.
+func exactPersistentIdSetLookup(variable: String, idsVariable: String) -> [String] {
+    [
+        "    set \(variable) to {}",
+        "    repeat with candidatePlaylist in every user playlist",
+        "        set candidatePersistentID to persistent ID of candidatePlaylist",
+        "        if candidatePersistentID is missing value then set candidatePersistentID to \"\"",
+        "        repeat with expectedIdCandidate in \(idsVariable)",
+        "            if (my textCodePointsMatch(candidatePersistentID, expectedIdCandidate)) is true then",
+        "                set end of \(variable) to contents of candidatePlaylist",
+        "                exit repeat",
+        "            end if",
+        "        end repeat",
+        "    end repeat",
+    ]
+}
+
 // MARK: - PUA-delimiter payload encoder (music_bridge.py:843-886)
 
 /// Encode every guarded source field into one compiler-friendly literal.
@@ -1118,6 +1345,14 @@ func mergeTrackGuardBlock() -> [String] {
 }
 
 /// Generate an AppleScript that validates every copy before one guarded write.
+///
+/// CRITICAL PIN (2026-08-06 free-form design, Task 1): for a same-name plan
+/// (`plan.isFreeForm == false`) this function's output is byte-identical to
+/// the pre-free-form text — the branch below is the ONLY change, and it is
+/// taken BEFORE any same-name-specific line is emitted. The free-form branch
+/// is delegated to `buildFreeFormMergeApplyScript`, a separate function, so
+/// the same-name body beneath this branch is untouched source text, not
+/// merely equivalent output.
 public func buildMergeApplyScript(
     plan: MergePlan,
     verifiedCopies: [PlaylistSnapshot],
@@ -1127,6 +1362,9 @@ public func buildMergeApplyScript(
     // (music_bridge.py:1198-1200).
     if !scalarEqual(verifiedCopies, plan.copies) {
         throw MusicScriptBuilderError("verified copies do not match the merge plan copies")
+    }
+    if plan.isFreeForm {
+        return try buildFreeFormMergeApplyScript(plan: plan, targetName: targetName)
     }
     let combined = plan.combinedTracks
     let encoded = try encodeExpectedSourcePayload(combined)
@@ -1229,6 +1467,157 @@ public func buildMergeApplyScript(
         "        duplicate selectedTrack to destinationPlaylist",
         "    end repeat",
     ])
+    let success = "{\"status\":\"ok\",\"duplicated_count\":\(plan.winnerSourceIndexes.count)}"
+    lines.append(contentsOf: [
+        "    return \(appleScriptString(success))",
+        "end tell",
+        "",
+    ])
+    return lines.joined(separator: "\n")
+}
+
+// MARK: - free-form merge writer (2026-08-06 free-form design; Swift-native,
+// no Python counterpart)
+
+/// The `buildMergeApplyScript` free-form branch: same N-copy guarded
+/// create-and-duplicate writer, reusing every per-track guard verbatim
+/// (`sourceFieldGuardLines`/`mergeTrackGuardBlock`, `encodeExpectedSourcePayload`,
+/// the compact delimiter-encoded payload — no per-track guard unrolling),
+/// but:
+///   - the initial candidate-playlist scan is `exactPersistentIdSetLookup`
+///     (PID-set membership) instead of `exactPlaylistLookup` (one shared
+///     name) — free-form copies are not required to share a name, so there
+///     is no single name to filter live playlists by. Everything AFTER that
+///     scan — the count-equals-expected guard, the nested per-copy PID
+///     search, the per-track field guard, the target lookup-and-create — is
+///     the same prose as the same-name path, unaffected by which lookup
+///     populated `sourcePlaylists`.
+///   - the target lookup-and-create is unchanged (by name — the target
+///     always has exactly one name, computed by the caller and passed as
+///     `targetName`; free-form-ness is a property of the SOURCES, not the
+///     target).
+///   - when `plan.targetDescription` is non-nil (always true for a
+///     free-form plan; the parameter is still tested independently so a
+///     future same-name-with-description plan would work unmodified), one
+///     additional statement sets `description of destinationPlaylist`
+///     immediately after the duplicate loop, in the SAME compiled
+///     execution, followed by an immediate in-script readback: any mismatch
+///     between what was set and what reads back raises an AppleScript
+///     error, which — like every other in-script guard here — fails the one
+///     compiled execution closed (caught by the caller as a writer failure,
+///     never silently downgraded to success).
+private func buildFreeFormMergeApplyScript(
+    plan: MergePlan,
+    targetName: String
+) throws -> String {
+    let combined = plan.combinedTracks
+    let encoded = try encodeExpectedSourcePayload(combined)
+
+    let targetNameLiteral = appleScriptString(targetName)
+    let copyPidsLiteral =
+        "{" + plan.copies.map { appleScriptString($0.persistentId) }.joined(separator: ", ") + "}"
+    let copyCountsLiteral =
+        "{" + plan.copies.map { String($0.tracks.count) }.joined(separator: ", ") + "}"
+    let selectedPositionsLiteral =
+        "{" + plan.winnerSourceIndexes.map { String($0 + 1) }.joined(separator: ", ") + "}"
+
+    var lines: [String] = []
+    lines.append(contentsOf: textCodePointHandlerLines())
+    lines.append("")
+    lines.append(contentsOf: cloudStatusHandlerLines())
+    lines.append("")
+    lines.append(contentsOf: runtimeLocalDeclarationLines(freeFormMergeApplyScriptLocals))
+    lines.append("")
+    lines.append(contentsOf: [
+        "set targetPlaylistName to \(targetNameLiteral)",
+        "set expectedCopyCount to \(plan.copies.count)",
+        "set expectedCopyPersistentIDs to \(copyPidsLiteral)",
+        "set expectedCopyTrackCounts to \(copyCountsLiteral)",
+        "set expectedCombinedTrackCount to \(plan.combinedTrackCount)",
+        "set expectedCombinedPayload to \(appleScriptString(encoded.payload))",
+        "set expectedFieldDelimiter to \(appleScriptString(encoded.fieldDelimiter))",
+        "set expectedRowDelimiter to \(appleScriptString(encoded.rowDelimiter))",
+        "set selectedCombinedPositions to \(selectedPositionsLiteral)",
+        "",
+        "set savedTextItemDelimiters to AppleScript's text item delimiters",
+        "try",
+        "    if expectedCombinedTrackCount is 0 then",
+        "        set expectedSourceRows to {}",
+        "    else",
+        "        considering case, diacriticals, hyphens, punctuation and white space",
+        "            set AppleScript's text item delimiters to {expectedRowDelimiter}",
+        "            set expectedSourceRows to every text item of expectedCombinedPayload",
+        "        end considering",
+        "    end if",
+        "    if (count of expectedSourceRows) is not expectedCombinedTrackCount then error \"internal expected combined payload row count mismatch\"",
+        "    set expectedSourceFieldsByPosition to {}",
+        "    considering case, diacriticals, hyphens, punctuation and white space",
+        "        set AppleScript's text item delimiters to {expectedFieldDelimiter}",
+        "        repeat with expectedSourceRow in expectedSourceRows",
+        "            set expectedSourceFields to every text item of (expectedSourceRow as text)",
+        "            if (count of expectedSourceFields) is not 11 then error \"internal expected combined payload field count mismatch\"",
+        "            copy expectedSourceFields to end of expectedSourceFieldsByPosition",
+        "        end repeat",
+        "    end considering",
+        "    set AppleScript's text item delimiters to savedTextItemDelimiters",
+        "on error errorMessage number errorNumber",
+        "    set AppleScript's text item delimiters to savedTextItemDelimiters",
+        "    error errorMessage number errorNumber",
+        "end try",
+        "",
+        "tell application \(appleScriptString(musicAppPath))",
+    ])
+    lines.append(contentsOf: exactPersistentIdSetLookup(
+        variable: "sourcePlaylists", idsVariable: "expectedCopyPersistentIDs"
+    ))
+    lines.append(contentsOf: [
+        "    if (count of sourcePlaylists) is not expectedCopyCount then error \"live copy count changed\"",
+        "    set combinedTracks to {}",
+        "    set combinedPosition to 0",
+        "    repeat with copyIndex from 1 to expectedCopyCount",
+        "        set expectedCopyPersistentID to item copyIndex of expectedCopyPersistentIDs",
+        "        set expectedCopyTrackCount to item copyIndex of expectedCopyTrackCounts",
+        "        set matchedCopy to missing value",
+        "        repeat with candidateCopy in sourcePlaylists",
+        "            set candidateCopyPID to persistent ID of candidateCopy",
+        "            if candidateCopyPID is missing value then set candidateCopyPID to \"\"",
+        "            if (my textCodePointsMatch(expectedCopyPersistentID, candidateCopyPID)) is true then",
+        "                set matchedCopy to contents of candidateCopy",
+        "                exit repeat",
+        "            end if",
+        "        end repeat",
+        "        if matchedCopy is missing value then error \"expected copy persistent ID is absent\"",
+        "        set copyTracks to every track of matchedCopy",
+        "        if (count of copyTracks) is not expectedCopyTrackCount then error \"copy track count changed\"",
+        "        repeat with withinPosition from 1 to expectedCopyTrackCount",
+    ])
+    lines.append(contentsOf: mergeTrackGuardBlock())
+    lines.append(contentsOf: [
+        "        end repeat",
+        "    end repeat",
+        "    if (count of combinedTracks) is not expectedCombinedTrackCount then error \"combined track count mismatch\"",
+        "",
+    ])
+    lines.append(contentsOf: exactPlaylistLookup(
+        variable: "targetPlaylists", requestedName: "targetPlaylistName"
+    ))
+    lines.append(contentsOf: [
+        "    if (count of targetPlaylists) is not 0 then error \"target user playlist already exists\"",
+        "    set destinationPlaylist to make new user playlist with properties {name:targetPlaylistName}",
+        "    repeat with selectedCombinedPosition in selectedCombinedPositions",
+        "        set selectedTrack to item (selectedCombinedPosition as integer) of combinedTracks",
+        "        duplicate selectedTrack to destinationPlaylist",
+        "    end repeat",
+    ])
+    if let targetDescription = plan.targetDescription {
+        let descriptionLiteral = appleScriptString(targetDescription)
+        lines.append(contentsOf: [
+            "    set description of destinationPlaylist to \(descriptionLiteral)",
+            "    set liveTargetDescription to description of destinationPlaylist",
+            "    if liveTargetDescription is missing value then set liveTargetDescription to \"\"",
+            "    if (my textCodePointsMatch(\(descriptionLiteral), liveTargetDescription)) is not true then error \"target description readback mismatch\"",
+        ])
+    }
     let success = "{\"status\":\"ok\",\"duplicated_count\":\(plan.winnerSourceIndexes.count)}"
     lines.append(contentsOf: [
         "    return \(appleScriptString(success))",

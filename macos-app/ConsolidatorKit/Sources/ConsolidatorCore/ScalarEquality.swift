@@ -101,6 +101,41 @@ func scalarEqual(_ lhs: ConsolidationPlan, _ rhs: ConsolidationPlan) -> Bool {
         && lhs.nonEligibleSourceIndexes == rhs.nonEligibleSourceIndexes
 }
 
+/// `nil == nil`; otherwise both non-nil and scalar-equal element-wise.
+func scalarEqual(_ lhs: [String]?, _ rhs: [String]?) -> Bool {
+    switch (lhs, rhs) {
+    case (nil, nil):
+        return true
+    case (let lhs?, let rhs?):
+        return lhs.count == rhs.count && zip(lhs, rhs).allSatisfy { scalarEqual($0, $1) }
+    default:
+        return false
+    }
+}
+
+/// `nil == nil`; otherwise both non-nil and scalar-equal.
+func scalarEqual(_ lhs: String?, _ rhs: String?) -> Bool {
+    switch (lhs, rhs) {
+    case (nil, nil):
+        return true
+    case (let lhs?, let rhs?):
+        return scalarEqual(lhs, rhs)
+    default:
+        return false
+    }
+}
+
+/// Extended for the free-form variant (2026-08-06 design amendment): every
+/// fail-closed merge gate (PlanIntegrity.swift's canonical-recompute-and-diff)
+/// reduces to this ONE comparison, so it has to cover the three new fields
+/// for that gate to see them at all. `sourcePersistentIDs`/`sourceNames`
+/// tampering IS caught this way (both are cross-validated against
+/// `plan.copies` before this comparison ever runs — see
+/// `validateMergePlanIntegrity`); `targetDescription` tampering alone is NOT
+/// — it is caller-supplied opaque text with nothing else in the plan to
+/// check it against, so the canonical recompute necessarily echoes back
+/// whatever the persisted plan already says (documented, deliberate
+/// boundary; see FreeFormMergePlanIntegrityTests).
 func scalarEqual(_ lhs: MergePlan, _ rhs: MergePlan) -> Bool {
     scalarEqual(lhs.mergedPlaylistSourceName, rhs.mergedPlaylistSourceName)
         && scalarEqual(lhs.copies, rhs.copies)
@@ -108,4 +143,7 @@ func scalarEqual(_ lhs: MergePlan, _ rhs: MergePlan) -> Bool {
         && lhs.winnerSourceIndexes == rhs.winnerSourceIndexes
         && scalarEqual(lhs.decisions, rhs.decisions)
         && lhs.nonEligibleSourceIndexes == rhs.nonEligibleSourceIndexes
+        && scalarEqual(lhs.sourcePersistentIDs, rhs.sourcePersistentIDs)
+        && scalarEqual(lhs.targetDescription, rhs.targetDescription)
+        && scalarEqual(lhs.sourceNames, rhs.sourceNames)
 }
