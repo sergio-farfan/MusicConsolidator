@@ -754,6 +754,15 @@ public class MusicBridgeSession {
     /// `ensureAllCopiesMatch` already covers). The returned copies are in
     /// plan order.
     public func ensureFreeFormCopiesMatch(plan: MergePlan) throws -> [PlaylistSnapshot] {
+        // 2026-08-06 review finding m1: assert the all-or-none invariant at
+        // this seam explicitly, in the house fail-closed style, rather than
+        // trusting `sourcePersistentIDs` alone and silently force-unwrapping
+        // `targetDescription`/`sourceNames` elsewhere later.
+        guard plan.freeFormFieldsAreConsistent else {
+            throw MusicBridgeError(
+                "merge plan mixes free-form and same-name fields; refusing"
+            )
+        }
         guard let expectedPersistentIds = plan.sourcePersistentIDs else {
             throw MusicBridgeError(
                 "ensureFreeFormCopiesMatch requires a free-form merge plan; use ensureAllCopiesMatch"
@@ -913,6 +922,15 @@ public class MusicBridgeSession {
     /// branch on the plan's variant internally, so this method does not
     /// duplicate them.
     public func applyFreeFormMergePlan(plan: MergePlan, targetName: String) throws -> ApplyResult {
+        // 2026-08-06 review finding m1: assert at THIS seam too, before
+        // delegating — `ensureFreeFormCopiesMatch` re-asserts it on its own,
+        // but a top-level entry point should not rely on a callee's guard
+        // to keep its own contract honest.
+        guard plan.freeFormFieldsAreConsistent else {
+            throw MusicBridgeError(
+                "merge plan mixes free-form and same-name fields; refusing"
+            )
+        }
         let verifiedCopies = try ensureFreeFormCopiesMatch(plan: plan)
         try assertTargetAbsent(targetName: targetName)
         do {

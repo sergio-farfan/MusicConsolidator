@@ -525,3 +525,233 @@ struct ApplyFreeFormMergePlanTests {
         }
     }
 }
+
+// MARK: - differential structural tests (2026-08-06 review finding I3)
+//
+// Controller ruling: a differential test NOW (structural extraction into a
+// shared builder deferred to the cleanup wave). These prove the free-form
+// writer/reader diverge from their same-name/name-based siblings ONLY in
+// the known, reviewed blocks — any FUTURE unreviewed divergence (a stray
+// line changed while editing something else, a forgotten pin update) fails
+// with the exact diverging lines in the message, not a vague "scripts
+// differ" complaint.
+
+@Suite("Free-form vs same-name: differential structural pin (Task 1 hardening, I3)")
+struct DifferentialStructuralPinTests {
+
+    /// One line-diff hunk classified against the known-difference buckets.
+    /// Returns the bucket's label, or nil for an UNRECOGNIZED divergence
+    /// (the caller fails with the hunk's own content in that case).
+    private func classifyWriterHunk(_ hunk: DiffHunk) -> String? {
+        let all = hunk.removed + hunk.added
+
+        if all.allSatisfy({ $0.hasPrefix("local ") }) {
+            return "locals list delta"
+        }
+        if all.allSatisfy({
+            $0.hasPrefix("set sourcePlaylistName to ") || $0.hasPrefix("set targetPlaylistName to ")
+        }) {
+            return "dropped sourcePlaylistName / target-name literal"
+        }
+        if all.allSatisfy({ line in
+            line.contains("expectedCopyNames") || line.contains("expectedCopyName")
+                || line.contains("candidateCopyName") || line.contains("copy name changed")
+        }) {
+            return "per-copy source-name check (review finding m2)"
+        }
+        // The lookup swap: matched EXACTLY against what the two lookup
+        // builders themselves emit (minus the two boilerplate lines and
+        // the trailing "end repeat" shared verbatim by both variants), so
+        // this bucket tracks those builders automatically rather than
+        // hardcoding their text a second time.
+        let sourceLookupInner = Array(
+            exactPlaylistLookup(variable: "sourcePlaylists", requestedName: "sourcePlaylistName")
+                .dropFirst(2).dropLast(1)
+        )
+        let pidLookupInner = Array(
+            exactPersistentIdSetLookup(variable: "sourcePlaylists", idsVariable: "expectedCopyPersistentIDs")
+                .dropFirst(2).dropLast(1)
+        )
+        if hunk.removed == sourceLookupInner && hunk.added == pidLookupInner {
+            return "lookup swap (shared name -> PID-set membership)"
+        }
+        if hunk.removed.isEmpty && hunk.added.allSatisfy({ line in
+            line.contains("destinationPlaylist to") || line.contains("liveTargetDescription")
+                || line.contains("target description readback mismatch")
+        }) {
+            return "description block (present only when the plan carries a description)"
+        }
+        return nil
+    }
+
+    // test_writer_scripts_differ_only_in_known_blocks
+    @Test("free-form writer script differs from the same-name writer script only in known blocks")
+    func writerScriptsDifferOnlyInKnownBlocks() throws {
+        // Parallel fixtures: identical track data on both sides (so payload/
+        // per-track-guard text is byte-identical) — only the STRUCTURAL
+        // shape differs (shared name vs. distinct names + description).
+        let copies = freeFormCopies()
+        let sameNameCopies: [PlaylistSnapshot] = [
+            PlaylistSnapshot(name: "G", persistentId: "PID-A", tracks: copies[0].tracks),
+            PlaylistSnapshot(name: "G", persistentId: "PID-B", tracks: copies[1].tracks),
+        ]
+        let sameNamePlan = try buildMergePlan(name: "G", copies: sameNameCopies)
+        let sameNameScript = try buildMergeApplyScript(
+            plan: sameNamePlan, verifiedCopies: sameNameCopies, targetName: "G — Merged"
+        )
+        let freeForm = try freeFormPlan()
+        let freeFormScript = try buildMergeApplyScript(
+            plan: freeForm, verifiedCopies: copies, targetName: freeFormTargetName
+        )
+
+        let hunkList = hunks(from: lineDiff(
+            sameNameScript.components(separatedBy: "\n"),
+            freeFormScript.components(separatedBy: "\n")
+        ))
+        #expect(!hunkList.isEmpty, "the two scripts must actually differ")
+
+        var seenBuckets: Set<String> = []
+        for hunk in hunkList {
+            guard let bucket = classifyWriterHunk(hunk) else {
+                Issue.record("""
+                unrecognized divergence between the same-name and free-form writer \
+                scripts (not one of the reviewed known blocks) — \
+                removed: \(hunk.removed); added: \(hunk.added)
+                """)
+                continue
+            }
+            seenBuckets.insert(bucket)
+        }
+        // Every expected bucket actually fired at least once — if the
+        // description block (say) silently vanished, this catches THAT
+        // too, not just unexpected additions.
+        #expect(seenBuckets == [
+            "locals list delta",
+            "dropped sourcePlaylistName / target-name literal",
+            "per-copy source-name check (review finding m2)",
+            "lookup swap (shared name -> PID-set membership)",
+            "description block (present only when the plan carries a description)",
+        ])
+    }
+
+    /// One reader-hunk classified against the one known-difference bucket:
+    /// the requestedName/requestedPersistentIds(+Set) lookup-identifier
+    /// swap. (Controller framing: "3 known lines" — the 3 ADDED lines;
+    /// there are also 2 removed lines swapped out, for 2 hunks total. Both
+    /// numbers are asserted below rather than picking just one.)
+    private func classifyReaderHunk(_ hunk: DiffHunk) -> String? {
+        let all = hunk.removed + hunk.added
+        if all.allSatisfy({
+            $0.contains("requestedName") || $0.contains("requestedPersistentIds")
+                || $0.contains("requestedPersistentIdSet")
+        }) {
+            return "lookup identifier swap (name -> PID set)"
+        }
+        return nil
+    }
+
+    // test_readers_differ_only_in_known_lines
+    @Test("free-form reader JXA differs from the name-based reader JXA only in known lines")
+    func readersDifferOnlyInKnownLines() throws {
+        let nameReader = buildReadJXA(name: "any")
+        let pidReader = buildReadByPersistentIdsJXA(persistentIds: ["PID-A", "PID-B"])
+
+        let hunkList = hunks(from: lineDiff(
+            nameReader.components(separatedBy: "\n"),
+            pidReader.components(separatedBy: "\n")
+        ))
+        #expect(!hunkList.isEmpty, "the two readers must actually differ")
+
+        var totalRemoved = 0
+        var totalAdded = 0
+        for hunk in hunkList {
+            guard let bucket = classifyReaderHunk(hunk) else {
+                Issue.record("""
+                unrecognized divergence between the name-based and PID-set read JXA \
+                (not the known lookup-identifier swap) — \
+                removed: \(hunk.removed); added: \(hunk.added)
+                """)
+                continue
+            }
+            #expect(bucket == "lookup identifier swap (name -> PID set)")
+            totalRemoved += hunk.removed.count
+            totalAdded += hunk.added.count
+        }
+        // The exact, reviewed shape: the const declaration swap (1 removed,
+        // 2 added: requestedPersistentIds + requestedPersistentIdSet) plus
+        // the filter's return-statement swap (1 removed, 1 added) — 2
+        // hunks, 2 removed lines, 3 added lines total.
+        #expect(hunkList.count == 2)
+        #expect(totalRemoved == 2)
+        #expect(totalAdded == 3)
+    }
+}
+
+// MARK: - minimal line diff (2026-08-06 review finding I3)
+
+enum DiffOp: Equatable {
+    case same(String)
+    case removed(String)
+    case added(String)
+}
+
+func lineDiff(_ a: [String], _ b: [String]) -> [DiffOp] {
+    let n = a.count, m = b.count
+    var lcs = Array(repeating: Array(repeating: 0, count: m + 1), count: n + 1)
+    for i in stride(from: n - 1, through: 0, by: -1) {
+        for j in stride(from: m - 1, through: 0, by: -1) {
+            if a[i] == b[j] {
+                lcs[i][j] = lcs[i + 1][j + 1] + 1
+            } else {
+                lcs[i][j] = max(lcs[i + 1][j], lcs[i][j + 1])
+            }
+        }
+    }
+    var ops: [DiffOp] = []
+    var i = 0, j = 0
+    while i < n && j < m {
+        if a[i] == b[j] {
+            ops.append(.same(a[i]))
+            i += 1; j += 1
+        } else if lcs[i + 1][j] >= lcs[i][j + 1] {
+            ops.append(.removed(a[i]))
+            i += 1
+        } else {
+            ops.append(.added(b[j]))
+            j += 1
+        }
+    }
+    while i < n { ops.append(.removed(a[i])); i += 1 }
+    while j < m { ops.append(.added(b[j])); j += 1 }
+    return ops
+}
+
+struct DiffHunk {
+    let removed: [String]
+    let added: [String]
+}
+
+func hunks(from ops: [DiffOp]) -> [DiffHunk] {
+    var result: [DiffHunk] = []
+    var removed: [String] = []
+    var added: [String] = []
+    func flush() {
+        if !removed.isEmpty || !added.isEmpty {
+            result.append(DiffHunk(removed: removed, added: added))
+        }
+        removed = []
+        added = []
+    }
+    for op in ops {
+        switch op {
+        case .same:
+            flush()
+        case .removed(let line):
+            removed.append(line)
+        case .added(let line):
+            added.append(line)
+        }
+    }
+    flush()
+    return result
+}

@@ -164,21 +164,23 @@ let mergeApplyScriptLocals: [String] = [
 /// — no Python counterpart): `mergeApplyScriptLocals` minus
 /// `sourcePlaylistName` (free-form copies do not share one name, so there is
 /// no single name to hold) plus the PID-set-scan lookup's own two locals
-/// (`candidatePersistentID`, `expectedIdCandidate`) and the optional
-/// description readback's (`liveTargetDescription`, declared unconditionally
-/// — an unused `local` is harmless and keeps this list stable regardless of
+/// (`candidatePersistentID`, `expectedIdCandidate`), the per-copy source-name
+/// check's three (`expectedCopyNames`, `expectedCopyName`,
+/// `candidateCopyName` — review finding m2), and the optional description
+/// readback's (`liveTargetDescription`, declared unconditionally — an
+/// unused `local` is harmless and keeps this list stable regardless of
 /// whether a given plan carries a description).
 let freeFormMergeApplyScriptLocals: [String] = [
     "targetPlaylistName", "expectedCopyCount",
-    "expectedCopyPersistentIDs", "expectedCopyTrackCounts",
+    "expectedCopyPersistentIDs", "expectedCopyTrackCounts", "expectedCopyNames",
     "expectedCombinedTrackCount", "expectedCombinedPayload",
     "expectedFieldDelimiter", "expectedRowDelimiter", "selectedCombinedPositions",
     "savedTextItemDelimiters", "expectedSourceRows", "expectedSourceFieldsByPosition",
     "expectedSourceRow", "expectedSourceFields", "errorMessage", "errorNumber",
     "sourcePlaylists", "candidatePlaylist", "candidatePersistentID", "expectedIdCandidate",
     "candidateName", "targetPlaylists",
-    "copyIndex", "expectedCopyPersistentID", "expectedCopyTrackCount",
-    "matchedCopy", "candidateCopy", "candidateCopyPID", "copyTracks",
+    "copyIndex", "expectedCopyPersistentID", "expectedCopyTrackCount", "expectedCopyName",
+    "matchedCopy", "candidateCopy", "candidateCopyPID", "candidateCopyName", "copyTracks",
     "withinPosition", "combinedPosition", "combinedTracks", "sourceIndex",
     "liveSourceTrack", "expectedDatabaseID", "liveTextValue", "expectedTextValue",
     "expectedNumberText", "liveDurationSeconds", "expectedNumberValue",
@@ -1358,6 +1360,15 @@ public func buildMergeApplyScript(
     verifiedCopies: [PlaylistSnapshot],
     targetName: String
 ) throws -> String {
+    // 2026-08-06 review finding m1: assert the all-or-none invariant at
+    // this seam too, in the house fail-closed style — a same-name plan
+    // with this check satisfied is trivially unaffected (guard passes
+    // silently), so this cannot perturb the same-name byte-identity pin.
+    guard plan.freeFormFieldsAreConsistent else {
+        throw MusicScriptBuilderError(
+            "merge plan mixes free-form and same-name fields; refusing"
+        )
+    }
     // Fail closed on any mismatch between the plan and the verified copies
     // (music_bridge.py:1198-1200).
     if !scalarEqual(verifiedCopies, plan.copies) {
@@ -1492,6 +1503,15 @@ public func buildMergeApplyScript(
 ///     search, the per-track field guard, the target lookup-and-create — is
 ///     the same prose as the same-name path, unaffected by which lookup
 ///     populated `sourcePlaylists`.
+///   - review finding m2: the same-name path's `exactPlaylistLookup` only
+///     ever admits playlists whose NAME already matched, so its per-copy
+///     match re-checks identity by name for free. The PID-set lookup here
+///     does not check name at all, so once a copy is matched by
+///     persistent ID, one explicit `textCodePointsMatch` against
+///     `plan.sourceNames[copyIndex]` catches a copy renamed between
+///     `ensureFreeFormCopiesMatch`'s preflight and this compiled execution
+///     — the same defense-in-depth relationship every other in-script
+///     guard here already has with its Swift-side preflight counterpart.
 ///   - the target lookup-and-create is unchanged (by name — the target
 ///     always has exactly one name, computed by the caller and passed as
 ///     `targetName`; free-form-ness is a property of the SOURCES, not the
@@ -1518,6 +1538,18 @@ private func buildFreeFormMergeApplyScript(
         "{" + plan.copies.map { appleScriptString($0.persistentId) }.joined(separator: ", ") + "}"
     let copyCountsLiteral =
         "{" + plan.copies.map { String($0.tracks.count) }.joined(separator: ", ") + "}"
+    // 2026-08-06 review finding m2: the same-name writer's per-copy match
+    // implicitly re-checks the NAME too, for free — `exactPlaylistLookup`
+    // only ever populates `sourcePlaylists` with playlists whose name
+    // already matched. This branch's PID-set lookup does not check name at
+    // all, so without an explicit check here a copy renamed between
+    // `ensureFreeFormCopiesMatch`'s preflight and this compiled execution
+    // would go undetected and merge under its old (planned) identity.
+    // `plan.sourceNames` is guaranteed non-nil here: `buildMergeApplyScript`
+    // asserts `freeFormFieldsAreConsistent` before ever branching into this
+    // function (2026-08-06 review finding m1).
+    let copyNamesLiteral =
+        "{" + plan.sourceNames!.map { appleScriptString($0) }.joined(separator: ", ") + "}"
     let selectedPositionsLiteral =
         "{" + plan.winnerSourceIndexes.map { String($0 + 1) }.joined(separator: ", ") + "}"
 
@@ -1533,6 +1565,7 @@ private func buildFreeFormMergeApplyScript(
         "set expectedCopyCount to \(plan.copies.count)",
         "set expectedCopyPersistentIDs to \(copyPidsLiteral)",
         "set expectedCopyTrackCounts to \(copyCountsLiteral)",
+        "set expectedCopyNames to \(copyNamesLiteral)",
         "set expectedCombinedTrackCount to \(plan.combinedTrackCount)",
         "set expectedCombinedPayload to \(appleScriptString(encoded.payload))",
         "set expectedFieldDelimiter to \(appleScriptString(encoded.fieldDelimiter))",
@@ -1577,6 +1610,7 @@ private func buildFreeFormMergeApplyScript(
         "    repeat with copyIndex from 1 to expectedCopyCount",
         "        set expectedCopyPersistentID to item copyIndex of expectedCopyPersistentIDs",
         "        set expectedCopyTrackCount to item copyIndex of expectedCopyTrackCounts",
+        "        set expectedCopyName to item copyIndex of expectedCopyNames",
         "        set matchedCopy to missing value",
         "        repeat with candidateCopy in sourcePlaylists",
         "            set candidateCopyPID to persistent ID of candidateCopy",
@@ -1587,6 +1621,9 @@ private func buildFreeFormMergeApplyScript(
         "            end if",
         "        end repeat",
         "        if matchedCopy is missing value then error \"expected copy persistent ID is absent\"",
+        "        set candidateCopyName to name of matchedCopy",
+        "        if candidateCopyName is missing value then set candidateCopyName to \"\"",
+        "        if (my textCodePointsMatch(expectedCopyName, candidateCopyName)) is not true then error \"copy name changed\"",
         "        set copyTracks to every track of matchedCopy",
         "        if (count of copyTracks) is not expectedCopyTrackCount then error \"copy track count changed\"",
         "        repeat with withinPosition from 1 to expectedCopyTrackCount",
