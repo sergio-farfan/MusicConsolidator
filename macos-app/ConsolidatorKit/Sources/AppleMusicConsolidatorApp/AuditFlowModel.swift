@@ -1306,6 +1306,21 @@ final class AuditFlowModel {
         checkedGroupNames.count + checkedFreeFormSingletonPersistentIds.count
     }
 
+    /// The unified merge list's footer count (2026-08-11 design): total
+    /// SOURCE playlists behind the current selection — every checked
+    /// group's own copy count summed, plus one per checked singleton. This
+    /// is exactly `freeFormMergeSelection.count` (reused rather than
+    /// re-derived: that property already expands checked groups into their
+    /// copies and appends checked singletons). Deliberately DISTINCT from
+    /// `mergeCheckedCount` above, which counts PICKS (one per checked row
+    /// regardless of a group's copy count) for the pre-unification
+    /// "Queued: N playlists" footer; this one feeds the unified list's
+    /// "Selected: N playlists" footer (e.g. a 2-copy group plus one checked
+    /// singleton reads 3, not 2).
+    var mergeSelectedSourceCount: Int {
+        freeFormMergeSelection.count
+    }
+
     // MARK: step navigation (fix round 4, item 3)
 
     /// Step legality — the single source of truth shared by the sidebar
@@ -1584,12 +1599,6 @@ final class AuditFlowModel {
         }
     }
 
-    /// Cmd+A / the section-header "Select all" (spec A4). Merge tab: every
-    /// DISPLAYED mergeable group — near matches and singletons are not
-    /// checkable there. Consolidate tab: every displayed checkable row —
-    /// the singletons, near-match-flagged ones included (they are legal to
-    /// consolidate). Existing checks, including ones hidden by the active
-    /// filter, survive.
     /// True when this source already has its mode target in the loaded
     /// listing (Sergio, 2026-08-06: block selection up front instead of
     /// skipping at the gate). Display-cache check; the engine guard still
@@ -1600,15 +1609,35 @@ final class AuditFlowModel {
         return loaded.listings.contains { scalarExact($0.name, target) }
     }
 
+    /// Cmd+A / the section-header "Select all" (spec A4). Merge tab: every
+    /// DISPLAYED mergeable group AND every displayed singleton (2026-08-11
+    /// unified merge list: singletons became checkable rows there too) —
+    /// near matches are still advisory-only, never independently checkable.
+    /// Consolidate tab: every displayed checkable row — the singletons,
+    /// near-match-flagged ones included (they are legal to consolidate).
+    /// Both tabs skip sources whose mode target already exists
+    /// (`isAlreadyProcessed`). Existing checks, including ones hidden by
+    /// the active filter, survive.
     func selectAllEligible() {
         guard let sections = displayedBrowserSections else { return }
         switch mode {
         case .merge:
-            let additions = sections.groups.map(\.name).filter { name in
+            let groupAdditions = sections.groups.map(\.name).filter { name in
                 !checkedGroupNames.contains { scalarExact($0, name) }
                     && !isAlreadyProcessed(name: name)
             }
-            checkedGroupNames.append(contentsOf: additions)
+            checkedGroupNames.append(contentsOf: groupAdditions)
+            // 2026-08-11 unified merge list: singletons are checkable rows
+            // too now, so select-all must cover them the same way it
+            // covers groups — skipping ones whose merge target already
+            // exists, mirroring the group filter above.
+            let singletonAdditions = sections.singletons
+                .filter {
+                    !checkedFreeFormSingletonPersistentIds.contains($0.persistentId)
+                        && !isAlreadyProcessed(name: $0.name)
+                }
+                .map(\.persistentId)
+            checkedFreeFormSingletonPersistentIds.formUnion(singletonAdditions)
         case .consolidate:
             checkedPersistentIds.formUnion(
                 sections.singletons

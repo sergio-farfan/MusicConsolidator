@@ -423,3 +423,97 @@ nonisolated func applyBrowserSort<T>(
         }.map(\.element)
     }
 }
+
+// MARK: - unified merge list (2026-08-11 design): one alphabetical row per
+// same-name group AND singleton
+
+/// One row of the merge tab's unified ALL PLAYLISTS checklist (2026-08-11
+/// design): a same-name group (>= 2 copies, one row for the whole group) or
+/// a singleton, optionally carrying its near-match twin's display name.
+/// `id` is the group's exact name or the singleton's persistent ID — the
+/// same identities `checkedGroupNames`/`checkedFreeFormSingletonPersistentIds`
+/// already key by.
+nonisolated enum MergeBrowserRow: Identifiable, Equatable, Sendable {
+    case group(PlaylistNameGroup)
+    /// `nearMatchTwin` is the OTHER variant's exact display name when this
+    /// singleton's own name is one of the (>= 2) variants of a
+    /// `sections.nearMatches` cluster; `nil` for a singleton outside every
+    /// cluster.
+    case singleton(PlaylistListing, nearMatchTwin: String?)
+
+    var id: String {
+        switch self {
+        case .group(let group): return group.name
+        case .singleton(let listing, _): return listing.persistentId
+        }
+    }
+}
+
+/// Build the unified merge-tab checklist: every eligible same-name group
+/// (one row per group) interleaved with every singleton, in ONE alphabetical
+/// order, filtered by `needle`, and sortable like every other browser list.
+/// Mirrors `cleanupRows`' shape (pure, display-only, never a guard/plan
+/// input).
+///
+/// `sections.groups`/`sections.singletons` are each already alphabetical on
+/// their own (the Core builder's contract), but `nameOrdered`/
+/// `alphabeticallyOrdered` — the comparator that produced that order — are
+/// `ConsolidatorCore`-internal and not visible here. Rather than
+/// re-implementing that collation, this looks up each row's position in
+/// `sections.allPlaylists`, which the SAME Core builder already sorted with
+/// that exact comparator over every listing (group copies included): a
+/// same-name group's copies are exact-name-identical, so they sort
+/// contiguously there, and the group's first copy (its own input-order-
+/// preserved first element) stands in for the whole row's position.
+nonisolated func mergeRows(
+    sections: PlaylistBrowseSections,
+    needle: String,
+    key: BrowserSortKey,
+    ascending: Bool
+) -> [MergeBrowserRow] {
+    let query = needle.lowercased()
+    func matches(_ name: String) -> Bool {
+        query.isEmpty || name.lowercased().contains(query)
+    }
+
+    let groups = sections.groups.filter { matches($0.name) }
+    let singletons = sections.singletons.filter { matches($0.name) }
+
+    func position(ofPersistentId persistentId: String) -> Int {
+        sections.allPlaylists.firstIndex {
+            scalarExact($0.persistentId, persistentId)
+        } ?? Int.max
+    }
+
+    func nearMatchTwin(for listing: PlaylistListing) -> String? {
+        for cluster in sections.nearMatches {
+            guard cluster.variants.contains(where: { scalarExact($0.name, listing.name) })
+            else { continue }
+            // The first OTHER variant, in the cluster's own (alphabetical)
+            // variant order — deterministic; a cluster with more than two
+            // variants simply keeps the first one that is not this row's
+            // own name (documented simplification, brief 2026-08-11).
+            return cluster.variants.first { !scalarExact($0.name, listing.name) }?.name
+        }
+        return nil
+    }
+
+    var ranked: [(position: Int, row: MergeBrowserRow)] = groups.map { group in
+        (position(ofPersistentId: group.copies[0].persistentId), .group(group))
+    }
+    ranked += singletons.map { listing in
+        (
+            position(ofPersistentId: listing.persistentId),
+            .singleton(listing, nearMatchTwin: nearMatchTwin(for: listing))
+        )
+    }
+    ranked.sort { $0.position < $1.position }
+    let rows = ranked.map(\.row)
+
+    return applyBrowserSort(rows, key: key, ascending: ascending) { row in
+        switch row {
+        case .group(let group): return group.combinedTrackCount
+        case .singleton(let listing, _): return listing.trackCount
+        }
+    }
+}
