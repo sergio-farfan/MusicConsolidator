@@ -191,33 +191,53 @@ let mergeApplyScriptLocals: [String] = [
 /// off the SAME collection reference (`trackRefs`/`fileTrackRefs`), never a
 /// second, freshly re-evaluated specifier, so every column's index lines up
 /// with every other column's index by construction. Total Apple Events per
-/// matched playlist: 13 (1 file-track count + 1 file-track column + 1 track
-/// count + 10 track columns), regardless of track count — versus roughly
-/// 1 + tracks*11 before (1 file-track materializing call plus, per track, 1
-/// materializing `tracks()` call amortized once and 10 per-track property
-/// calls).
+/// MATCHED playlist: 16 — 13 columnar (1 file-track count + 1 file-track
+/// column + 1 track count + 10 track columns) PLUS 3 per-object scalar
+/// property gets in the return block (`playlist.id()`, `playlist.name()`,
+/// `playlist.persistentID()` — one Apple Event each; these are not columnar
+/// because there is exactly one playlist object per matched record) —
+/// regardless of track count, versus roughly 1 + tracks*11 before (1
+/// file-track materializing call plus, per track, 1 materializing
+/// `tracks()` call amortized once and 10 per-track property calls). This
+/// does NOT count the LOOKUP above it: the unchanged
+/// `Music.userPlaylists().filter(...)` calls `.name()` once per playlist in
+/// the WHOLE LIBRARY (not just the matches) to find them — roughly one more
+/// Apple Event per library playlist, paid once regardless of match count;
+/// include it when reasoning about live before/after timing.
 ///
 /// Every column's guard rejects, fail-closed, no retry, no repair, a column
-/// that disagrees with its collection's count-first read, throwing a LITERAL
-/// (not concatenated) message naming that column, e.g.
-/// `column length mismatch: database_id` (a track added or removed mid-scan
-/// skews alignment between the count read and a later column read). The
-/// message is a source-text literal per column, not built via string
-/// concatenation, so it stays byte-pinnable. Records are assembled by index
-/// afterward in a plain in-memory loop that touches no Music object — only
-/// the already-fetched arrays and the file-track ID set — so it sends no
-/// further Apple Events. The JSON shape (keys, key order, per-record and
-/// per-track field order) is byte-identical to the pre-columnar script.
+/// that disagrees with its collection's count-first read. The TYPE check
+/// (`!Array.isArray(...)`) and the LENGTH check (`.length !== expected...`)
+/// are separate `if` statements, each with its own accurate, LITERAL (not
+/// concatenated) message: `column type mismatch: <field>` when the column
+/// itself came back as something other than an array, and
+/// `column length mismatch: <field>` when it IS an array but the wrong
+/// length (e.g. `column length mismatch: database_id` — a track added or
+/// removed mid-scan skews alignment between the count read and a later
+/// column read). Both messages are source-text literals per column, not
+/// built via string concatenation, so they stay byte-pinnable. Records are
+/// assembled by index afterward in a plain in-memory loop that touches no
+/// Music object — only the already-fetched arrays and the file-track ID set
+/// — so it sends no further Apple Events. The JSON shape (keys, key order,
+/// per-record and per-track field order) is byte-identical to the
+/// pre-columnar script.
 ///
 /// DIVERGENCE FROM THE PYTHON REFERENCE (deliberate, expected): unlike every
 /// other builder in this file, `buildReadJXA`'s TEXT no longer matches
 /// `apple_music_consolidator.music_bridge.build_read_jxa` byte-for-byte — the
 /// Python CLI has no columnar mode and does not need one. This is a
 /// Swift/native-app-only performance change; the wire JSON contract (what
-/// `parseExactPlaylistSnapshot`/`parseAllCopies` consume) is unchanged, but
-/// `ScriptGoldenTests.readJXAMatchesGolden`'s read_jxa golden cases pin the
-/// PRE-columnar text and go red by design. See the bulk-read-speedup Task 2
-/// report for the disposition of that gate.
+/// `parseExactPlaylistSnapshot`/`parseAllCopies` consume) is unchanged.
+/// `ScriptGoldenTests`'s `read_jxa` byte-parity cases were REMOVED 2026-08-11
+/// (Sergio's decision, not forced green) rather than edited to tolerate the
+/// divergence — wire-output parity with the reference is instead held by
+/// the shared parse fixtures (`parseExactPlaylistSnapshot`/`parseAllCopies`
+/// against `tests/fixtures/music_snapshot.json` and the MusicBridge
+/// parse/orchestration suites); the writer golden cases (`buildApplyScript`,
+/// `buildMergeApplyScript`) keep full byte parity, untouched. See
+/// `legacyReadJXAScript` immediately below for the retained pre-columnar
+/// text (Task 3 Diagnostics reader cross-check only; nothing routes to it
+/// yet).
 public func buildReadJXA(name: String) -> String {
     let encodedAppPath = appleScriptString(musicAppPath)
     let encodedName = appleScriptString(name)
@@ -242,10 +262,10 @@ public func buildReadJXA(name: String) -> String {
         "    const expectedFileTrackCount = fileTrackRefs.length;",
         "",
         "    const fileTrackDatabaseIdColumn = fileTrackRefs.databaseID();",
-        "    if (",
-        "        !Array.isArray(fileTrackDatabaseIdColumn) ||",
-        "        fileTrackDatabaseIdColumn.length !== expectedFileTrackCount",
-        "    ) {",
+        "    if (!Array.isArray(fileTrackDatabaseIdColumn)) {",
+        "        throw new Error(\"column type mismatch: file_track_database_id\");",
+        "    }",
+        "    if (fileTrackDatabaseIdColumn.length !== expectedFileTrackCount) {",
         "        throw new Error(\"column length mismatch: file_track_database_id\");",
         "    }",
         "    const fileTrackDatabaseIDs = new Set(fileTrackDatabaseIdColumn);",
@@ -254,52 +274,82 @@ public func buildReadJXA(name: String) -> String {
         "    const expectedTrackCount = trackRefs.length;",
         "",
         "    const databaseIds = trackRefs.databaseID();",
-        "    if (!Array.isArray(databaseIds) || databaseIds.length !== expectedTrackCount) {",
+        "    if (!Array.isArray(databaseIds)) {",
+        "        throw new Error(\"column type mismatch: database_id\");",
+        "    }",
+        "    if (databaseIds.length !== expectedTrackCount) {",
         "        throw new Error(\"column length mismatch: database_id\");",
         "    }",
         "",
         "    const persistentIds = trackRefs.persistentID();",
-        "    if (!Array.isArray(persistentIds) || persistentIds.length !== expectedTrackCount) {",
+        "    if (!Array.isArray(persistentIds)) {",
+        "        throw new Error(\"column type mismatch: persistent_id\");",
+        "    }",
+        "    if (persistentIds.length !== expectedTrackCount) {",
         "        throw new Error(\"column length mismatch: persistent_id\");",
         "    }",
         "",
         "    const titles = trackRefs.name();",
-        "    if (!Array.isArray(titles) || titles.length !== expectedTrackCount) {",
+        "    if (!Array.isArray(titles)) {",
+        "        throw new Error(\"column type mismatch: title\");",
+        "    }",
+        "    if (titles.length !== expectedTrackCount) {",
         "        throw new Error(\"column length mismatch: title\");",
         "    }",
         "",
         "    const artists = trackRefs.artist();",
-        "    if (!Array.isArray(artists) || artists.length !== expectedTrackCount) {",
+        "    if (!Array.isArray(artists)) {",
+        "        throw new Error(\"column type mismatch: artist\");",
+        "    }",
+        "    if (artists.length !== expectedTrackCount) {",
         "        throw new Error(\"column length mismatch: artist\");",
         "    }",
         "",
         "    const albums = trackRefs.album();",
-        "    if (!Array.isArray(albums) || albums.length !== expectedTrackCount) {",
+        "    if (!Array.isArray(albums)) {",
+        "        throw new Error(\"column type mismatch: album\");",
+        "    }",
+        "    if (albums.length !== expectedTrackCount) {",
         "        throw new Error(\"column length mismatch: album\");",
         "    }",
         "",
         "    const durations = trackRefs.duration();",
-        "    if (!Array.isArray(durations) || durations.length !== expectedTrackCount) {",
+        "    if (!Array.isArray(durations)) {",
+        "        throw new Error(\"column type mismatch: duration\");",
+        "    }",
+        "    if (durations.length !== expectedTrackCount) {",
         "        throw new Error(\"column length mismatch: duration\");",
         "    }",
         "",
         "    const kinds = trackRefs.kind();",
-        "    if (!Array.isArray(kinds) || kinds.length !== expectedTrackCount) {",
+        "    if (!Array.isArray(kinds)) {",
+        "        throw new Error(\"column type mismatch: kind\");",
+        "    }",
+        "    if (kinds.length !== expectedTrackCount) {",
         "        throw new Error(\"column length mismatch: kind\");",
         "    }",
         "",
         "    const bitRates = trackRefs.bitRate();",
-        "    if (!Array.isArray(bitRates) || bitRates.length !== expectedTrackCount) {",
+        "    if (!Array.isArray(bitRates)) {",
+        "        throw new Error(\"column type mismatch: bit_rate\");",
+        "    }",
+        "    if (bitRates.length !== expectedTrackCount) {",
         "        throw new Error(\"column length mismatch: bit_rate\");",
         "    }",
         "",
         "    const sampleRates = trackRefs.sampleRate();",
-        "    if (!Array.isArray(sampleRates) || sampleRates.length !== expectedTrackCount) {",
+        "    if (!Array.isArray(sampleRates)) {",
+        "        throw new Error(\"column type mismatch: sample_rate\");",
+        "    }",
+        "    if (sampleRates.length !== expectedTrackCount) {",
         "        throw new Error(\"column length mismatch: sample_rate\");",
         "    }",
         "",
         "    const cloudStatuses = trackRefs.cloudStatus();",
-        "    if (!Array.isArray(cloudStatuses) || cloudStatuses.length !== expectedTrackCount) {",
+        "    if (!Array.isArray(cloudStatuses)) {",
+        "        throw new Error(\"column type mismatch: cloud_status\");",
+        "    }",
+        "    if (cloudStatuses.length !== expectedTrackCount) {",
         "        throw new Error(\"column length mismatch: cloud_status\");",
         "    }",
         "",
@@ -321,6 +371,72 @@ public func buildReadJXA(name: String) -> String {
         "            is_file_track: fileTrackDatabaseIDs.has(databaseID)",
         "        });",
         "    }",
+        "    return {",
+        "        id: playlist.id(),",
+        "        name: playlist.name(),",
+        "        persistent_id: playlist.persistentID(),",
+        "        tracks: tracks",
+        "    };",
+        "});",
+        "",
+        "JSON.stringify({playlists: playlists});",
+        "",
+    ]
+    return lines.joined(separator: "\n")
+}
+
+/// The PRE-columnar exact-playlist read JXA (bulk-read-speedup Task 2),
+/// kept ONLY for Task 3's Diagnostics reader cross-check — it will read the
+/// same library with this legacy per-track-loop script and the new columnar
+/// `buildReadJXA(name:)` script back-to-back and diff the parsed results.
+/// Nothing routes to it yet (Task 3 wires it up); this builder exists for
+/// that one release and is removed after the columnar reader has been
+/// validated against it — do not add new callers. Body and output are
+/// byte-identical to the pre-2026-08-11 `buildReadJXA` (pinned verbatim in
+/// `LegacyReadJXABuilderTests`) — this is a pure copy under a new name, not
+/// a behavior change.
+public func legacyReadJXAScript(name: String) -> String {
+    let encodedAppPath = appleScriptString(musicAppPath)
+    let encodedName = appleScriptString(name)
+    let lines = [
+        "const Music = Application(\(encodedAppPath));",
+        "const requestedName = \(encodedName);",
+        "",
+        "function textOrEmpty(value) {",
+        "    return value === null || value === undefined ? \"\" : String(value);",
+        "}",
+        "",
+        "function numberOrNull(value) {",
+        "    return value === null || value === undefined || Number.isNaN(value) ? null : value;",
+        "}",
+        "",
+        "const matches = Music.userPlaylists().filter(function (playlist) {",
+        "    return playlist.name() === requestedName;",
+        "});",
+        "",
+        "const playlists = matches.map(function (playlist) {",
+        "    const fileTrackDatabaseIDs = new Set(",
+        "        playlist.fileTracks().map(function (fileTrack) {",
+        "            return fileTrack.databaseID();",
+        "        })",
+        "    );",
+        "    const tracks = playlist.tracks().map(function (track, sourceIndex) {",
+        "        const databaseID = track.databaseID();",
+        "        return {",
+        "            source_index: sourceIndex,",
+        "            database_id: databaseID,",
+        "            persistent_id: textOrEmpty(track.persistentID()),",
+        "            title: textOrEmpty(track.name()),",
+        "            artist: textOrEmpty(track.artist()),",
+        "            album: textOrEmpty(track.album()),",
+        "            duration: numberOrNull(track.duration()),",
+        "            kind: textOrEmpty(track.kind()),",
+        "            bit_rate: numberOrNull(track.bitRate()),",
+        "            sample_rate: numberOrNull(track.sampleRate()),",
+        "            cloud_status: textOrEmpty(track.cloudStatus()),",
+        "            is_file_track: fileTrackDatabaseIDs.has(databaseID)",
+        "        };",
+        "    });",
         "    return {",
         "        id: playlist.id(),",
         "        name: playlist.name(),",
@@ -396,19 +512,25 @@ public func buildReadJXA(name: String) -> String {
 ///
 /// Every column's guard — including the loop-built `trackCounts` — rejects,
 /// fail-closed, no retry, no repair, a column that disagrees with the
-/// count-first read, throwing a LITERAL (not concatenated) message naming
-/// that column, e.g. `column length mismatch: name` (a playlist created or
-/// deleted mid-scan skews alignment between the count read and a later
-/// column read). The message is a source-text literal per column, not built
-/// via string concatenation, so it stays byte-pinnable. `trackCounts` is
-/// `expectedCount`-long by construction (the loop bound IS `expectedCount`),
-/// so its length check is a symmetry/defense-in-depth guard; its element-type
-/// check (`typeof value === "number"`) is the guard that actually earns its
-/// keep for that column. Records are assembled by index afterward in a plain
-/// in-memory loop that touches no Music object — only the six already-
-/// fetched arrays — so it sends no further Apple Events. The JSON shape
-/// (keys, key order, per-record field order) is byte-identical to the
-/// pre-columnar script.
+/// count-first read. The TYPE check (`!Array.isArray(...)`) and the LENGTH
+/// check (`.length !== expectedCount`) are separate `if` statements, each
+/// with its own accurate, LITERAL (not concatenated) message naming that
+/// column: `column type mismatch: <field>` when the column itself came back
+/// as something other than an array, and `column length mismatch: <field>`
+/// when it IS an array but the wrong length (e.g. `column length mismatch:
+/// name` — a playlist created or deleted mid-scan skews alignment between
+/// the count read and a later column read). Both messages are source-text
+/// literals per column, not built via string concatenation, so they stay
+/// byte-pinnable. `trackCounts` is `expectedCount`-long by construction (the
+/// loop bound IS `expectedCount`), so its length check is a
+/// symmetry/defense-in-depth guard; its element-type check (`typeof value
+/// === "number"`) is the guard that actually earns its keep for that
+/// column, and — being a type concern, not a length one — reports `column
+/// type mismatch: track_count` too. Records are assembled by index
+/// afterward in a plain in-memory loop that touches no Music object — only
+/// the six already-fetched arrays — so it sends no further Apple Events.
+/// The JSON shape (keys, key order, per-record field order) is
+/// byte-identical to the pre-columnar script.
 public func buildListPlaylistsJXA() -> String {
     let lines = [
         "const Music = Application(\"/System/Applications/Music.app\");",
@@ -417,17 +539,26 @@ public func buildListPlaylistsJXA() -> String {
         "const expectedCount = playlistRefs.length;",
         "",
         "const ids = playlistRefs.id();",
-        "if (!Array.isArray(ids) || ids.length !== expectedCount) {",
+        "if (!Array.isArray(ids)) {",
+        "    throw new Error(\"column type mismatch: id\");",
+        "}",
+        "if (ids.length !== expectedCount) {",
         "    throw new Error(\"column length mismatch: id\");",
         "}",
         "",
         "const names = playlistRefs.name();",
-        "if (!Array.isArray(names) || names.length !== expectedCount) {",
+        "if (!Array.isArray(names)) {",
+        "    throw new Error(\"column type mismatch: name\");",
+        "}",
+        "if (names.length !== expectedCount) {",
         "    throw new Error(\"column length mismatch: name\");",
         "}",
         "",
         "const persistentIds = playlistRefs.persistentID();",
-        "if (!Array.isArray(persistentIds) || persistentIds.length !== expectedCount) {",
+        "if (!Array.isArray(persistentIds)) {",
+        "    throw new Error(\"column type mismatch: persistent_id\");",
+        "}",
+        "if (persistentIds.length !== expectedCount) {",
         "    throw new Error(\"column length mismatch: persistent_id\");",
         "}",
         "",
@@ -435,21 +566,29 @@ public func buildListPlaylistsJXA() -> String {
         "for (let index = 0; index < expectedCount; index++) {",
         "    trackCounts.push(playlistRefs[index].tracks.length);",
         "}",
-        "if (",
-        "    !Array.isArray(trackCounts) ||",
-        "    trackCounts.length !== expectedCount ||",
-        "    !trackCounts.every(function (value) { return typeof value === \"number\"; })",
-        ") {",
+        "if (!Array.isArray(trackCounts)) {",
+        "    throw new Error(\"column type mismatch: track_count\");",
+        "}",
+        "if (trackCounts.length !== expectedCount) {",
         "    throw new Error(\"column length mismatch: track_count\");",
+        "}",
+        "if (!trackCounts.every(function (value) { return typeof value === \"number\"; })) {",
+        "    throw new Error(\"column type mismatch: track_count\");",
         "}",
         "",
         "const smartFlags = playlistRefs.smart();",
-        "if (!Array.isArray(smartFlags) || smartFlags.length !== expectedCount) {",
+        "if (!Array.isArray(smartFlags)) {",
+        "    throw new Error(\"column type mismatch: smart\");",
+        "}",
+        "if (smartFlags.length !== expectedCount) {",
         "    throw new Error(\"column length mismatch: smart\");",
         "}",
         "",
         "const specialKinds = playlistRefs.specialKind();",
-        "if (!Array.isArray(specialKinds) || specialKinds.length !== expectedCount) {",
+        "if (!Array.isArray(specialKinds)) {",
+        "    throw new Error(\"column type mismatch: special_kind\");",
+        "}",
+        "if (specialKinds.length !== expectedCount) {",
         "    throw new Error(\"column length mismatch: special_kind\");",
         "}",
         "",

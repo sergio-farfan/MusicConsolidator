@@ -499,43 +499,71 @@ struct ReadJXAPortTests {
         #expect(!probe.contains("playlist.fileTracks()"))
     }
 
-    // bulk-read-speedup Task 2: count-first, narrowest drift window — each
-    // collection's `.length` count read precedes every columnar get taken
-    // off that SAME collection.
+    // bulk-read-speedup Task 2 (I2, review fix): count-first, narrowest
+    // drift window — each collection's `.length` count read precedes EVERY
+    // columnar get taken off that SAME collection, not just the first one.
+    // Mirrors PlaylistListingTests.readsCountFirst's fixed form (String
+    // .range(of:) offsets, looped over every column).
     @Test("counts each collection before fetching any of its columns")
     func countsBeforeColumns() throws {
         let script = buildReadJXA(name: "any")
-        let probe = ByteText(script)
 
-        let trackCount = try #require(probe.offset(of: "trackRefs.length"))
-        let firstTrackColumn = try #require(probe.offset(of: "trackRefs.databaseID()"))
-        #expect(trackCount < firstTrackColumn)
+        guard let fileTrackCountRange = script.range(
+            of: "const expectedFileTrackCount = fileTrackRefs.length;"
+        ) else {
+            Issue.record("file-track count-first read is missing")
+            return
+        }
+        for column in ["fileTrackRefs.databaseID()"] {
+            guard let columnRange = script.range(of: column) else {
+                Issue.record("missing columnar fetch: \(column)")
+                continue
+            }
+            #expect(
+                fileTrackCountRange.upperBound <= columnRange.lowerBound,
+                "\(column) read before the file-track count"
+            )
+        }
 
-        let fileTrackCount = try #require(probe.offset(of: "fileTrackRefs.length"))
-        let fileTrackColumn = try #require(probe.offset(of: "fileTrackRefs.databaseID()"))
-        #expect(fileTrackCount < fileTrackColumn)
+        guard let trackCountRange = script.range(
+            of: "const expectedTrackCount = trackRefs.length;"
+        ) else {
+            Issue.record("track count-first read is missing")
+            return
+        }
+        for column in [
+            "trackRefs.databaseID()", "trackRefs.persistentID()", "trackRefs.name()",
+            "trackRefs.artist()", "trackRefs.album()", "trackRefs.duration()",
+            "trackRefs.kind()", "trackRefs.bitRate()", "trackRefs.sampleRate()",
+            "trackRefs.cloudStatus()",
+        ] {
+            guard let columnRange = script.range(of: column) else {
+                Issue.record("missing columnar fetch: \(column)")
+                continue
+            }
+            #expect(
+                trackCountRange.upperBound <= columnRange.lowerBound,
+                "\(column) read before the track count"
+            )
+        }
     }
 
-    // bulk-read-speedup Task 2: every track/file-track column's alignment
-    // guard names that exact column, fail-closed, in a source-text literal.
-    @Test("guards every track column's length against the count-first read")
+    // bulk-read-speedup Task 2 (M2, review fix): the TYPE branch
+    // (`!Array.isArray(...)`) and the LENGTH branch (`.length !==
+    // expected...`) are separate `if` statements with their own accurate,
+    // verbatim message per column — closes Task 1's deferred minor
+    // ("type-branch guard message says 'length mismatch' inaccurately")
+    // uniformly across both columnar scripts.
+    @Test("guards every track column's type and length against the count-first read")
     func guardsEveryTrackColumnLength() throws {
         let script = buildReadJXA(name: "any")
         let probe = ByteText(script)
-        for message in [
-            "column length mismatch: database_id",
-            "column length mismatch: persistent_id",
-            "column length mismatch: title",
-            "column length mismatch: artist",
-            "column length mismatch: album",
-            "column length mismatch: duration",
-            "column length mismatch: kind",
-            "column length mismatch: bit_rate",
-            "column length mismatch: sample_rate",
-            "column length mismatch: cloud_status",
-            "column length mismatch: file_track_database_id",
+        for field in [
+            "database_id", "persistent_id", "title", "artist", "album", "duration",
+            "kind", "bit_rate", "sample_rate", "cloud_status", "file_track_database_id",
         ] {
-            #expect(probe.contains(message), "\(message)")
+            #expect(probe.contains("column type mismatch: \(field)"), "type: \(field)")
+            #expect(probe.contains("column length mismatch: \(field)"), "length: \(field)")
         }
     }
 
@@ -564,6 +592,102 @@ struct ReadJXAPortTests {
     func emitsNumericPlaylistId() throws {
         let script = buildReadJXA(name: "Trance 2022")
         #expect(ByteText(script).contains("id: playlist.id()"))
+    }
+}
+
+// bulk-read-speedup Task 2 (I3, controller decision): the pre-columnar
+// `buildReadJXA` body, restored under a new name from git history (commit
+// ebd8854, the last commit before the columnar rewrite) — pinned VERBATIM so
+// it cannot drift before Task 3's Diagnostics reader cross-check exists to
+// use it. Nothing routes to `legacyReadJXAScript` yet.
+private let expectedLegacyReadJXA = """
+const Music = Application("/System/Applications/Music.app");
+const requestedName = "any";
+
+function textOrEmpty(value) {
+    return value === null || value === undefined ? "" : String(value);
+}
+
+function numberOrNull(value) {
+    return value === null || value === undefined || Number.isNaN(value) ? null : value;
+}
+
+const matches = Music.userPlaylists().filter(function (playlist) {
+    return playlist.name() === requestedName;
+});
+
+const playlists = matches.map(function (playlist) {
+    const fileTrackDatabaseIDs = new Set(
+        playlist.fileTracks().map(function (fileTrack) {
+            return fileTrack.databaseID();
+        })
+    );
+    const tracks = playlist.tracks().map(function (track, sourceIndex) {
+        const databaseID = track.databaseID();
+        return {
+            source_index: sourceIndex,
+            database_id: databaseID,
+            persistent_id: textOrEmpty(track.persistentID()),
+            title: textOrEmpty(track.name()),
+            artist: textOrEmpty(track.artist()),
+            album: textOrEmpty(track.album()),
+            duration: numberOrNull(track.duration()),
+            kind: textOrEmpty(track.kind()),
+            bit_rate: numberOrNull(track.bitRate()),
+            sample_rate: numberOrNull(track.sampleRate()),
+            cloud_status: textOrEmpty(track.cloudStatus()),
+            is_file_track: fileTrackDatabaseIDs.has(databaseID)
+        };
+    });
+    return {
+        id: playlist.id(),
+        name: playlist.name(),
+        persistent_id: playlist.persistentID(),
+        tracks: tracks
+    };
+});
+
+JSON.stringify({playlists: playlists});
+
+"""
+
+@Suite("Legacy read JXA builder (Task 3 Diagnostics cross-check only)")
+struct LegacyReadJXABuilderTests {
+
+    @Test("legacy script text is the pre-Task-2 pinned constant, byte for byte")
+    func legacyScriptTextIsPinned() {
+        expectByteEqual(
+            legacyReadJXAScript(name: "any"),
+            expectedLegacyReadJXA,
+            context: "legacyReadJXAScript"
+        )
+    }
+
+    @Test("legacy builder is deterministic across calls")
+    func legacyBuilderIsDeterministic() {
+        expectByteEqual(
+            legacyReadJXAScript(name: "any"),
+            legacyReadJXAScript(name: "any"),
+            context: "two calls"
+        )
+    }
+
+    @Test(
+        "legacy read script compiles (osacompile -l JavaScript; never executed)",
+        .enabled(if: appleScriptCompilerAndMusicAvailable)
+    )
+    func legacyStaticScriptCompiles() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("bulk-read-legacy-read-compile-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let output = directory.appendingPathComponent("read-legacy.scpt")
+        let result = try runTool(
+            osacompilePath,
+            arguments: ["-l", "JavaScript", "-o", output.path],
+            stdinText: legacyReadJXAScript(name: "any")
+        )
+        #expect(result.status == 0, "\(result.stderr)")
     }
 }
 
