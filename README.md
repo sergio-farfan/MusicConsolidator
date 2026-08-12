@@ -9,14 +9,9 @@ guarded writer, and proven correct by reading the library back.
 
 ![The Merge tab: one checklist of every playlist — combine any of them, or merge same-name groups as units](docs/images/merge-tab.png)
 
-Two implementations share one behavioral contract:
-
-- **`apple_music_consolidator/`** — the Python reference implementation and
-  CLI (stdlib only). It defines the exact matching, planning, and
-  verification semantics.
-- **`macos-app/`** — the native SwiftUI app (Swift 6, macOS 14+). A faithful
-  port of the reference implementation, pinned to it by golden fixtures and
-  differential tests, talking to Music.app in-process via OSAKit.
+A native SwiftUI app (Swift 6, macOS 14+) talking to Music.app in-process
+via OSAKit, with the engine's matching, planning, and verification
+semantics pinned by golden fixtures and differential tests.
 
 ## Why
 
@@ -108,16 +103,12 @@ app does and survives updates.
 - macOS 14 or later (developed against macOS 26 Tahoe)
 - Xcode command line tools with Swift 6
 - Music.app with an Apple Music library
-- Python 3 for the reference CLI (standard library only)
 
 ## Building
 
 ```bash
-# Full Swift test suite
+# Full test suite (900+ tests, fully offline)
 cd macos-app/ConsolidatorKit && swift test
-
-# Python reference implementation tests
-python3 -m unittest discover -v
 
 # Build, assemble, and sign the app bundle
 bash macos-app/scripts/build-app.sh
@@ -127,35 +118,19 @@ The build script signs the bundle with a stable self-signed certificate so
 the macOS Automation permission survives rebuilds. First launch requires
 granting the app permission to control Music.
 
-## CLI usage (reference implementation)
-
-```bash
-# Read-only audit of one playlist; writes the reviewable plan artifacts
-python3 scripts/apple_music_consolidate.py audit \
-  --playlist "Playlist Name" --output-dir reports
-
-# Apply a reviewed plan (creates the new target; sources untouched)
-python3 scripts/apple_music_consolidate.py apply \
-  --plan reports/<plan-file>.plan.json \
-  --target-name "Playlist Name — Consolidated" --confirm-create
-
-# Same-name merge: merge-audit / merge-apply follow the same pattern
-```
-
 ## Repository layout
 
 ```
-apple_music_consolidator/   Python reference implementation (engine)
-scripts/                    CLI entry point
 macos-app/ConsolidatorKit/  Swift package: core engine, Music bridge, app
-macos-app/golden/           Fixtures exported from the reference implementation
+macos-app/golden/           Golden fixtures pinning the engine's behavior
 macos-app/assets/           App icon generator and assets
 docs/                       Project documentation
 ```
 
 Plan, run-report, and result artifacts (`reports/`), workflow records
-(`docs/superpowers/`), library exports (`Library*.xml`), and analysis
-scratch files are local-only evidence, excluded from the repository.
+(`docs/superpowers/`), library exports (`Library*.xml`), analysis scratch
+files, and the Python development reference are local-only, excluded from
+the repository.
 
 ## Author
 
