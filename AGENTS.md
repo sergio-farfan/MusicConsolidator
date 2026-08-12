@@ -21,6 +21,13 @@ evidence files exceed GitHub's file-size limit and stay local-only via
 `.gitignore` — never remove that exclusion. Commits are authored solely by
 Sergio Farfan; routine work may be committed and pushed, but never force-push
 and never rewrite published history.
+- EXCEPTION, executed once (Sergio, 2026-08-11): an explicitly authorized
+  history rewrite removed the local-only records from all past commits
+  (`reports/`, `docs/superpowers/`, the root analysis CSVs, and two scratch
+  evidence notes) after they were untracked and gitignored. The pre-rewrite
+  history is preserved in
+  `~/Downloads/MusicConsolidator-pre-rewrite-20260811.bundle`. The standing
+  rule above remains in force.
 
 ## Data protection
 
