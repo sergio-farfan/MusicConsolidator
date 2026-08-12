@@ -12,3 +12,11 @@ macos-app/build/
 
 # DMG installers (rebuild via macos-app/scripts/package-dmg.sh)
 macos-app/dist/
+
+# Local-only records and scratch evidence (2026-08-11): plan/run artifacts,
+# workflow ledgers, and analysis exports stay on disk, out of the repo.
+reports/
+docs/superpowers/
+/*.csv
+/current_duplicate_playlists.md
+/soundiiz_merge_audit_musica_xtotal.md
