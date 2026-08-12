@@ -150,8 +150,8 @@ struct HandoffCommandTests {
     func shlexQuoteParity() {
         // Expected values pinned by running python3 shlex.quote (2026-08-01).
         #expect(
-            shlexQuote("/Users/sergio.farfan/projects/git/MusicConsolidator/reports/Trance-2022-20260801-225539-0600.plan.json")
-                == "/Users/sergio.farfan/projects/git/MusicConsolidator/reports/Trance-2022-20260801-225539-0600.plan.json"
+            shlexQuote("/Users/example/reports/Trance-2022-20260801-225539-0600.plan.json")
+                == "/Users/example/reports/Trance-2022-20260801-225539-0600.plan.json"
         )
         #expect(shlexQuote("Trance 2022 \u{2014} Merged") == "'Trance 2022 \u{2014} Merged'")
         #expect(shlexQuote("It's") == "'It'\"'\"'s'")

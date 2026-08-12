@@ -1,0 +1,25 @@
+# ci.yml
+# Apple Music Consolidator
+# Copyright (C) 2026 Sergio Farfan <sergio.farfan@gmail.com>. All rights reserved.
+#
+# Full offline test suite on every push and pull request. The suite never
+# touches a live Music library; the osacompile/live gates are guarded by
+# environment checks and skip themselves on runners.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select latest Xcode
+        run: sudo xcode-select -s "$(ls -d /Applications/Xcode*.app | sort -V | tail -1)/Contents/Developer" && swift --version
+      - name: Run test suite
+        working-directory: macos-app/ConsolidatorKit
+        run: swift test

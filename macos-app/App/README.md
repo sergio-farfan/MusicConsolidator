@@ -31,7 +31,7 @@ Still canonical in this directory:
 Build, assemble, and sign the bundle with:
 
 ```bash
-/Users/sergio.farfan/projects/git/MusicConsolidator/macos-app/scripts/build-app.sh
+<repo>/macos-app/scripts/build-app.sh
 ```
 
 Output: `macos-app/build/AppleMusicConsolidator.app`.

@@ -13,6 +13,26 @@ import ConsolidatorCore
 import MusicBridge
 @testable import AppleMusicConsolidatorApp
 
+@Suite("Default output directory (public-portability fix, 2026-08-12)")
+struct DefaultOutputDirectoryTests {
+    // The default artifact directory must derive from the USER'S home, not
+    // a hardcoded developer path — a stranger building this repo gets a
+    // working default. An explicit Settings value still wins (pinned by the
+    // existing defaults-key tests).
+    @Test("the fallback derives from Application Support")
+    func derivedDefault() {
+        let expected = FileManager.default.urls(
+            for: .applicationSupportDirectory, in: .userDomainMask
+        )[0].appendingPathComponent("AppleMusicConsolidator/reports", isDirectory: true).path
+        #expect(AuditFlowModel.defaultReportsDirectoryPath() == expected)
+        #expect(
+            AuditFlowModel.currentOutputDirectoryPath(defaults: InMemoryDefaults())
+                == expected
+        )
+    }
+}
+
+
 private let m11WindowBox = NSRect(x: 0, y: 0, width: 1280, height: 860)
 
 @MainActor

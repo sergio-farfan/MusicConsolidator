@@ -26,3 +26,8 @@ docs/superpowers/
 apple_music_consolidator/
 scripts/
 tests/
+
+# Operating contract and workflow docs (2026-08-12): local-only.
+/AGENTS.md
+/CLAUDE.md
+docs/apple-music-consolidator.md

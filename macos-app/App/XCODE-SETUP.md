@@ -40,7 +40,7 @@ write or apply path.
    - Testing System: `None`
    - Storage: `None`
 4. **Next** → in the save sheet navigate to
-   `/Users/sergio.farfan/projects/git/MusicConsolidator/macos-app`
+   `<repo>/macos-app`
    and **UNCHECK "Create Git repository on my Mac"** → **Create**.
 
 Xcode creates `macos-app/AppleMusicConsolidator/` containing
@@ -144,7 +144,7 @@ Without this key macOS kills the Apple-event send instead of prompting.
 
 1. **File > Add Package Dependencies…** → click **Add Local…**
    (bottom-left) → navigate to
-   `/Users/sergio.farfan/projects/git/MusicConsolidator/macos-app/ConsolidatorKit`
+   `<repo>/macos-app/ConsolidatorKit`
    (the folder that directly contains `Package.swift`) → **Add Package**.
 2. In the "Choose Package Products" sheet, set BOTH products to the app
    target:
@@ -214,7 +214,7 @@ Run in your normal Terminal (project root; read-only against Music — it
 writes only new report artifacts):
 
 ```bash
-cd /Users/sergio.farfan/projects/git/MusicConsolidator
+cd <repo>
 python3 scripts/apple_music_consolidate.py merge-audit --name 'Trance 2022' --output-dir reports
 ```
 
@@ -222,7 +222,7 @@ Then compare the freshly created `.plan.json` against the app's display
 (plan `copies` are in the same ascending playlist-id order as the app):
 
 ```bash
-cd /Users/sergio.farfan/projects/git/MusicConsolidator
+cd <repo>
 python3 - reports/<the-new-file>.plan.json <<'EOF'
 import json, sys
 with open(sys.argv[1], encoding="utf-8") as handle:
@@ -268,7 +268,7 @@ text.
    not across relaunches):
 
    ```bash
-   cd /Users/sergio.farfan/projects/git/MusicConsolidator
+   cd <repo>
    python3 -c "from apple_music_consolidator.music_bridge import build_read_jxa; import sys; sys.stdout.write(build_read_jxa('Trance 2022'))" > /tmp/trance-read.jxa
    osascript -l JavaScript /tmp/trance-read.jxa > /tmp/trance-osascript-raw.json
    ```

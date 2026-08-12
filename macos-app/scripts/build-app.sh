@@ -15,7 +15,7 @@
 #
 # This script NEVER launches the app and sends no Apple events.
 # Launch is a manual step for Sergio in the GUI session:
-#     open /Users/sergio.farfan/projects/git/MusicConsolidator/macos-app/build/AppleMusicConsolidator.app
+#     open <repo>/macos-app/build/AppleMusicConsolidator.app
 
 set -euo pipefail
 

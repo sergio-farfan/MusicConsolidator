@@ -1014,7 +1014,7 @@ final class AuditFlowModel {
     init(
         makeRunner: @escaping @Sendable () -> any ScriptRunner = { OSAKitRunner() },
         defaults: UserDefaults = .standard,
-        defaultOutputDirectoryPath: String = "/Users/sergio.farfan/projects/git/MusicConsolidator/reports",
+        defaultOutputDirectoryPath: String = AuditFlowModel.defaultReportsDirectoryPath(),
         cacheDirectoryPath: String = defaultListingCacheDirectoryPath(),
         appSessionID: String = UUID().uuidString,
         now: @escaping @Sendable () -> Date = { Date() },
@@ -1458,7 +1458,19 @@ final class AuditFlowModel {
         defaults: UserDefaults = .standard
     ) -> String {
         defaults.string(forKey: outputDirectoryDefaultsKey)
-            ?? "/Users/sergio.farfan/projects/git/MusicConsolidator/reports"
+            ?? defaultReportsDirectoryPath()
+    }
+
+    /// The fallback artifact directory: derived from the user's home
+    /// (public-portability fix, 2026-08-12 — the previous hardcoded
+    /// developer path broke the default for anyone else building the app).
+    /// An explicit Settings value always wins over this.
+    nonisolated static func defaultReportsDirectoryPath() -> String {
+        FileManager.default.urls(
+            for: .applicationSupportDirectory, in: .userDomainMask
+        )[0].appendingPathComponent(
+            "AppleMusicConsolidator/reports", isDirectory: true
+        ).path
     }
 
     /// The single mutating entry point for mode changes (fix round 1,

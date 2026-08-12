@@ -1,5 +1,7 @@
 # MusicConsolidator
 
+[![CI](https://github.com/sergio-farfan/MusicConsolidator/actions/workflows/ci.yml/badge.svg)](https://github.com/sergio-farfan/MusicConsolidator/actions/workflows/ci.yml)
+
 A macOS tool that cleans up an Apple Music library that has accumulated
 duplicate playlists and duplicate tracks — safely. It merges same-name
 playlist copies, consolidates duplicate tracks inside a single playlist, and
@@ -48,10 +50,6 @@ the library as a small, reviewable, verifiable transaction.
   state: refused before write, writer failed, unverifiable, source drifted
   after a verified write, or target mismatch — plus a guarded shortcut to
   remove any leftover it created.
-- **Everything leaves a record** — plans (`.plan.json`, `.detail.csv`,
-  `.summary.md`), run reports, and mutation results are written to
-  `reports/` and never overwritten; the artifacts are the durable history
-  of every change ever made.
 
 ## The safety model
 
@@ -126,6 +124,10 @@ macos-app/golden/           Golden fixtures pinning the engine's behavior
 macos-app/assets/           App icon generator and assets
 docs/                       Project documentation
 ```
+
+## License
+
+MIT — see [LICENSE](LICENSE).
 
 ## Author
 
