@@ -23,9 +23,11 @@ docs/superpowers/
 
 # Python development reference (2026-08-11): engine reference, CLI, and its
 # suite stay local-only; the Swift app is the repository's implementation.
-apple_music_consolidator/
-scripts/
-tests/
+# Root-anchored (2026-08-12): an unanchored "scripts/" also swallowed
+# macos-app/scripts/, silently ignoring new files there.
+/apple_music_consolidator/
+/scripts/
+/tests/
 
 # Operating contract and workflow docs (2026-08-12): local-only.
 /AGENTS.md
