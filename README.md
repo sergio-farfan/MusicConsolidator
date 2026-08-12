@@ -127,11 +127,6 @@ macos-app/assets/           App icon generator and assets
 docs/                       Project documentation
 ```
 
-Plan, run-report, and result artifacts (`reports/`), workflow records
-(`docs/superpowers/`), library exports (`Library*.xml`), analysis scratch
-files, and the Python development reference are local-only, excluded from
-the repository.
-
 ## Author
 
 Sergio Farfan
