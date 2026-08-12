@@ -26,8 +26,12 @@ and never rewrite published history.
   (`reports/`, `docs/superpowers/`, the root analysis CSVs, and two scratch
   evidence notes) after they were untracked and gitignored. The pre-rewrite
   history is preserved in
-  `~/Downloads/MusicConsolidator-pre-rewrite-20260811.bundle`. The standing
-  rule above remains in force.
+  `~/Downloads/MusicConsolidator-pre-rewrite-20260811.bundle`. A second
+  authorized rewrite the same day removed the Python development reference
+  (`apple_music_consolidator/`, `scripts/`, `tests/`) from history after
+  untracking it (backup:
+  `~/Downloads/MusicConsolidator-pre-rewrite2-20260811.bundle`). The
+  standing rule above remains in force.
 
 ## Data protection
 
