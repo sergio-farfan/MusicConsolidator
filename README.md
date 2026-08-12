@@ -7,6 +7,8 @@ retires leftovers through guarded, individually verified operations. Every
 write is planned first, reviewed as an on-disk artifact, executed through a
 guarded writer, and proven correct by reading the library back.
 
+![The Merge tab: one checklist of every playlist — combine any of them, or merge same-name groups as units](docs/images/merge-tab.png)
+
 Two implementations share one behavioral contract:
 
 - **`apple_music_consolidator/`** — the Python reference implementation and
@@ -27,10 +29,12 @@ the library as a small, reviewable, verifiable transaction.
 
 ## Features
 
-- **Merge** — combines same-name playlist copies into one new
-  `<Name> — Merged` playlist, deduplicating across copies with a strict
-  duplicate key (normalized title + normalized artist + exact rounded
-  duration) and a deterministic winner preference. Source playlists are
+- **Merge** — combines playlists into one new `<Name> — Merged` playlist,
+  deduplicating across copies with a strict duplicate key (normalized
+  title + normalized artist + exact rounded duration) and a deterministic
+  winner preference. Merge same-name copies as a unit, or select any mix
+  of playlists and merge them as one; the created playlist's description
+  records when it was merged and from which sources. Source playlists are
   never modified.
 - **Consolidate** — deduplicates tracks inside a single playlist into a new
   `<Name> — Consolidated` playlist, same strict key, with every omission
@@ -39,14 +43,12 @@ the library as a small, reviewable, verifiable transaction.
   process them unattended; every item still gets its own fresh library
   read, plan, guarded write, and readback verification, and the run always
   ends in a persisted report listing every judgment call made.
-- **Guarded delete and rename** — playlist deletion and renaming as
-  first-class, individually gated operations: persistent-ID-pinned,
-  session-bound single-use plan artifacts, SHA-256 rechecked before
-  dispatch, typed-confirmation gates, and a full-library bijective readback
-  proving exactly the approved change happened and nothing else.
-- **Post-merge cleanup** — discovers completed merges from their plan
-  evidence and retires the now-redundant source copies, one guarded
-  execution per copy with verification between copies.
+- **Cleanup** — delete or rename any playlist directly behind a single
+  confirmation, one persistent-ID-pinned compiled execution per action.
+  Select many at once for batch deletion, or batch-rename them with
+  per-row editable names and a find/replace fill helper (e.g. strip
+  " — Merged" from a whole page of playlists in one pass). Deleting a
+  playlist never removes songs from the library.
 - **Failure taxonomy** — a failed operation reports its exact library
   state: refused before write, writer failed, unverifiable, source drifted
   after a verified write, or target mismatch — plus a guarded shortcut to
@@ -86,10 +88,20 @@ for attended flows, run reports), **Reports** (the artifact history), and
 itself the Apple-events sender, which is what allows unattended batch runs
 that a terminal-driven script cannot do.
 
-The test suite (700+ tests) runs fully offline against scripted fakes —
+The test suite (900+ tests) runs fully offline against scripted fakes —
 tests never touch a live library. UI structure is enforced by offscreen
 rendering tests with geometric containment assertions at multiple window
 sizes.
+
+## Installation
+
+Download the latest installer from the
+[Releases page](https://github.com/sergio-farfan/MusicConsolidator/releases/latest)
+(`AppleMusicConsolidator-<version>.dmg`, SHA-256 checksum alongside), open
+it, and drag the app to Applications. The app is signed with a personal
+certificate, so the first launch needs right-click → Open; it will then ask
+for permission to control Music — that grant is required for everything the
+app does and survives updates.
 
 ## Requirements
 
