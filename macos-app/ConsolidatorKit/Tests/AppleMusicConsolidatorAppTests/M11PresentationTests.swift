@@ -37,7 +37,18 @@ private func summaries(forRealPlan basename: String) throws -> JudgmentSummaries
     )
 }
 
-@Suite("M11 — judgment summaries against the real plans")
+
+/// The ground-truth suites read REAL plan artifacts from the local-only
+/// reports/ directory (2026-08-12): they run on the development machine
+/// where the artifacts live and skip on clean checkouts (CI) — the same
+/// availability-gate idiom as the osacompile suites.
+private var realPlansAvailable: Bool {
+    FileManager.default.fileExists(atPath: reportsURL(
+        "Trance-2022-20260801-225539-0600.plan.json"
+    ).path)
+}
+
+@Suite("M11 — judgment summaries against the real plans", .enabled(if: realPlansAvailable))
 struct JudgmentSummaryGroundTruthTests {
 
     @Test("Trance 2022: exactly the Gamemaster kept-pair, no distinct omissions")

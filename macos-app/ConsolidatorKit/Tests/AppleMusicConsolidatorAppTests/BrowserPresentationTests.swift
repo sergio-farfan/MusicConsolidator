@@ -209,7 +209,15 @@ private func reportsURL(_ basename: String) -> URL {
         .appendingPathComponent(basename)
 }
 
-@Suite("Near-identical winner pairs — real plan fixtures")
+/// Real-plan artifacts live in the local-only reports/ directory
+/// (2026-08-12): run where they exist, skip on clean checkouts (CI).
+private var realPlanFixturesAvailable: Bool {
+    FileManager.default.fileExists(atPath: reportsURL(
+        "Trance-2022-20260801-225539-0600.plan.json"
+    ).path)
+}
+
+@Suite("Near-identical winner pairs — real plan fixtures", .enabled(if: realPlanFixturesAvailable))
 struct RealPlanNearIdenticalTests {
 
     private func pairs(for basename: String) throws -> [NearIdenticalWinnerPair] {

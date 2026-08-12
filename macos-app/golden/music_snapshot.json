@@ -1,0 +1,38 @@
+{
+  "playlists": [
+    {
+      "name": "#Musica xTotal",
+      "persistent_id": "PLAYLIST-123",
+      "tracks": [
+        {
+          "source_index": 0,
+          "database_id": 101,
+          "persistent_id": "TRACK-A",
+          "title": "Rock—Song",
+          "artist": "Björk",
+          "album": "Album One",
+          "duration": 183.456,
+          "kind": "Apple Music AAC audio file",
+          "bit_rate": 256,
+          "sample_rate": 44100,
+          "cloud_status": "matched",
+          "is_file_track": false
+        },
+        {
+          "source_index": 1,
+          "database_id": 202,
+          "persistent_id": "TRACK-B",
+          "title": "Local Song",
+          "artist": "Artist",
+          "album": "",
+          "duration": null,
+          "kind": "MPEG audio file",
+          "bit_rate": null,
+          "sample_rate": null,
+          "cloud_status": "",
+          "is_file_track": true
+        }
+      ]
+    }
+  ]
+}

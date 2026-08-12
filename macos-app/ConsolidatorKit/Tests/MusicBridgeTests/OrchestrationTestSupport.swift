@@ -77,18 +77,11 @@ func orchestrationSourceSnapshot() -> PlaylistSnapshot {
     )
 }
 
-/// The reference's read fixture tests/fixtures/music_snapshot.json, read-only.
+/// The synthetic read fixture, read-only. Vendored into macos-app/golden/
+/// (2026-08-12) so a clean checkout builds without the local-only Python
+/// reference tree it originally lived in.
 func musicSnapshotFixtureText() throws -> String {
-    let url = URL(fileURLWithPath: #filePath)
-        .deletingLastPathComponent()
-        .deletingLastPathComponent()
-        .deletingLastPathComponent()
-        .deletingLastPathComponent()
-        .deletingLastPathComponent()
-        .appendingPathComponent("tests")
-        .appendingPathComponent("fixtures")
-        .appendingPathComponent("music_snapshot.json")
-    return try String(contentsOf: url, encoding: .utf8)
+    try String(contentsOf: goldenFileURL("music_snapshot.json"), encoding: .utf8)
 }
 
 /// NFC/NFD pin fixtures, built from explicit escapes so no editor or tool can
