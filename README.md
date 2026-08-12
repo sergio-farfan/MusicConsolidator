@@ -150,12 +150,12 @@ scripts/                    CLI entry point
 macos-app/ConsolidatorKit/  Swift package: core engine, Music bridge, app
 macos-app/golden/           Fixtures exported from the reference implementation
 macos-app/assets/           App icon generator and assets
-reports/                    Plan, run-report, and result artifacts (the record)
-docs/                       Design specs, implementation plans, workflow docs
+docs/                       Project documentation
 ```
 
-`Library*.xml` library exports are local-only evidence and are excluded
-from the repository.
+Plan, run-report, and result artifacts (`reports/`), workflow records
+(`docs/superpowers/`), library exports (`Library*.xml`), and analysis
+scratch files are local-only evidence, excluded from the repository.
 
 ## Author
 
